@@ -5,8 +5,8 @@ from unittest.mock import Mock
 import pytest
 
 from backend.services.processing import preprocessing as p
-from backend.services.reporting.errors import QuantroError, Stage
-from backend.services.reporting.types import MediaFeatures
+from backend.services.shared.errors import QuantroError, Stage
+from backend.services.shared.types import MediaFeatures
 from backend.services.specialist.alignment import verify_and_align
 
 

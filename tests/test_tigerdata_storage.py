@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import pytest
 
-from backend.services.external_apis.post_contract import Post
+from backend.services.shared.types import Post
 from backend.services.external_apis.tigerdata_storage import (
     StorageError,
     TigerDataPostStore,

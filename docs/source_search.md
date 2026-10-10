@@ -113,6 +113,5 @@ Private settings are in ignored root `.env.local`. Windows certificate trust was
 configured with the existing `TIGERDATA_SSL_ROOT_CERT` option pointing at a local
 PEM of trusted system CAs; certificate and hostname verification remain enabled.
 Those retrieval checks did not verify transcription or S3 hosting. The orchestrator
-and frontend are now connected; see [the integration audit](MVP_INTEGRATION_AUDIT.md)
-for current verification and provider gates. Discovery remains the stored corpus,
-not an unimplemented public-web search provider.
+and frontend are now connected; see [integration](INTEGRATION.md) and
+[provider deployment](PROVIDERS.md) for current verification and provider gates.

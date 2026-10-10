@@ -5,8 +5,8 @@ import pytest
 
 from backend.services.processing import preprocessing as p
 from backend.services.specialist import transcription as t
-from backend.services.reporting.errors import QuantroError
-from backend.services.reporting.types import MediaFeatures
+from backend.services.shared.errors import QuantroError
+from backend.services.shared.types import MediaFeatures
 
 
 def test_provider_defaults_and_rejects_unknown(monkeypatch):

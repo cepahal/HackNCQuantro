@@ -5,7 +5,7 @@ import pytest
 from pydantic import BaseModel
 
 import backend.services.reporting.save_report as save_report_module
-from backend.services.reporting.errors import ErrorCode, QuantroError, Stage
+from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.reporting.save_report import (
     InMemoryJobStore,
     InMemoryReportStore,

@@ -1,7 +1,7 @@
 import pytest
 
 from backend.services.reporting.build_report import merge_limitations, sanitize_report
-from backend.services.reporting.errors import ErrorCode, QuantroError, Stage, normalize_exception
+from backend.services.shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
 
 
 def test_sanitize_removes_sensitive_keys_at_every_depth():

@@ -8,7 +8,7 @@ import httpx
 import pytest
 from google import genai
 
-from backend.services.reporting.errors import QuantroError, Stage
+from backend.services.shared.errors import QuantroError, Stage
 from backend.services.specialist import gemini
 
 

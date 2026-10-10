@@ -1,39 +1,53 @@
 # Cleanup log — 2026-10-10
 
-Each candidate was checked for (1) importers across `backend/`, `tests/`, `benchmarks/`,
-`frontend/`, `backend/services/photon/`, docs and package scripts; (2) changes in the
-last five `origin/main` commits (origin/main had not moved past `913f7ff`); and
-(3) whether it is a config file.
+Each candidate was checked for importers and references across `backend/`, `tests/`,
+`benchmarks/`, `frontend/`, `backend/services/photon/`, docs, scripts, `render.yaml`
+and Dockerfiles, and against recent teammate commits. Every deleted file can be
+restored from git history: `git show <sha>:<path>`.
 
-## Deleted
+## Pass 1 (commit `8633da5`)
 
-| File | Reason | Replacement |
-|---|---|---|
-| `backend/services/_archive/analyze.py` | One-line "archived, empty unreferenced merge scaffold"; no importers | None needed |
-| `backend/services/_archive/example_api.py` | Same | None needed |
-| `backend/services/_archive/helpers.py` | Same | None needed |
-| `backend/services/_archive/scoring.py` | Same | None needed |
-| `frontend/lib/displayModel.ts` | Deleted earlier by the frontend agent; types moved | `frontend/lib/api-types.ts` |
-| `frontend/AGENTS.md` (untracked) | Written by `next dev` (`node_modules/next/dist/server/lib/generate-agent-files.js`); not project content | None. `next dev` may re-create it; do not stage it |
-| `backend/utils/` (untracked, git-ignored) | Contained only a stale `__pycache__/helpers.cpython-314.pyc` with no source | None needed |
+| File | Reason | Replacement | Restore from |
+|---|---|---|---|
+| `backend/services/_archive/{analyze,example_api,helpers,scoring}.py` | One-line empty merge scaffolds; no importers | None needed | `913f7ff` |
+| `frontend/lib/displayModel.ts` | Types moved by the frontend work | `frontend/lib/api-types.ts` | `913f7ff` |
+| `frontend/AGENTS.md` (untracked) | Written by `next dev`; not project content. `next dev` may re-create it; do not stage it | None | n/a |
+| `backend/utils/` (untracked, git-ignored) | Only a stale `__pycache__/helpers.cpython-314.pyc`, no source | None | n/a |
 
-`docs/architecture.md` was updated because it stated the `_archive` scaffolds were
-retained. `docs/MVP_INTEGRATION_AUDIT.md` still mentions them as a dated audit record.
+## Pass 2 (after Jason's `2f7643e`; the user authorized removing repeated/unused files)
+
+| File | Reason | Replacement | Restore from |
+|---|---|---|---|
+| `backend/services/reporting/types.py` | Re-export shim; no production importers | `backend/services/shared/types.py` | `2f7643e` |
+| `backend/services/reporting/errors.py` | Re-export shim; no production importers | `backend/services/shared/errors.py` (also re-exported by `backend/services/reporting/__init__.py`) | `2f7643e` |
+| `backend/services/external_apis/post_contract.py` | Re-export shim (Abdullah); tests only | `backend/services/shared/types.py` | `2f7643e` |
+| `backend/services/external_apis/search_contract.py` | Re-export shim (Abdullah); tests only | `backend/services/shared/types.py` | `2f7643e` |
+| `backend/services/external_apis/snowflake_storage.py`, `snowflake_schema.sql` | Abdullah's optional Snowflake adapter; nothing in production imports it, `REPORT_STORE` accepts only `tiger`/`memory`, and no requirement installs the connector | Tiger Data (`tigerdata_storage.py`, `storage/tiger.py`) | `2f7643e` |
+| `tests/test_snowflake_storage.py` | Tested only the deleted adapter | None | `2f7643e` |
+| `backend/.env.example` | Duplicate of the root template; nothing referenced it | Root `.env.example` (now includes the Photon webhook, Exa and Whisper keys) | `2f7643e` |
+| `docs/MVP_INTEGRATION_AUDIT.md` | Point-in-time audit referencing removed files | `docs/INTEGRATION.md`, `docs/RUNBOOK.md`, `docs/PROVIDERS.md`, this log | `2f7643e` |
+
+Test imports in 16 files were repointed to `backend.services.shared.types` /
+`backend.services.shared.errors`. Tests that only asserted the shims re-exported the
+canonical classes were removed (`test_post_models_match_retrieval_owner_contract`, four
+shim rows of `test_legacy_type_imports_reexport_the_canonical_class`);
+`test_error_imports_reexport_the_canonical_class` became
+`test_reporting_package_reexports_the_canonical_error`. `tests/test_retrieve_post.py` still asserts retrieval never imports Snowflake.
+
+The root `.env.example` dropped keys no code reads: `RETRIEVAL_PROVIDER_API_KEY`,
+`SEARCH_PROVIDER_API_KEY`, `TRANSCRIPTION_API_KEY` and `SNOWFLAKE_*`.
 
 ## Kept
 
 | File | Reason |
 |---|---|
-| `backend/services/reporting/types.py` | Compatibility re-export of `shared/types.py`, pinned by `tests/test_contract_shapes.py::test_legacy_type_imports_reexport_the_canonical_class`; edited by Jason in `7f9d614` (last five commits) |
-| `backend/services/reporting/errors.py` | Compatibility re-export of `shared/errors.py`, pinned by `test_error_imports_reexport_the_canonical_class`; imported by 15 test files including `tests/test_photon_reporting.py`, which was being edited by the Photon webhook work |
-| `backend/services/external_apis/post_contract.py`, `search_contract.py` | Abdullah-owned compatibility shims; `tests/test_types_contract.py` and `tests/test_contract_shapes.py` assert they re-export the canonical classes; `docs/retrieve_post.md` documents `post_contract.py` |
-| `backend/services/external_apis/snowflake_storage.py` | Abdullah-owned optional adapter with its own tests (`tests/test_snowflake_storage.py`) and documented `SNOWFLAKE_*` settings; not wired into `REPORT_STORE` but not dead |
+| `backend/services/messaging/delivery_tracker.py` | Requested path; imported by `routes/photon_webhook.py` and `tests/test_photon_webhook.py` |
+| `docs/PROVIDERS.md` | Canonical Exa/Whisper provider reference; deploy steps live in `docs/RUNBOOK.md` section 6 and link to it |
+| `README.md` | Original project plan; mentions Snowflake as narrative, not configuration |
 | `frontend/app/reports/[report_id]/page.tsx` | Redirect for `/reports/{id}`, the URL the backend sends in iMessage summaries |
-| `frontend/app/results/page.tsx` | Redirects `/results?report_id=` to `/results/{id}`; a different URL, not a duplicate |
-| Root `.env`, `.env.local` | User env files; both git-ignored (`.gitignore` lines 2 and 4) |
+| `frontend/app/results/page.tsx` | Redirects `/results?report_id=` to `/results/{id}`; a different URL |
+| `benchmarks/`, `docs/evidence/`, Photon Node sidecar | In use |
+| Root `.env`, `.env.local`, `.secrets/` | User env files; git-ignored |
 
-No `*.bak`, `*.orig`, `*_old*`, `*_v1*`, `*_deprecated*`, `mock_*.py` or `fake_*.py` files,
-no `backend/services/reporting/_stubs.py`, and no API client besides `frontend/lib/api.ts`
-calling `fetch` were found. `next build` reports no duplicate routes.
-
-No imports needed repointing.
+No tracked `.DS_Store`, `__pycache__`, `.pyc`, `.bak` or `.orig` files, and no duplicate
+requirement entries, were found.

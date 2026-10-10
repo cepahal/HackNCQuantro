@@ -9,7 +9,7 @@ import backend.services.reporting.send_summary as send_summary_module
 from backend.main import app
 from backend.routes.common import get_tiger_store
 from backend.services.reporting.display_report import display_report
-from backend.services.reporting.errors import QuantroError
+from backend.services.shared.errors import QuantroError
 from backend.services.reporting.send_summary import InMemoryDeliveryTracker, SendReceipt
 from backend.services.storage.tiger import TigerStore
 

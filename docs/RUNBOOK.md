@@ -12,7 +12,7 @@ owners and failure modes are in [INTEGRATION.md](INTEGRATION.md).
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-whisper.txt
 cd ..
 mkdir -p .secrets && chmod 700 .secrets
 cp .env.example .secrets/.env && chmod 600 .secrets/.env   # tracked blank template -> fill in the copy
@@ -31,7 +31,13 @@ REPORT_STORE=tiger
 REPORT_BASE_URL=http://localhost:3000
 GEMINI_API_KEY=<key>
 GEMINI_MODEL=gemini-flash-latest
+SEARCH_PROVIDER=exa
+EXA_API_KEY=<key>
+TRANSCRIPTION_PROVIDER=whisper
+WHISPER_MODEL=small.en
 ```
+
+Provider behavior and limits (Exa search, local Whisper) are in [PROVIDERS.md](PROVIDERS.md).
 
 Retrieval and search also need `TIGERDATA_DSN` (the same Tiger URL) and
 `TIGERDATA_SSL_ROOT_CERT=system`, or the absolute path to the service's trusted CA
@@ -51,9 +57,7 @@ python -m services.storage.tiger list     # recent jobs as JSON ([] on a fresh d
 ```
 
 The API creates `quantro_jobs`, `quantro_posts` and `quantro_reports` on first boot.
-`REPORT_STORE` supports `tiger` and `memory` only. Snowflake report persistence is
-unsupported; use Tiger Data for the MVP. The separate optional Snowflake media
-adapter does not provide a report store.
+`REPORT_STORE` supports `tiger` and `memory` only; use Tiger Data for the MVP.
 
 ### Frontend (Node 20+)
 
@@ -156,7 +160,7 @@ jobs, and browser-facing ingest JSON omits local media and frame file paths.
 Run from the repo root unless noted.
 
 ```bash
-cd backend && python -c "from services.reporting.types import ReportV2; print('types ok')" && cd ..
+cd backend && python -c "from services.shared.types import ReportV2; print('types ok')" && cd ..
 pytest tests/ -v
 cd backend && uvicorn main:app --port 8000          # boots clean, Ctrl-C to stop
 cd backend && python -m services.storage.tiger list # real Tiger Data
@@ -164,14 +168,12 @@ grep -r "/tmp/\|local_path\|api_key\|secret" backend/services/reporting/
 ```
 
 The grep is never empty, and that is expected. `build_report.py` names the keys and
-path prefixes its sanitizer strips. `types.py` declares the internal `local_path` and
-`image_path` fields that the sanitizer removes, and docstrings describe the rule. A
-match in any other file is a real finding. To list only lines that are not the
-denylist or the internal models:
+path prefixes its sanitizer strips, and docstrings describe the rule. A match in any
+other file is a real finding. To list only lines that are not the denylist:
 
 ```bash
 grep -rn --include='*.py' "/tmp/\|local_path\|api_key\|secret" backend/services/reporting/ \
-  | grep -v -e '^backend/services/reporting/build_report.py:' -e '^backend/services/reporting/types.py:'
+  | grep -v -e '^backend/services/reporting/build_report.py:'
 ```
 
 ## 5. Pre-demo checklist
@@ -193,13 +195,18 @@ grep -rn --include='*.py' "/tmp/\|local_path\|api_key\|secret" backend/services/
 Frontend on Vercel, API on Render, both from this repo. Set values in each dashboard; never commit them.
 
 - **API (Render):** New > Blueprint, pick this repo. `render.yaml` builds `backend/Dockerfile.vercel`
-  with `backend/` as the context and prompts for: `REPORT_BASE_URL` (the Vercel URL; it is also the
-  only CORS origin), `TIGER_DATABASE_URL`, `TIGERDATA_DSN`, `TIGER_TABLE_PREFIX`, `GEMINI_API_KEY`,
-  `GEMINI_MODEL`, `PHOTON_API_KEY`, `PHOTON_BASE_URL`, `PHOTON_SENDER_ID`. Startup needs a reachable
-  Tiger database; the health check is `/openapi.json`.
-- **Frontend (Vercel):** `vercel.json` routes everything to the `frontend/` service. Set
-  `NEXT_PUBLIC_API_BASE_URL` (the Render URL, no `/api` suffix), `NEXT_PUBLIC_REPORT_BASE_URL`
-  (the Vercel URL) and `NEXT_PUBLIC_PHOTON_NUMBER`; they are inlined at build time, so redeploy after
-  changing them.
+  with `backend/` as the context. The image bakes in Whisper and its model (`WHISPER_MODEL` is set
+  by the image; do not override it). The Blueprint sets `SEARCH_PROVIDER=exa`,
+  `TRANSCRIPTION_PROVIDER=whisper`, `REPORT_STORE=tiger` and `TIGERDATA_SSL_ROOT_CERT`, and prompts
+  for: `REPORT_BASE_URL` (the Vercel URL; it is also the only CORS origin), `EXA_API_KEY`,
+  `TIGER_DATABASE_URL`, `TIGERDATA_DSN`, `TIGER_TABLE_PREFIX`, `GEMINI_API_KEY`, `GEMINI_MODEL`,
+  `PHOTON_API_KEY`, `PHOTON_BASE_URL`, `PHOTON_SENDER_ID`. Startup needs a reachable Tiger database;
+  the health check is `/openapi.json`. The Blueprint uses the free plan (512 MB); check memory
+  before relying on Whisper there (see [PROVIDERS.md](PROVIDERS.md)).
+- **Frontend (Vercel):** project `quantro`, production URL https://quantro-ten.vercel.app.
+  `vercel.json` routes everything to the `frontend/` service and `.vercelignore` limits CLI uploads
+  to `vercel.json` and `frontend/`. Set `NEXT_PUBLIC_API_BASE_URL` (the Render URL, no `/api`
+  suffix), `NEXT_PUBLIC_REPORT_BASE_URL` (the Vercel URL) and `NEXT_PUBLIC_PHOTON_NUMBER`; they are
+  inlined at build time, so redeploy (`vercel deploy --prod` from the repo root) after changing them.
 - The Photon Node bridge (`backend/services/photon`) is a long-running local process and is not part
   of either deploy.

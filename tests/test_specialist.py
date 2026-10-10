@@ -7,7 +7,7 @@ from backend.services.processing import preprocessing as p
 from backend.services.specialist import comparison as c
 from backend.services.specialist.alignment import verify_and_align
 from backend.services.specialist.context import select_surrounding_context
-from backend.services.reporting.errors import QuantroError
+from backend.services.shared.errors import QuantroError
 
 @pytest.fixture(autouse=True)
 def isolate_transcription_provider(monkeypatch):

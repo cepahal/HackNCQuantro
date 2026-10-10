@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 import backend.routes.analyze as analyze_route
 from backend.main import app
 from backend.routes.common import get_tiger_store
-from backend.services.reporting.errors import QuantroError
+from backend.services.shared.errors import QuantroError
 from backend.services.reporting.run_analysis import AnalysisResult
 
 client = TestClient(app)

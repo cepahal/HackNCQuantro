@@ -3,10 +3,9 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from backend.services.external_apis import post_contract
 from backend.services.external_apis.retrieve_post import _result
-from backend.services.reporting import types as t
-from backend.services.reporting.errors import ErrorCode, QuantroError, Stage
+from backend.services.shared import types as t
+from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.specialist import comparison as jason_comparison
 from backend.services.specialist.alignment import verify_and_align
 from backend.services.specialist.comparison import compare_context_and_caption
@@ -72,22 +71,6 @@ def test_model_has_exact_contract_fields(model):
 @pytest.mark.parametrize("enum", list(EXPECTED_ENUMS), ids=lambda e: e.__name__)
 def test_enum_has_exact_contract_values(enum):
     assert {member.value for member in enum} == EXPECTED_ENUMS[enum]
-
-
-@pytest.mark.parametrize(
-    "ours, theirs",
-    [
-        (t.Author, post_contract.Author),
-        (t.Engagement, post_contract.Engagement),
-        (t.MediaAsset, post_contract.MediaAsset),
-        (t.Retrieval, post_contract.Retrieval),
-        (t.Post, post_contract.Post),
-    ],
-    ids=lambda m: m.__name__,
-)
-def test_post_models_match_retrieval_owner_contract(ours, theirs):
-    assert ours is theirs
-    assert set(ours.model_fields) == set(theirs.model_fields)
 
 
 @pytest.mark.parametrize(

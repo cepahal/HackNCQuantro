@@ -99,10 +99,6 @@ def test_return_boundary_validates_legacy_json_native_shape():
 
 
 @pytest.mark.parametrize("module_path,name", [
-    ("backend.services.reporting.types", "Post"),
-    ("backend.services.external_apis.post_contract", "Post"),
-    ("backend.services.external_apis.post_contract", "MediaAsset"),
-    ("backend.services.external_apis.search_contract", "Queries"),
     ("backend.services.specialist.comparison", "Comparison"),
     ("backend.services.reporting.display_report", "DisplayModel"),
     ("backend.services.reporting.run_analysis", "AnalysisResult"),
@@ -112,10 +108,10 @@ def test_legacy_type_imports_reexport_the_canonical_class(module_path, name):
     assert getattr(importlib.import_module(module_path), name) is getattr(shared, name)
 
 
-def test_error_imports_reexport_the_canonical_class():
-    from backend.services.reporting.errors import QuantroError as legacy_error
+def test_reporting_package_reexports_the_canonical_error():
+    from backend.services.reporting import QuantroError as reporting_error
 
-    assert legacy_error is QuantroError
+    assert reporting_error is QuantroError
 
 
 def test_startup_checks_every_contract_function():

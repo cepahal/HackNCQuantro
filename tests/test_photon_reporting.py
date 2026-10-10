@@ -2,7 +2,7 @@ import importlib
 import unittest
 from unittest.mock import Mock, call, patch
 
-from backend.services.reporting.errors import ErrorCode, QuantroError, Stage
+from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.reporting.run_analysis import deliver_summary_after_save
 
 stage = importlib.import_module("backend.services.reporting.send_summary")

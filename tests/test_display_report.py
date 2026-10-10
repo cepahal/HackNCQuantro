@@ -6,7 +6,7 @@ from backend.services.reporting.display_report import (
     NO_SOURCE_MESSAGE,
     build_display_model,
 )
-from backend.services.reporting.errors import ErrorCode, QuantroError, Stage
+from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 
 
 def _confidence(level):

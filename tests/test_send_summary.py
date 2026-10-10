@@ -1,6 +1,6 @@
 import pytest
 
-from backend.services.reporting.errors import ErrorCode, QuantroError, Stage
+from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.reporting.send_summary import (
     InMemoryDeliveryTracker,
     PhotonProvider,

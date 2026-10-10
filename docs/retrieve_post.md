@@ -93,7 +93,7 @@ Success has exactly this structure; example values below are illustrative:
 }
 ```
 
-TypedDict definitions live in `backend/services/external_apis/post_contract.py`.
+Model definitions live in `backend/services/shared/types.py`.
 Every key is present. `author` and `engagement` always contain their complete nested
 objects, even when every value is null. JPEG uses `media.jpg` and
 `mime_type: "image/jpeg"`; the shape stays identical. `candidate_id` is null for a
@@ -164,8 +164,8 @@ For tests or a caller-managed connection, pass a store implementing
 store. An injected database connection must be dedicated to this store, idle on
 entry, and have autocommit disabled: `save_post` commits or rolls back its
 transaction. Injection preserves the same Post contract and failure behavior; the
-production default remains Tiger Data. The existing Snowflake helper is retained
-for compatibility and is not invoked by default.
+production default remains Tiger Data. The unused Snowflake helper was removed
+(see `docs/CLEANUP_LOG.md`).
 
 ## Supported retrieval
 
@@ -196,12 +196,12 @@ they are for extraction on the shared backend filesystem, not public media URLs.
 
 ## Verification
 
-`python -m pytest tests/test_retrieve_post.py tests/test_retrieval_worker.py tests/test_tigerdata_storage.py tests/test_snowflake_storage.py`
+`python -m pytest tests/test_retrieve_post.py tests/test_retrieval_worker.py tests/test_tigerdata_storage.py`
 
 Tests cover exact v2 Post/error contracts, nullable metadata and provenance,
 downstream handoff, JPEG/MP4, default persistence and injected stores, preservation
 of all v2 metadata, Tiger Data bytes/JSON transaction bindings and rollback, TLS/DSN
-settings, safe failures, and cleanup. Existing Snowflake compatibility tests remain.
+settings, safe failures, and cleanup.
 Live Tiger Data authentication, schema setup and JPG/MP4 persistence were verified
 on 2026-10-10; see the latest verification entry below.
 

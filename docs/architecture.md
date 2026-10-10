@@ -2,11 +2,11 @@
 
 The canonical app is `backend/` (FastAPI/Python) and `frontend/` (Next.js).
 `backend/services/reporting/run_analysis.py` connects the contract functions;
-`docs/MVP_INTEGRATION_AUDIT.md` records exact imports, types, routes and live gates.
+`docs/INTEGRATION.md` records the function map, routes and environment variables.
 
 All contract models and enums now live in `backend/services/shared/types.py`;
-`shared/errors.py` owns QuantroError and stage normalization. Historical type/error
-modules only re-export canonical classes. Each public contract function validates
+`shared/errors.py` owns QuantroError and stage normalization; import them directly
+(the old re-export shims were removed). Each public contract function validates
 its return against these models, retaining JSON dict serialization at existing
 upstream boundaries. Startup checks all twelve team functions plus run_analysis.
 The four empty merge scaffolds formerly under `services/_archive/` were deleted
@@ -55,8 +55,8 @@ see the audit for the existing loader precedence differences.
 `GET /media/{media_id}` reads real stored JPEG/MP4 bytes for browser playback,
 including HTTP byte ranges, when the Post has no public playback_url. IDs are
 validated and SQL parameters are bound. No S3 upload is implemented or claimed.
-The optional SnowflakePostStore remains a real compatibility adapter; Tiger is
-the active default. REPORT_STORE supports tiger and explicit local memory only.
+Tiger is the only storage backend. REPORT_STORE supports tiger and explicit local
+memory only.
 
 ## Frontend and API
 

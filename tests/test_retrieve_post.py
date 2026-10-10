@@ -14,7 +14,7 @@ from types import ModuleType
 import pytest
 
 from backend.services.external_apis import retrieve_post as retrieval
-from backend.services.external_apis.post_contract import MediaAsset, Post
+from backend.services.shared.types import MediaAsset, Post
 
 RetrievalError = retrieval.RetrievalError
 retrieve_post = retrieval.retrieve_post

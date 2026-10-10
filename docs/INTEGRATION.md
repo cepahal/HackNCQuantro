@@ -66,9 +66,10 @@ retryable}`, and the job row records `error_code` and `error_stage`.
 `run_analysis.py` calls all eight; submitted retrieval is delegated through
 `pipeline/run_ingest.py`. Their outputs (`{queries, warnings}`,
 `{candidates, warnings}`, Post, MediaFeatures, Alignment, Context, Comparison) are
-validated against `backend/services/reporting/types.py` at the reporting boundary.
-Search covers Abdullah's Tiger Data post corpus (`quantro_retrieval.posts`), not the
-public web: seed it with `retrieve_post(source_url)` for each demo source.
+validated against `backend/services/shared/types.py` at the reporting boundary.
+Search uses Exa public-web discovery with `SEARCH_PROVIDER=exa` (production), or
+Abdullah's Tiger Data post corpus (`quantro_retrieval.posts`) with
+`SEARCH_PROVIDER=tiger`; see `docs/PROVIDERS.md`.
 
 ## Environment variables
 
@@ -82,19 +83,20 @@ blank template; keep credentials out of tracked files.
 |---|---|---|---|
 | `TIGER_DATABASE_URL` | `storage/tiger.py` (API startup, CLI) | Bhrigu | Preferred operational URL. Falls back to `TIGERDATA_DSN`, then `DATABASE_URL`; fallback Postgres connections enforce `verify-full`, `TIGERDATA_SSL_ROOT_CERT`, and a 10-second connection timeout. |
 | `TIGER_TABLE_PREFIX` | `storage/tiger.py` | Bhrigu | Default `quantro_`. Lowercase letters, digits, `_`. |
-| `REPORT_STORE` | `save_report.get_report_store()` | Bhrigu | `tiger` (default) or `memory` (tests). The API routes always use the Tiger store. Snowflake report persistence is unsupported; selecting it fails with a storage error. |
+| `REPORT_STORE` | `save_report.get_report_store()` | Bhrigu | `tiger` (default) or `memory` (tests). The API routes always use the Tiger store. Any other value fails with a storage error. |
 | `REPORT_BASE_URL` | `save_report.py`, CORS in `main.py` | Bhrigu | Frontend origin; report links are `{REPORT_BASE_URL}/reports/{report_id}`. |
 | `TIGERDATA_DSN` (fallback `DATABASE_URL`) | `external_apis/tigerdata_storage.py` | Abdullah | Retrieval media store and the search corpus (`quantro_retrieval.posts`). Same Tiger service as `TIGER_DATABASE_URL`; the code enforces `verify-full` TLS. |
 | `TIGERDATA_SSL_ROOT_CERT` | `external_apis/tigerdata_storage.py` | Abdullah | Default `system`. |
-| `SNOWFLAKE_ACCOUNT`, `_USER`, `_PASSWORD`/`_TOKEN`, `_DATABASE`, `_SCHEMA`, `_WAREHOUSE`, `_MEDIA_STAGE`, `_POSTS_TABLE` | `external_apis/snowflake_storage.py` | Abdullah | Optional Snowflake track. |
-| `RETRIEVAL_PROVIDER_API_KEY`, `SEARCH_PROVIDER`, `SEARCH_PROVIDER_API_KEY` | nothing yet | Abdullah | Present in env templates. Search currently uses the Tiger Data corpus and needs no key. |
-| `GEMINI_API_KEY` | `specialist/gemini.py` | Jason | Required for transcription (function 2) and comparison (function 8). |
+| `SEARCH_PROVIDER` | `external_apis/search_candidates.py` | Jason/Abdullah | `exa` (production) or `tiger` (stored corpus; also the default when unset). Any other value fails with `SEARCH_FAILED`. |
+| `EXA_API_KEY` | `external_apis/exa_search.py` | Jason | Required when `SEARCH_PROVIDER=exa`. |
+| `GEMINI_API_KEY` | `specialist/gemini.py` | Jason | Required for frame OCR and comparison (function 8), and for transcription when `TRANSCRIPTION_PROVIDER=gemini`. |
 | `GEMINI_MODEL` | `specialist/gemini.py` | Jason | Default `gemini-flash-latest`. Ignore the old `gemini-1.5-pro` example. |
-| `TRANSCRIPTION_PROVIDER`, `TRANSCRIPTION_API_KEY` | nothing | Jason | Transcription goes through Gemini. |
+| `TRANSCRIPTION_PROVIDER` | `specialist/transcription.py` | Jason | `whisper` (production; local faster-whisper) or `gemini` (default when unset). |
+| `WHISPER_MODEL` | `specialist/transcription.py` | Jason | Default `small`; local example `small.en`. The Docker image sets it to the baked-in `/opt/quantro/whisper`. |
 | `SPECTRUM_PROJECT_ID`, `SPECTRUM_PROJECT_SECRET` | Photon sidecar `backend/services/photon` (`--imessage` mode) | Photon sidecar: `iner54` | From Photon project Settings. Only needed for real iMessage; terminal mode runs without them. |
 | `PHOTON_BRIDGE_TOKEN`, `PHOTON_BRIDGE_PORT`, `PHOTON_DATA_DIR` | `external_apis/photon.py` and the sidecar | Photon sidecar: `iner54`; `send_summary` caller: Bhrigu | Token authenticates Python → loopback bridge `127.0.0.1:8766`. Delivery ledger persists in `PHOTON_DATA_DIR`. |
 | `PHOTON_API_KEY`, `PHOTON_BASE_URL`, `PHOTON_SENDER_ID` | `services/messaging/photon.py` (`POST /webhooks/photon`) | Bhrigu | Alternative HTTP webhook path. Assumed contract: `POST {base}/messages` with bearer key; inbound `X-Photon-Signature` = hex HMAC-SHA256 of the raw body keyed with `PHOTON_API_KEY`. Confirm with Photon. |
-| `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_REPORT_BASE_URL` | frontend (not built yet) | Grant | `http://localhost:8000` and `http://localhost:3000` locally. |
+| `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_REPORT_BASE_URL`, `NEXT_PUBLIC_PHOTON_NUMBER` | `frontend/lib/api.ts`, `ShareButton.tsx`, `PhotonBanner.tsx` | Grant | `http://localhost:8000` and `http://localhost:3000` locally. Inlined at build time. |
 
 ## What to check when it breaks
 

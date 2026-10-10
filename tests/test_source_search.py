@@ -12,17 +12,17 @@ from typing import Any, cast
 import pytest
 
 from backend.services.external_apis.build_search_queries import build_search_queries
-from backend.services.external_apis.post_contract import Post
+from backend.services.shared.types import Post
 from backend.services.external_apis.retrieve_candidate_media import (
     retrieve_candidate_media,
 )
 from backend.services.external_apis.search_candidates import search_candidates
-from backend.services.external_apis.search_contract import Candidate
+from backend.services.shared.types import Candidate
 from backend.services.external_apis.tigerdata_storage import (
     StorageError,
     TigerDataPostStore,
 )
-from backend.services.reporting.errors import QuantroError
+from backend.services.shared.errors import QuantroError
 
 QUERY = '"those numbers were accurate"'
 URL = "https://www.youtube.com/watch?v=full123"

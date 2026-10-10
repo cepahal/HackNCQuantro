@@ -5,7 +5,7 @@ import backend.services.pipeline.run_ingest as ingest_module
 from backend.main import app
 from backend.routes.ingest import get_tiger_store
 from backend.services.external_apis.retrieve_post import RetrievalError
-from backend.services.reporting.errors import QuantroError
+from backend.services.shared.errors import QuantroError
 from backend.services.storage.tiger import TigerConfigError, TigerStore
 
 
