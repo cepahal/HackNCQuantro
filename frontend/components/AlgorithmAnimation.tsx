@@ -41,7 +41,7 @@ export default function AlgorithmAnimation() {
     const targetEndX = stageWidth * 0.5 - 14;
     const targetEndY = stageHeight * 0.65 - 14;
     const gridWidth = (mobile ? 20 : 28) * 5 + (mobile ? 6 : 8) * 4;
-    const outsideGridX = stageWidth * 0.43 + gridWidth + 22;
+    const outsideGridX = stageWidth * 0.43 + gridWidth + 60;
     const curvePoints = [
       [targetStartX, targetStartY],
       [outsideGridX, targetStartY],
