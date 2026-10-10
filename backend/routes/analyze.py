@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from backend.routes.common import get_tiger_store, not_found, quantro_error_response
 from backend.services.reporting.build_report import sanitize_report
+from backend.services.reporting.display_report import display_report
 from backend.services.reporting.run_analysis import run_analysis
 from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.shared.types import ReportV2, parse_stage_output
@@ -48,3 +49,15 @@ def get_report(report_id: ReportId, store: TigerDependency) -> JSONResponse:
     except (TypeError, ValueError):
         return quantro_error_response(QuantroError(ErrorCode.PROCESSING_FAILED, Stage.DISPLAY_REPORT))
     return JSONResponse(content=report)
+
+
+@router.get("/reports/{report_id}/display")
+def get_display_model(report_id: ReportId, store: TigerDependency) -> JSONResponse:
+    response = get_report(report_id, store)
+    if response.status_code != 200:
+        return response
+    try:
+        model = display_report(json.loads(response.body))
+        return JSONResponse(content=model.model_dump(mode="json"))
+    except QuantroError as error:
+        return quantro_error_response(error)

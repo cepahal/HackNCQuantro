@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getReport, mediaUrl, publicUrl, startAnalysis } from "../lib/api.ts";
+import { getReport, getDisplayModel, mediaUrl, publicUrl, runAnalysis, startAnalysis } from "../lib/api.ts";
 
 test("submission sends the exact route and JSON contract, then fetches the persisted report", async (t) => {
   const calls: Array<{ url: string; options: RequestInit | undefined }> = [];
@@ -47,4 +47,31 @@ test("media links use the byte-serving API and reject non-HTTP schemes", () => {
   assert.equal(publicUrl("file:///private"), null);
   assert.equal(publicUrl("https://name:secret@example.com"), null);
   assert.equal(mediaUrl({ media_id: "../private", playback_url: null, mime_type: "video/mp4" }), null);
+});
+
+
+test("runAnalysis generates the required job ID and forwards conversation ID", async (t) => {
+  let sent: Record<string, unknown> = {};
+  t.mock.method(globalThis, "fetch", async (url: string, options?: RequestInit) => {
+    const jobId = new URL(url).pathname.split("/")[2]!;
+    assert.match(jobId, /^job_[0-9a-f-]{36}$/);
+    sent = JSON.parse(String(options?.body));
+    return Response.json({job_id:jobId, outcome:"no_verified_match", report_id:`report_${jobId}`,
+      report_url:`http://localhost:3000/reports/report_${jobId}`, delivery_status:"skipped", delivery_warning:null, warnings:[]});
+  });
+  await runAnalysis("https://example.com/video.mp4", "conv_test");
+  assert.deepEqual(sent, {url:"https://example.com/video.mp4", conversation_id:"conv_test"});
+});
+
+test("confidence display data comes from the backend DisplayModel endpoint", async (t) => {
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    assert.match(url, /\/reports\/report_job_1\/display$/);
+    return Response.json({confidence_note:"Evidence is not a probability.", submitted_panel:{}, limitations:[]});
+  });
+  assert.equal((await getDisplayModel("report_job_1")).confidence_note, "Evidence is not a probability.");
+});
+
+test("malformed display data fails safely", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({}));
+  await assert.rejects(getDisplayModel("report_job_1"), /invalid display model/);
 });

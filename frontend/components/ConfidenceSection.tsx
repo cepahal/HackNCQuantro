@@ -57,11 +57,9 @@ export default function ConfidenceSection({
   return (
     <section aria-label="Confidence">
       {no_source_message ? <p role="status">{no_source_message}</p> : null}
-      {source_match ? <AssessmentCard block={source_match} /> : null}
-      {clip_coverage ? <ClipCoverageCard block={clip_coverage} /> : null}
-      {context_assessment ? (
-        <AssessmentCard block={context_assessment} note={context_unavailable_message} />
-      ) : null}
+      {<AssessmentCard block={source_match ?? { label: "Source-match confidence", value: "Not assessed", basis: [], limitations: [] }} />}
+      {<ClipCoverageCard block={clip_coverage ?? { label: "Submitted clip aligned", value: "Not assessed", description: "No verified coverage measurement is available." }} />}
+      {<AssessmentCard block={context_assessment ?? { label: "Context-assessment confidence", value: "Not assessed", basis: [], limitations: [] }} note={context_unavailable_message} />}
       <p>{confidence_note}</p>
     </section>
   );

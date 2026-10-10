@@ -155,3 +155,11 @@ def test_startup_rejects_stub_implementation(monkeypatch):
     monkeypatch.setattr(main.inspect, "getsourcefile", lambda function: "/tmp/_stubs.py")
     with pytest.raises(RuntimeError, match="retrieve_post: stub/mock implementation"):
         main.validate_contract_functions()
+
+
+def test_frontend_wire_types_are_generated_from_canonical_models():
+    from pathlib import Path
+    from backend.services.shared.export_frontend_types import generate
+
+    target = Path(__file__).resolve().parents[1] / "frontend" / "lib" / "contracts.ts"
+    assert target.read_text(encoding="utf-8") == generate()

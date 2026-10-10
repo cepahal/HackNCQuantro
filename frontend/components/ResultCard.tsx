@@ -1,14 +1,12 @@
-import type { Confidence, ReportMedia, ReportV2 } from "../lib/api";
+import type { ReportMedia, ReportV2 } from "../lib/api";
 import { mediaUrl, publicUrl } from "../lib/api";
 import ConfidenceSection from "./ConfidenceSection";
 
-const labels = { high: "High", moderate: "Moderate", low: "Low", not_assessed: "Not assessed" } as const;
-function confidenceBlock(label: string, confidence: Confidence) {
-  return { label, value: labels[confidence.level], basis: confidence.basis, limitations: confidence.limitations };
-}
+import type { DisplayModel } from "../lib/displayModel";
+
 const count = (value: number | null | undefined) => value == null ? "Unavailable" : value.toLocaleString();
 const seconds = (start: number, end: number) => `${start.toFixed(1)}s–${end.toFixed(1)}s`;
-const editLabels: Record<string, string> = {
+const editLabels: Partial<Record<keyof NonNullable<ReportV2["alignment"]>["edit_analysis"]["counts"], string>> = {
   matched_passages: "Matched passages", source_gaps: "Source gaps", unmatched_clip_segments: "Unmatched clip segments",
   confirmed_added_segments: "Confirmed added segments", confirmed_deleted_segments: "Confirmed deleted segments",
 };
@@ -34,31 +32,21 @@ function MediaPanel({ title, media }: { title: string; media: ReportMedia }) {
   </section>;
 }
 
-export default function ResultCard({ report }: { report: ReportV2 }) {
+export default function ResultCard({ report, display }: { report: ReportV2; display: DisplayModel }) {
   return <article><div className="verdict"><span className="eyebrow">Analysis result</span>
     <h1>{report.outcome === "matched" ? "A source match was verified" : "No verified source match"}</h1>
     <p>{report.summary || report.comparison?.summary || "There is not enough evidence to assess the post’s context."}</p>
     <small>Confidence describes the evidence for this assessment. It is not a probability that a post is true.</small></div>
     <div className="panels"><MediaPanel title="Submitted post" media={report.submitted}/>
       {report.source && <MediaPanel title="Matched source" media={report.source}/>}</div>
-    <section className="panel"><ConfidenceSection
-      source_match={report.alignment?.status === "verified" ? confidenceBlock("Source-match confidence", report.alignment.match_quality.confidence) : null}
-      clip_coverage={report.alignment?.status === "verified" ? {
-        label: "Submitted clip aligned", value: report.alignment.match_quality.clip_coverage_ratio === null ? "Not assessed" : `${(100 * report.alignment.match_quality.clip_coverage_ratio).toFixed(0)}%`,
-        description: "The share of the submitted clip covered by verified source matches.",
-      } : null}
-      context_assessment={report.alignment?.status === "verified" && report.comparison ? confidenceBlock("Context-assessment confidence", report.comparison.assessment_confidence) : null}
-      confidence_note="Confidence describes the strength and completeness of evidence, not a probability that the post is true."
-      no_source_message={report.outcome === "no_verified_match" ? "No verified source match was found. Context could not be assessed against a source." : null}
-      context_unavailable_message={report.comparison?.context_assessment === "not_assessed" ? "Context was not assessed." : null}
-    />{report.comparison && <p>Context: {report.comparison.context_assessment.replaceAll("_", " ")}. Caption: {report.comparison.caption_assessment.replaceAll("_", " ")}.</p>}</section>
+    <section className="panel"><ConfidenceSection {...display}/>{report.comparison && <p>Context: {report.comparison.context_assessment.replaceAll("_", " ")}. Caption: {report.comparison.caption_assessment.replaceAll("_", " ")}.</p>}</section>
     {report.alignment && <section className="panel"><h2>Matching passages and edit analysis</h2>
       {report.alignment.matches.length ? <table><thead><tr><th>Passage</th><th>Submitted clip</th><th>Source</th></tr></thead><tbody>
         {report.alignment.matches.map((match) => <tr key={match.match_id}><td>{match.match_id}</td>
           <td>{seconds(match.clip_start_seconds, match.clip_end_seconds)}</td><td>{seconds(match.source_start_seconds, match.source_end_seconds)}</td></tr>)}</tbody></table> : <p>No verified matching passages.</p>}
       <p>Edit analysis: {report.alignment.edit_analysis.status.replaceAll("_", " ")}. {report.alignment.edit_analysis.scope}</p>
       <dl className="metadata">{Object.entries(editLabels).map(([key, label]) => <div key={key}><dt>{label}</dt>
-        <dd>{report.alignment!.edit_analysis.counts[key] == null ? "Not assessed" : report.alignment!.edit_analysis.counts[key]}</dd></div>)}</dl>
+        <dd>{report.alignment!.edit_analysis.counts[key as keyof typeof report.alignment.edit_analysis.counts] == null ? "Not assessed" : report.alignment!.edit_analysis.counts[key as keyof typeof report.alignment.edit_analysis.counts]}</dd></div>)}</dl>
       {Boolean(report.alignment.edit_analysis.source_gaps.length) && <><h3>Source gaps between matched passages</h3><ul>{report.alignment.edit_analysis.source_gaps.map((gap, index) => <li key={index}>{seconds(gap.start_seconds, gap.end_seconds)}</li>)}</ul></>}
       {Boolean(report.alignment.edit_analysis.unmatched_clip_ranges.length) && <><h3>Unmatched clip ranges</h3><ul>{report.alignment.edit_analysis.unmatched_clip_ranges.map((range, index) => <li key={index}>{seconds(range.start_seconds, range.end_seconds)}</li>)}</ul></>}
     </section>}

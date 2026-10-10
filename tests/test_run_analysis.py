@@ -452,3 +452,15 @@ def test_query_warnings_forwarded_by_search_are_not_duplicated(client, upstream,
     response = _run(client, "job_dedup_warnings", conversation_id=None)
     assert response.status_code == 200
     assert response.json()["warnings"].count(warning) == 1
+
+
+def test_display_endpoint_uses_canonical_backend_display_model(client, upstream):
+    assert _run(client, "job_display_api", conversation_id=None).status_code == 200
+    report = client.get("/reports/report_job_display_api").json()
+    response = client.get("/reports/report_job_display_api/display")
+    assert response.status_code == 200
+    assert response.json() == display_report(report).model_dump(mode="json")
+    assert response.json()["source_match"]["label"] == "Source-match confidence"
+    assert response.json()["clip_coverage"]["label"] == "Submitted clip aligned"
+    assert response.json()["context_assessment"]["label"] == "Context-assessment confidence"
+    assert "local_path" not in response.text and "/tmp/" not in response.text
