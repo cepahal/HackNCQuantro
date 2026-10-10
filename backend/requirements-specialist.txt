@@ -1,0 +1,2 @@
+# Function 2 and 8 provider client. The backend requires Python 3.11+.
+google-genai==2.29.0

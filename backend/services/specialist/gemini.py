@@ -1,0 +1,39 @@
+"""Private Gemini adapter used only by Jason's specialist stages."""
+import os
+from pathlib import Path
+
+from ..reporting.errors import QuantroError, ErrorCode
+
+
+def client_and_model(stage):
+    from dotenv import load_dotenv
+    from google import genai
+    root = Path(__file__).resolve().parents[3]
+    load_dotenv(root / '.env')
+    load_dotenv(root / 'backend' / '.env')
+    key = os.getenv('GEMINI_API_KEY')
+    model = os.getenv('GEMINI_MODEL', 'gemini-flash-latest')
+    if not key:
+        raise QuantroError(ErrorCode.PROCESSING_FAILED, stage,
+                           'GEMINI_API_KEY is not configured.')
+    return genai.Client(api_key=key, http_options={'timeout': 120000}), model
+
+
+def generate_json(client, model, contents, schema, stage, code=ErrorCode.PROCESSING_FAILED):
+    import json
+    try:
+        response = client.models.generate_content(
+            model=model, contents=contents,
+            config={'response_mime_type': 'application/json',
+                    'response_json_schema': schema, 'temperature': 0},
+        )
+        if not response.candidates:
+            raise ValueError('No response candidate')
+        reason = response.candidates[0].finish_reason
+        if getattr(reason, 'value', reason) != 'STOP':
+            raise ValueError('Generation did not complete')
+        return json.loads(response.text)
+    except Exception as exc:
+        status = getattr(exc, 'code', None)
+        retryable = status in (429, 500, 502, 503, 504) or isinstance(exc, (TimeoutError, ConnectionError))
+        raise QuantroError(code, stage, retryable=retryable) from None

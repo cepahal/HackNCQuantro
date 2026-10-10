@@ -120,10 +120,15 @@ def select_surrounding_context(alignment, candidate_features, options=None):
 
     transcript = candidate_features["transcript"]
     processed_ranges = transcript["processed_ranges"]
+    for interval in processed_ranges:
+        left = _number(interval["start_seconds"], "processed start")
+        right = _number(interval["end_seconds"], "processed end")
+        if not 0 <= left < right <= duration:
+            raise ValueError("Processed transcript range is outside the recording.")
     sentences = transcript["sentences"]
 
     result_windows = []
-    limitations = []
+    limitations = list(candidate_features.get("warnings", []))
 
     for index, window in enumerate(windows, start=1):
         start = window["start"]

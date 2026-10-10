@@ -6,3 +6,5 @@ pytest
 pytest-asyncio
 pytest-mock
 httpx
+
+-r requirements-specialist.txt
