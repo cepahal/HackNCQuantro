@@ -14,7 +14,13 @@ One intermediate retry returned a media-inspection error. A subsequent download 
 
 The runtime recovery completed in 234.479 seconds: HTTP 200, one completed Tiger job, one post, one report, and a Photon-accepted reply. However, browser review found that the selected source was the submitted Reel itself with a different tracking query, and the comparison treated missing visual evidence as a contradiction. That result is not accepted as a valid source verification. Its public sharing was withdrawn; the original report and delivery ledger were preserved, with a private before-image.
 
-Implemented corrections: compare platform post identity before retrieval and after URL resolution; reject cached self-matches; constrain transcript-only caption assessment so unavailable gestures/audience behavior cannot count as contradicted evidence. Focused regressions pass. A fresh real Instagram job is running without a conversation ID, so no new message is sent before review.
+Implemented corrections: compare platform post identity before retrieval and after URL resolution; reject cached self-matches; constrain transcript-only caption assessment so unavailable gestures/audience behavior cannot count as contradicted evidence. Focused regressions and the real regressions below pass.
+
+**Fresh Instagram end-to-end regression:** HTTP 200 in 181.458 seconds, `no_verified_match`, complete submitted transcript, report/display GETs 200, one completed Tiger job, one post, one report, and no sanitization leaks. The submitted Reel was explicitly excluded as its own source. Source and comparison are null, so no unsupported verdict is published. No conversation ID was supplied and no message was sent.
+
+**Real Gemini comparison regression:** reused the original stored features, source context, and caption without modifying Tiger. One invocation, with its normal bounded two generation attempts, completed in 5.36 seconds. Both actual provider responses classified the claims as requiring an unobserved modality. The canonical result is `not_assessed` for context, caption, and confidence, with empty findings/basis. Private generation metadata is absent from the public result.
+
+The corrected report is available locally. Publishing this replacement through the external demo gateway is pending explicit approval; automatic approval review rejected expanding the public allowlist for this payload. The original inaccurate report remains unshared. Accepted delivery ledgers and original Tiger evidence remain intact.
 
 ## Changes implemented
 
@@ -48,9 +54,10 @@ Operator setup and rollback: [docs/PHOTON_PUBLIC_DEMO.md](docs/PHOTON_PUBLIC_DEM
 | Test 12: null versus zero | Unknown author counts serialized as null. The YouTube author's known follower count was 6,680,000; following/posts remained null. Source and no-match unknown counts were null. |
 | Test 13: real extraction | Fresh real YouTube download, actual Whisper transcript, and three existing frame files; no contract-example transcript. Exact-word fidelity remains imperfect: Whisper transcribed "trunks" as "punks." |
 | Test 14: website flow structure | Rerun completed HTTP 200 in 35.127 seconds with `no_verified_match`; report/display GETs returned 200, one post/report persisted, no leaks. Six of the eight literal checks passed; the two matched-only confidence checks fail on the required null alignment/comparison in a no-match report. Null-aware no-match handling passed. This is not a matched-source rendering proof. |
+| Corrected Instagram local browser | Edge rendered the real transcript, no-source state, unknown metadata as Unavailable, and all three confidence blocks as Not assessed. Automated screenshot capture timed out; a screenshot artifact is still missing. |
 | Photon live exchange | User confirmed the acknowledgment and initial report message arrived. The initial localhost link was not phone-accessible. A temporary public page later rendered both metadata cards, three confidence blocks, findings, and media in Edge. Latest phone-link rendering and the under-60-second target remain acceptance gates. |
 | Focused Python regressions | 93 search/comparison/pipeline tests passed. Separately, 33 runtime/ingest tests passed; Ruff and diff checks passed for the new runtime work. |
-| Instagram correctness regressions | 42 pipeline tests passed; 88 specialist tests passed and one skipped. These cover aliases, resolved provenance, cached self-match rejection, actual gesture/applause evidence, missing classifications, and preservation of genuine spoken contradictions. |
+| Instagram correctness regressions | 42 pipeline tests passed; 88 specialist tests passed and one skipped. These cover aliases, resolved provenance, cached self-match rejection, actual gesture/applause evidence, missing classifications, and preservation of genuine spoken contradictions. Fresh real Instagram analysis passed with honest no-match in 181.458 seconds. A separate real Gemini comparison of the original failure returned not assessed in 5.36 seconds. |
 | Photon regressions | 73 tests passed; TypeScript typecheck passed. |
 | Frontend regressions | 18 tests passed; typecheck and production build passed. Local no-match rendering and local CORS preflight were checked with sharing enabled. |
 
@@ -60,18 +67,18 @@ These focused checks do not claim the full repository test suite was rerun after
 
 | Owner / area | Remaining work | Coordination boundary |
 |---|---|---|
-| Codex: Instagram correctness | Code guards and focused regressions are complete; finish the one fresh real regression. The original technically completed report was withdrawn from public sharing because review found these defects. Investigate any reproducible media-inspection failure. | Preserve original Tiger rows and accepted delivery ledgers. Do not replay the original job or publish an unreviewed result. |
+| Codex: Instagram correctness | Code guards, focused tests, real no-match analysis, and the real caption-comparison regression are complete. Corrected external sharing awaits explicit approval. A transient intermediate media-inspection failure remains unexplained and was not reproduced. | Preserve original Tiger rows and accepted delivery ledgers. The original invalid report remains revoked; use a fresh job for new analyses. Do not blindly republish it. |
 | Jason / media specialist | Improve and evaluate ASR fidelity on representative clips; the current base Whisper model misheard "trunks." Preserve actual audio-derived output and transcript limitations. | Do not hand-edit transcripts to match expected words. |
 | Frontend / deployment owner | Replace the temporary tunnel with stable hosting, coordinate backend reachability, and check the report from a real phone. The demo gateway does not expose public analysis submissions or the homepage. | Avoid changing the active gateway, API-base configuration, or report origin without coordinating restart and link delivery. |
 | Photon owner | Measure a new live acknowledgment and report-delivery run, confirm mobile rendering, and address the 60-second budget. Durable recovery of saved-but-unstarted queue items after a process restart remains unimplemented. | Preserve accepted/ambiguous delivery ledgers; do not blindly resend or delete processing markers. |
-| Integrator / QA | Finish the full agreed pre-demo checklist and test suite. Exercise a spoken real no-match case, a genuinely distinct verified source, transient provider failures, and restart behavior. | Test 14 now verifies the real no-match route; its matched-only checks still need a genuine matched example. Existing Test 11 is a valid silent/no-search-evidence case, not a universal search proof. |
+| Integrator / QA | Finish the full agreed pre-demo checklist and test suite, including the missing final UI screenshot. Exercise a spoken real no-match case, a genuinely distinct verified source, transient provider failures, and restart behavior. | Test 14 now verifies the real no-match route; its matched-only checks still need a genuine matched example. Existing Test 11 is a valid silent/no-search-evidence case, not a universal search proof. |
 | Platform scope | TikTok returned an IP-blocked `MEDIA_UNAVAILABLE` error. One Instagram Reel and the latest failed Reel have downloaded successfully, but broad Instagram reliability is not established. | Do not advertise TikTok support. Keep the conservative pitch scope "YouTube + direct video URLs" until broader platform tests pass. |
 
 ## Current work order
 
 1. Publish these tested fixes and this handoff so teammates can work on the separate items above.
 2. Keep the reviewed bad result unshared; its source-identity and evidence-scope fixes now pass focused tests.
-3. Verify one fresh real Instagram regression with source identity checked and unsupported assessments suppressed.
-4. Publish the exact regression results and coordinate the remaining deployment, latency, and QA gates.
+3. Completed: fresh real Instagram no-match regression and separate real Gemini regression of the unsupported visual claim.
+4. Coordinate stable deployment, the 60-second budget, mobile acceptance, ASR fidelity, and the remaining QA gates. Replacement public sharing awaits explicit approval.
 
 External providers and inaccessible media can still fail. The fixes aim to prevent missing local prerequisites and incorrect failure classification; they do not promise arbitrary URLs always produce a verified source or a report within 60 seconds.
