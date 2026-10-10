@@ -9,6 +9,38 @@ from backend.services.reporting.errors import QuantroError
 from backend.services.storage.tiger import TigerConfigError, TigerStore
 
 
+@pytest.mark.parametrize("frontend_origin,expected_origin", [
+    ("http://localhost:3000/", "http://localhost:3000"),
+    ("", "https://reports.example"),
+])
+def test_frontend_cors_can_remain_local_with_public_report_links(frontend_origin, expected_origin):
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    result = subprocess.run(
+        [sys.executable, "-c", """
+import json
+from fastapi.testclient import TestClient
+from backend.main import app, FRONTEND_ORIGIN
+client = TestClient(app)
+response = client.options('/analyze/job_cors/run', headers={
+    'Origin': FRONTEND_ORIGIN,
+    'Access-Control-Request-Method': 'POST',
+    'Access-Control-Request-Headers': 'Content-Type',
+})
+print(json.dumps({'origin': FRONTEND_ORIGIN, 'status': response.status_code,
+                  'allowed': response.headers.get('access-control-allow-origin')}))
+"""],
+        cwd=Path(__file__).resolve().parents[1],
+        env={**os.environ, "FRONTEND_ORIGIN": frontend_origin, "REPORT_BASE_URL": "https://reports.example/"},
+        capture_output=True, text=True, check=True, timeout=60,
+    )
+    assert json.loads(result.stdout) == {"origin": expected_origin, "status": 200, "allowed": expected_origin}
+
+
 @pytest.fixture
 def store(tmp_path):
     tiger = TigerStore(f"sqlite:///{tmp_path / 'tiger.db'}")

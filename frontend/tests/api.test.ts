@@ -75,3 +75,50 @@ test("malformed display data fails safely", async (t) => {
   t.mock.method(globalThis, "fetch", async () => Response.json({}));
   await assert.rejects(getDisplayModel("report_job_1"), /invalid display model/);
 });
+
+test("read-only report sharing preserves the separate analysis endpoint", async (t) => {
+  const priorApi = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const priorReportApi = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL;
+  t.after(() => {
+    if (priorApi === undefined) delete process.env.NEXT_PUBLIC_API_BASE_URL;
+    else process.env.NEXT_PUBLIC_API_BASE_URL = priorApi;
+    if (priorReportApi === undefined) delete process.env.NEXT_PUBLIC_REPORT_API_BASE_URL;
+    else process.env.NEXT_PUBLIC_REPORT_API_BASE_URL = priorReportApi;
+  });
+  process.env.NEXT_PUBLIC_API_BASE_URL = "http://localhost:8000";
+  process.env.NEXT_PUBLIC_REPORT_API_BASE_URL = "https://reports.example/api/";
+  const urls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    urls.push(url);
+    if (url.endsWith("/run")) return Response.json({ job_id: "job_1", outcome: "no_verified_match",
+      report_id: "report_job_1", warnings: [] });
+    if (!url.endsWith("/display")) return Response.json({ schema_version: "2.1", submitted: {},
+      outcome: "no_verified_match", limitations: [] });
+    return Response.json({ confidence_note: "Evidence is not a probability.", submitted_panel: {}, limitations: [] });
+  });
+  await startAnalysis("https://example.com/video.mp4", "job_1");
+  await getReport("report_job_1");
+  await getDisplayModel("report_job_1");
+  assert.deepEqual(urls, ["http://localhost:8000/analyze/job_1/run",
+    "https://reports.example/api/reports/report_job_1", "https://reports.example/api/reports/report_job_1/display"]);
+  assert.equal(mediaUrl({ media_id: "media_1", playback_url: null, mime_type: "video/mp4" }),
+    "https://reports.example/api/media/media_1");
+
+  const priorWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  t.after(() => {
+    if (priorWindow) Object.defineProperty(globalThis, "window", priorWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  });
+  for (const hostname of ["localhost", "127.0.0.1", "[::1]"]) {
+    Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { hostname } } });
+    await getReport("report_job_1");
+    await getDisplayModel("report_job_1");
+    assert.deepEqual(urls.slice(-2), ["http://localhost:8000/reports/report_job_1",
+      "http://localhost:8000/reports/report_job_1/display"]);
+    assert.equal(mediaUrl({ media_id: "media_1", playback_url: null, mime_type: "video/mp4" }),
+      "http://localhost:8000/media/media_1");
+  }
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { hostname: "reports.example" } } });
+  await getDisplayModel("report_job_1");
+  assert.equal(urls.at(-1), "https://reports.example/api/reports/report_job_1/display");
+});

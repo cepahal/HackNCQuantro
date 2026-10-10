@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { basename } from "node:path";
 import test from "node:test";
 import { readConfig } from "../src/config.ts";
 
@@ -29,4 +30,15 @@ test("rejects unsupported args and invalid bridge ports", () => {
     assert.throws(() => readConfig({ ...env, PHOTON_BRIDGE_PORT: port }, []));
     assert.throws(() => readConfig({ ...env, PHOTON_BACKEND_PORT: port }, []));
   }
+});
+
+test("public sharing is optional and requires its file to remain inside the data directory", () => {
+  assert.equal(readConfig(env, []).publicReportsFile, undefined);
+  assert.throws(() => readConfig({ ...env, PHOTON_PUBLIC_REPORTS_FILE: ".data/photon/public-reports.json" }, []));
+  for (const file of [".data/outside.json", ".data/photon", ".data/photon/../../outside.json"]) {
+    assert.throws(() => readConfig({ ...env, REPORT_BASE_URL: "https://quantro.example", PHOTON_PUBLIC_REPORTS_FILE: file }, []));
+  }
+  const config = readConfig({ ...env, REPORT_BASE_URL: "https://quantro.example", PHOTON_PUBLIC_REPORTS_FILE: ".data/photon/public-reports.json" }, []);
+  assert.equal(basename(config.publicReportsFile!), "public-reports.json");
+  assert.equal(config.reportBaseUrl, "https://quantro.example");
 });

@@ -33,6 +33,13 @@ GEMINI_API_KEY=<key>
 GEMINI_MODEL=gemini-flash-latest
 ```
 
+Install FFmpeg including `ffprobe` before starting the backend. Both executables
+must be visible to the backend process. If an existing Windows terminal has a
+stale PATH after installation, put the absolute directory containing both tools
+in the ignored environment as `MEDIA_TOOLS_DIR`. Startup validates the configured
+directory and both tools before connecting to Tiger Data or accepting requests.
+Restart the backend after changing this setting.
+
 Retrieval and search also need `TIGERDATA_DSN` (the same Tiger URL) and
 `TIGERDATA_SSL_ROOT_CERT=system`, or the absolute path to the service's trusted CA
 bundle on systems that need it. The operational store falls back to `TIGERDATA_DSN`

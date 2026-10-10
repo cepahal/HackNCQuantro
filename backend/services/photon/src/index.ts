@@ -6,10 +6,15 @@ import { readConfig } from "./config.ts";
 import { createReceiver, hasConversation } from "./receive.ts";
 import { createBridgeServer } from "./server.ts";
 import { BridgeError, createSummarySender } from "./summary.ts";
-import { createAnalysisDispatcher } from "./analysis.ts";
+import { assertBackendReady, BACKEND_NOT_READY_MESSAGE, createAnalysisDispatcher } from "./analysis.ts";
+import { createPublicReportPreparer } from "./public-reports.ts";
 
 async function main(): Promise<void> {
   const config = readConfig(process.env, process.argv.slice(2));
+  if (config.cloud) await assertBackendReady(config.backendPort);
+  const prepareReport = config.publicReportsFile
+    ? await createPublicReportPreparer({ directory: config.directory, file: config.publicReportsFile, reportBaseUrl: config.reportBaseUrl })
+    : undefined;
   const cloudApp = config.cloud
     ? await Spectrum({
       projectId: config.projectId, projectSecret: config.projectSecret,
@@ -27,6 +32,7 @@ async function main(): Promise<void> {
   } });
   const sendSummary = createSummarySender({
     deliveryDirectory: join(config.directory, "deliveries"),
+    prepareReport,
     resolveConversation: async (id) => {
       const live = conversations.get(id);
       if (live) return live;
@@ -82,7 +88,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(() => {
-  console.error("Quantro Photon could not start. Check the private env, Node 24, SDK setup and local port. Credentials were omitted.");
+main().catch((error: unknown) => {
+  console.error(error instanceof Error && error.message === BACKEND_NOT_READY_MESSAGE
+    ? BACKEND_NOT_READY_MESSAGE
+    : "Quantro Photon could not start. Check the private env, Node 24, SDK setup and local port. Credentials were omitted.");
   process.exitCode = 1;
 });

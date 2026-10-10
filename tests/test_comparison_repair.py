@@ -4,6 +4,7 @@ from copy import deepcopy
 from unittest.mock import Mock
 
 import pytest
+from google.genai import types
 
 from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.specialist import comparison as comparison_module
@@ -90,6 +91,8 @@ def test_invalid_quote_gets_one_repair_with_original_evidence(monkeypatch, compa
     assert FIRST in repair_prompt and SECOND in repair_prompt
     assert PRIVATE_RESPONSE not in repair_prompt
     assert repair_prompt != first_prompt
+    for call in generate.call_args_list:
+        assert call.args[3]["$defs"]["Evidence"]["properties"]["quote"]["enum"] == [FIRST, SECOND]
     client.close.assert_called_once()
 
 
@@ -136,3 +139,51 @@ def test_provider_failure_does_not_trigger_validation_repair(monkeypatch, compar
     assert caught.value is provider_error
     generate.assert_called_once()
     client.close.assert_called_once()
+
+
+def test_generation_quote_choices_are_exact_actual_transcript_sentences(monkeypatch, comparison_case):
+    clip, context, valid, _ = comparison_case
+    submitted_only = "This exact sentence appears only in the submitted transcript."
+    clip["transcript"]["sentences"][0]["text"] = submitted_only
+    clip["frames"] = [{"frame_id": "frame_001", "timestamp_seconds": 1.0,
+                       "image_path": "FRAME_PATH_IS_NOT_QUOTABLE", "image_url": None}]
+    clip["visual_text"] = [{"frame_id": "frame_001", "timestamp_seconds": 1.0,
+                            "text": "OCR_TEXT_IS_NOT_TRANSCRIPT_EVIDENCE"}]
+    context["windows"].append(deepcopy(context["windows"][0]))
+    client = Mock()
+    generate = Mock(return_value=valid)
+    monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (client, "test-model"))
+    monkeypatch.setattr(comparison_module, "generate_json", generate)
+
+    comparison_module.compare_context_and_caption(clip, context, "Cancel it")
+
+    schema = generate.call_args.args[3]
+    choices = schema["$defs"]["Evidence"]["properties"]["quote"]["enum"]
+    assert choices == [submitted_only, FIRST, SECOND]
+    assert FIRST + " " + SECOND not in choices
+    assert clip["visual_text"][0]["text"] not in choices
+    assert clip["frames"][0]["image_path"] not in choices
+    config = types.GenerateContentConfig(response_mime_type="application/json", response_json_schema=schema)
+    assert config.response_json_schema == schema
+
+
+def test_quote_choices_are_fresh_and_do_not_change_shared_comparison_schema(monkeypatch, comparison_case):
+    clip, context, valid, _ = comparison_case
+    canonical_schema = comparison_module.Comparison.model_json_schema()
+    client = Mock()
+    generate = Mock(return_value=valid)
+    monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (client, "test-model"))
+    monkeypatch.setattr(comparison_module, "generate_json", generate)
+    first_only = "The first request has a unique submitted sentence."
+    second_only = "The second request has a different submitted sentence."
+    clip["transcript"]["sentences"][0]["text"] = first_only
+    comparison_module.compare_context_and_caption(clip, context, "Cancel it")
+    clip["transcript"]["sentences"][0]["text"] = second_only
+    comparison_module.compare_context_and_caption(clip, context, "Cancel it")
+
+    first_schema, second_schema = [call.args[3] for call in generate.call_args_list]
+    assert first_schema is not second_schema
+    assert first_schema["$defs"]["Evidence"]["properties"]["quote"]["enum"] == [first_only, FIRST, SECOND]
+    assert second_schema["$defs"]["Evidence"]["properties"]["quote"]["enum"] == [second_only, FIRST, SECOND]
+    assert comparison_module.Comparison.model_json_schema() == canonical_schema
+    assert "enum" not in canonical_schema["$defs"]["Evidence"]["properties"]["quote"]

@@ -6,6 +6,7 @@ import logging
 import math
 import os
 import ssl
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
@@ -100,77 +101,85 @@ def _web_search(queries: list[str], limit: int, warnings: list[str]) -> dict[str
         trust_env=False,
         verify=ssl.create_default_context(),
     ) as client:
-        for query in queries:
-            try:
-                headers: dict[str, str] = {}
-                params: dict[str, str | int]
-                if name == "serpapi":
-                    endpoint = "https://serpapi.com/search.json"
-                    params = {
-                        "engine": "google",
-                        "q": query,
-                        "api_key": key,
-                        "num": count,
-                    }
-                elif name == "brave":
-                    endpoint = "https://api.search.brave.com/res/v1/web/search"
-                    params = {"q": query, "count": count}
-                    headers = {"X-Subscription-Token": key}
-                else:
-                    endpoint = "https://www.googleapis.com/customsearch/v1"
-                    params = {"q": query, "key": key, "cx": engine, "num": count}
-                response = client.get(endpoint, params=params, headers=headers)
-                response.raise_for_status()
-                data = response.json()
-                if not isinstance(data, dict) or data.get("error"):
-                    raise ValueError("Invalid provider response")
-                rows = (
-                    data.get("organic_results", [])
-                    if name == "serpapi"
-                    else data.get("web", {}).get("results", [])
-                    if name == "brave"
-                    else data.get("items", [])
-                )
-                if not isinstance(rows, list):
-                    raise TypeError("Invalid provider results")
-                for row in rows[:count]:
-                    if not isinstance(row, dict):
-                        continue
-                    raw_url = (
-                        row.get("link")
-                        if name in {"serpapi", "google_cse"}
-                        else row.get("url")
+        def fetch(query: str) -> list[Any]:
+            headers: dict[str, str] = {}
+            params: dict[str, str | int]
+            if name == "serpapi":
+                endpoint = "https://serpapi.com/search.json"
+                params = {
+                    "engine": "google",
+                    "q": query,
+                    "api_key": key,
+                    "num": count,
+                }
+            elif name == "brave":
+                endpoint = "https://api.search.brave.com/res/v1/web/search"
+                params = {"q": query, "count": count}
+                headers = {"X-Subscription-Token": key}
+            else:
+                endpoint = "https://www.googleapis.com/customsearch/v1"
+                params = {"q": query, "key": key, "cx": engine, "num": count}
+            response = client.get(endpoint, params=params, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            if not isinstance(data, dict) or data.get("error"):
+                raise ValueError("Invalid provider response")
+            rows = (
+                data.get("organic_results", [])
+                if name == "serpapi"
+                else data.get("web", {}).get("results", [])
+                if name == "brave"
+                else data.get("items", [])
+            )
+            if not isinstance(rows, list):
+                raise TypeError("Invalid provider results")
+            return rows[:count]
+
+        # Overlap network waits, then merge in query order to preserve ranking,
+        # first-seen metadata, provenance, and failure behavior.
+        with ThreadPoolExecutor(max_workers=min(3, len(queries))) as executor:
+            futures = [executor.submit(fetch, query) for query in queries]
+            for query, future in zip(queries, futures, strict=True):
+                try:
+                    rows = future.result()
+                    for row in rows:
+                        if not isinstance(row, dict):
+                            continue
+                        raw_url = (
+                            row.get("link")
+                            if name in {"serpapi", "google_cse"}
+                            else row.get("url")
+                        )
+                        try:
+                            url = _candidate_url(raw_url)
+                        except (QuantroError, TypeError, ValueError):
+                            continue
+                        if url in found:
+                            if query not in found[url]["discovered_by_queries"]:
+                                found[url]["discovered_by_queries"].append(query)
+                            continue
+                        title = row.get("title", row.get("name"))
+                        snippet = row.get("snippet", row.get("description"))
+                        found[url] = {
+                            "candidate_id": "candidate_" + uuid4().hex[:8],
+                            "url": url,
+                            "title": title if isinstance(title, str) else None,
+                            "publisher": urlsplit(url).hostname,
+                            "published_at": None,
+                            "snippet": snippet[:500] if isinstance(snippet, str) else None,
+                            "discovered_by_queries": [query],
+                        }
+                except (httpx.HTTPError, ValueError, TypeError, AttributeError) as error:
+                    failures += 1
+                    retryable = (
+                        retryable
+                        or not isinstance(error, httpx.HTTPStatusError)
+                        or error.response.status_code in {408, 429}
+                        or (
+                            isinstance(error, httpx.HTTPStatusError)
+                            and error.response.status_code >= 500
+                        )
                     )
-                    try:
-                        url = _candidate_url(raw_url)
-                    except (QuantroError, TypeError, ValueError):
-                        continue
-                    if url in found:
-                        if query not in found[url]["discovered_by_queries"]:
-                            found[url]["discovered_by_queries"].append(query)
-                        continue
-                    title = row.get("title", row.get("name"))
-                    snippet = row.get("snippet", row.get("description"))
-                    found[url] = {
-                        "candidate_id": "candidate_" + uuid4().hex[:8],
-                        "url": url,
-                        "title": title if isinstance(title, str) else None,
-                        "publisher": urlsplit(url).hostname,
-                        "published_at": None,
-                        "snippet": snippet[:500] if isinstance(snippet, str) else None,
-                        "discovered_by_queries": [query],
-                    }
-            except (httpx.HTTPError, ValueError, TypeError, AttributeError) as error:
-                failures += 1
-                retryable = (
-                    retryable
-                    or not isinstance(error, httpx.HTTPStatusError)
-                    or error.response.status_code in {408, 429}
-                    or (
-                        isinstance(error, httpx.HTTPStatusError)
-                        and error.response.status_code >= 500
-                    )
-                )
     if failures == len(queries):
         raise QuantroError(
             "SEARCH_FAILED",

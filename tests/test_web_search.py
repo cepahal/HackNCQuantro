@@ -1,6 +1,7 @@
 """Fixed-host web search contracts using deterministic HTTP response fixtures."""
 
 import importlib
+from threading import Barrier, Event, Lock
 
 import httpx
 import pytest
@@ -207,3 +208,79 @@ def test_supported_media_ranks_before_articles_before_limit(monkeypatch, web):
         "https://news.example.com/q1",
         "https://news.example.com/q2",
     ]
+
+
+def test_parallel_queries_keep_query_order_provenance_and_partial_failures(monkeypatch, web):
+    monkeypatch.setenv("SEARCH_PROVIDER", "serpapi")
+    entered = Barrier(3, timeout=5)
+    third_done, second_done = Event(), Event()
+    lock = Lock()
+    completed = []
+    active = maximum = 0
+    shared = "https://www.youtube.com/watch?v=shared"
+
+    def response(request):
+        nonlocal active, maximum
+        query = request.url.params["q"]
+        with lock:
+            active += 1
+            maximum = max(maximum, active)
+        try:
+            if query == "failed":
+                return httpx.Response(503, json={"error": "test-private-key"})
+            # All three requests must overlap. Release them in reverse order.
+            entered.wait()
+            if query == "first":
+                assert second_done.wait(5)
+            elif query == "second":
+                assert third_done.wait(5)
+            with lock:
+                completed.append(query)
+            if query == "third":
+                third_done.set()
+            elif query == "second":
+                second_done.set()
+            return httpx.Response(200, json={"organic_results": [
+                {"link": shared, "title": query},
+                {"link": f"https://www.youtube.com/watch?v={query}"},
+            ]})
+        finally:
+            with lock:
+                active -= 1
+
+    web(response)
+    result = module.search_candidates(
+        {"queries": ["first", "second", "third", "failed"], "warnings": ["inherited"]}, 9
+    )
+    assert maximum == 3
+    assert completed == ["third", "second", "first"]
+    assert [candidate["url"] for candidate in result["candidates"]] == [
+        shared,
+        "https://www.youtube.com/watch?v=first",
+        "https://www.youtube.com/watch?v=second",
+        "https://www.youtube.com/watch?v=third",
+    ]
+    assert result["candidates"][0]["title"] == "first"
+    assert result["candidates"][0]["discovered_by_queries"] == ["first", "second", "third"]
+    assert result["warnings"] == ["inherited", "1 search queries failed; results may be incomplete."]
+
+
+@pytest.mark.parametrize("second_status,retryable", [(401, False), (503, True)])
+def test_parallel_total_failure_preserves_retryability(monkeypatch, web, second_status, retryable):
+    monkeypatch.setenv("SEARCH_PROVIDER", "serpapi")
+    entered = Barrier(2, timeout=5)
+
+    def response(request):
+        entered.wait()
+        return httpx.Response(
+            401 if request.url.params["q"] == "first" else second_status,
+            json={"error": "test-private-key"},
+        )
+
+    web(response)
+    with pytest.raises(QuantroError) as caught:
+        module.search_candidates(["first", "second"], 5)
+    assert caught.value.code == "SEARCH_FAILED"
+    assert caught.value.stage == "search_candidates"
+    assert caught.value.retryable is retryable
+    assert "test-private-key" not in str(caught.value)

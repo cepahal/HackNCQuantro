@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repository = fileURLToPath(new URL("../../../../", import.meta.url));
@@ -27,8 +27,18 @@ export function readConfig(env: NodeJS.ProcessEnv, args: string[]) {
   if (!/^\d+$/.test(backendPortText) || !Number.isInteger(backendPort) || backendPort < 1024 || backendPort > 65535) {
     throw new Error("PHOTON_BACKEND_PORT must be a local backend port from 1024 to 65535.");
   }
+  const directory = resolve(repository, env.PHOTON_DATA_DIR?.trim() || ".data/photon");
+  const publicReportsText = env.PHOTON_PUBLIC_REPORTS_FILE?.trim();
+  const publicReportsFile = publicReportsText ? resolve(repository, publicReportsText) : undefined;
+  if (publicReportsFile) {
+    const path = relative(directory, publicReportsFile);
+    if (!path || path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path)) {
+      throw new Error("PHOTON_PUBLIC_REPORTS_FILE must be a file inside PHOTON_DATA_DIR.");
+    }
+    if (!env.REPORT_BASE_URL?.trim()) throw new Error("Public report sharing requires REPORT_BASE_URL.");
+  }
   return {
     cloud, token, projectId, projectSecret, port, backendPort,
-    directory: resolve(repository, env.PHOTON_DATA_DIR?.trim() || ".data/photon"),
+    directory, publicReportsFile, reportBaseUrl: env.REPORT_BASE_URL?.trim() ?? "",
   };
 }
