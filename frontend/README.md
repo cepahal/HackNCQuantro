@@ -33,8 +33,12 @@ npm --prefix frontend run build
 npm --prefix frontend start
 ```
 
-Source discovery currently searches the indexed Tiger Data corpus. A no-match result is a
-valid evidence-limited result. This UI does not claim public-web coverage or treat missing
-evidence as proof that a post is false. The MVP runs requests synchronously; keep the tab open
-while analysis completes. Authentication and access control for private submissions must be
+Source discovery uses Exa when SEARCH_PROVIDER=exa, or the indexed Tiger Data corpus when SEARCH_PROVIDER=tiger. A no-match result is a
+valid evidence-limited result. The UI does not treat missing evidence as proof that a post is false. The MVP starts requests synchronously. After a page refresh, the results page polls
+GET /analyze/{job_id}/status and opens the saved report when ready without resubmitting.
+Polling stops after about 15 minutes; refresh to check again. A backend restart does not
+resume interrupted jobs automatically. Authentication and access control for private submissions must be
 added before hosting submissions for people outside the demo team.
+
+The passage map labels approximate source gaps rather than confirmed deletions. Surrounding
+context windows show their requested intervals and transcript coverage explicitly.

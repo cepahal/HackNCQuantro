@@ -21,7 +21,9 @@ The four empty merge scaffolds formerly under `services/_archive/` were deleted
 3. Extraction produces contract MediaFeatures. Requested transcription/OCR
    provider failures are errors; missing speech is explicitly unavailable.
 4. Query generation feeds the configured search provider: Exa public-web search
-   or the legacy Tiger Post metadata corpus. Candidate webpages are attempted
+   or the legacy Tiger Post metadata corpus. Query ordering mixes spoken, OCR, and title evidence. Exa uses the first three
+   clues plus a video-host search, with at most four requests. Exa prioritizes recording-shaped URLs within fetched results
+   before applying the candidate limit; this is not verification. Candidate webpages are attempted
    through the guarded downloader; unsupported media is skipped with warnings. The submitted URL is excluded from source selection.
 5. Transcript alignment verifies candidates conservatively. Only a verified
    candidate proceeds to surrounding context and caption comparison.
@@ -29,7 +31,10 @@ The four empty merge scaffolds formerly under `services/_archive/` were deleted
    limitations and evidence. Filesystem paths are removed from public results.
 7. Report is saved before the job is completed. Repeated completed requests reuse
    it; concurrent first-save-wins requests deliver the actual stored report.
-8. The frontend loads `GET /reports/{report_id}` and displays the saved result.
+8. Job-owned temporary downloads and frames are removed after reporting or failure;
+   original media bytes remain in Tiger for playback. Paths in stored internal feature
+   metadata are not a durable file cache.
+9. The frontend loads `GET /reports/{report_id}` and displays the saved result.
    With a conversation ID, summary delivery runs after save; delivery failure
    does not discard a successfully saved report.
 
@@ -66,7 +71,7 @@ The homepage handles URL submission, loading, safe errors and saved results.
 metadata, source/context confidence, clip coverage, matching/edit information,
 findings and limitations; unknown fields are displayed as unavailable.
 
-API routes are `/analyze/{job_id}/run`, `/reports/{report_id}`,
+API routes are `/analyze/{job_id}/run`, `/analyze/{job_id}/status`, `/reports/{report_id}`,
 `/ingest/{job_id}` (POST/GET), and `/media/{media_id}`. CORS uses REPORT_BASE_URL,
 default localhost:3000. There is no generic POST /analyze route.
 
@@ -84,3 +89,15 @@ See its README and `docs/RUNBOOK.md` for operator steps. Local Whisper and Exa
 production function calls were verified on 2026-10-10; see `docs/PROVIDERS.md` for
 deployment settings and limits. The user reports a successful team Photon round
 trip; the new deployed Exa-to-verified-source path still needs a live check.
+
+
+The website supports public link submission, not file uploads. Reloading a running
+results URL polls persisted job state without starting another analysis. The status
+route returns only job status, a completed report ID, and a safe failure envelope.
+It is not a durable task queue: interrupted jobs still require a new submission.
+
+The HTTP Photon webhook reserves inbound conversation/job pairs while processing.
+An analysis or summary-delivery failure releases the reservation for a later retry;
+a retry of a completed analysis reuses its report. Successful replies remain deduplicated
+in the process-local tracker. Cross-process/restart deduplication still requires durable
+inbound tracking; the Spectrum sidecar retains its separate persistent queue.

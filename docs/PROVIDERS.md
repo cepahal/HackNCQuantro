@@ -53,8 +53,12 @@ workspace or deployed service is automatically updated by committing this code.
 - Function 4 selects Exa for SEARCH_PROVIDER=exa. SEARCH_PROVIDER=tiger retains
   the previous stored-corpus mode; unset remains tiger for legacy compatibility.
   There is no silent fallback if Exa credentials or calls fail.
-- Exa makes at most four queries, with at most ten results/query. Results merge
-  by round-robin rank with exact URL deduplication and matched-query provenance.
+- Exa makes at most four requests, with at most ten results/request. Three use
+  the first mixed speech/OCR/title clues; one repeats the leading clue using
+  the [documented includeDomains filter](https://exa.ai/docs/reference/search)
+  for YouTube, Vimeo and Internet Archive. General search remains unrestricted.
+  Results merge by round-robin rank and prefer recording-shaped URLs before
+  limiting, with exact URL deduplication and matched-query provenance.
   It returns the existing CandidateList contract; optional metadata stays null
   when not available. A search result is never a verified recording.
 - Some failed queries produce an explicit limited-coverage warning. Complete
@@ -83,3 +87,13 @@ Docker is unavailable on this development machine, so image build, hosted memory
 use, hosted Tiger access and full deployed analysis were not validated here.
 The user reports a successful Photon video-to-website round trip on the team's
 setup; that is separate from verification of this new deployed search path.
+
+
+### Integration repair validation
+
+A fresh local small.en Whisper run on the existing compressed Kennedy sample
+returned 3 sentences and 72 timed words in 3.80 seconds, with a maximum resident
+set of 1,027,145,728 bytes (about 980 MiB). This is one macOS CPU measurement,
+not a Linux production sizing benchmark. Allow additional memory for the API,
+frame processing, database client, and simultaneous requests. Hosted capacity
+must be validated before relying on the current free-plan blueprint.
