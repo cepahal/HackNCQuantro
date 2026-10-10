@@ -63,6 +63,37 @@ def _phrase(text: object, *, minimum: int = 2) -> str | None:
     return '"' + " ".join(words) + '"'
 
 
+_TITLE_NOISE = {"motivational", "inspirational", "motivation", "inspiration", "speech", "speeches",
+                "quote", "quotes", "short", "shorts", "video", "videos", "viral", "trending",
+                "official", "full", "original", "subscribe", "like", "share"}
+
+
+def _title_clue(title):
+    """Compact unverified metadata, without inferring a speaker's identity."""
+    if title is None:
+        return None
+    if not isinstance(title, str):
+        raise TypeError("Title must be a string")
+    words = []
+    seen = set()
+    for word in _WORDS.findall(title[:4000]):
+        normalized = word.casefold()
+        if normalized in seen or normalized in _STOP | _TITLE_NOISE or len(word) > 40:
+            continue
+        seen.add(normalized)
+        words.append(word)
+        if len(words) == 6:
+            break
+    return " ".join(words)[:160] or None
+
+
+def _with_clue(clue, phrase):
+    if not phrase:
+        return None
+    combined = f"{clue} {phrase}" if clue else phrase
+    return combined if len(combined) <= 512 else phrase
+
+
 def build_search_queries(features: dict[str, Any], post: Post) -> Queries:
     """Use spoken phrases, OCR and post clues; captions remain unverified clues."""
     # aligned with shared/types.py on 2026-10-10
@@ -99,14 +130,25 @@ def build_search_queries(features: dict[str, Any], post: Post) -> Queries:
 
             spoken = []
             if transcript["status"] != "unavailable":
-                spoken = [p for item in sentences[:500] if (p := _phrase(item["text"], minimum=4))][:4]
+                # Keep a quoted query within an utterance instead of crossing
+                # punctuation into the next thought just to fill twelve words.
+                spoken = list(dict.fromkeys(p for item in sentences[:500]
+                    for part in re.split(r"[.!?]+", item["text"])
+                    if (p := _phrase(part, minimum=4))))[:4]
             visual = [p for item in visible[:3] if (p := _phrase(item["text"]))]
             title = _phrase(post["title"]) if post["title"] is not None else None
-            # Providers may execute only four queries. Put different evidence types
-            # in that prefix so a speech-heavy clip cannot crowd out visual clues.
-            for phrase in [*spoken[:1], *visual[:1], title, *spoken[1:2]]:
-                append(phrase)
-            for phrase in [*spoken[2:], *visual[1:]]:
+            clue = _title_clue(post["title"])
+            if clue:
+                result["warnings"].append("The submitted title is an unverified search clue, not verified speaker identity.")
+            # The first clue also drives recording-host search. Include title
+            # context there, but keep a speech-only query if metadata is wrong.
+            if spoken:
+                append(_with_clue(clue, spoken[0]))
+                append(spoken[0])
+            if visual:
+                append(_with_clue(clue, visual[0]))
+            append(title)
+            for phrase in [*spoken[1:], *visual]:
                 append(phrase)
             caption = post["caption"]
             if caption is not None:

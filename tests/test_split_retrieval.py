@@ -91,3 +91,33 @@ def test_worker_downloads_fixed_paths_with_shared_budget(tmp_path,monkeypatch,ca
         assert json.loads(capsys.readouterr().out)['acodec']=='aac'
     else:
         with pytest.raises(ValueError):worker._split_media_main(args)
+
+
+def test_stream_selection_downshifts_to_fit_audio_and_video_budget():
+    def video(height, size):
+        return dict(url='https://video.example/file', protocol='https', ext='mp4',
+                    vcodec='avc1', acodec='none', height=height, filesize=size)
+    large, small = video(720, 203), video(360, 65)
+    audio = dict(url='https://audio.example/file', protocol='https', ext='m4a',
+                 vcodec='none', acodec='aac', filesize=25)
+    info = dict(formats=[large, small, audio], requested_formats=[large, audio])
+    assert worker._budgeted_streams(info, 100) == [small, audio]
+    small['has_drm'] = True
+    with pytest.raises(worker.SplitMediaTooLargeError):
+        worker._budgeted_streams(info, 100)
+    small['has_drm'] = False
+    audio['filesize'] = 40
+    with pytest.raises(worker.SplitMediaTooLargeError):
+        worker._budgeted_streams(info, 100)
+
+
+def test_oversize_worker_result_is_reported_without_private_output(tmp_path, monkeypatch):
+    monkeypatch.setattr(retrieval.subprocess, 'run', lambda *a, **k:
+                        subprocess.CompletedProcess(a[0], 4, '', 'private details'))
+    with pytest.raises(retrieval.RetrievalError) as caught:
+        retrieval._retrieve_split_media('https://youtube.com/watch?v=test', tmp_path,
+                                       100, time.monotonic() + 30)
+    assert caught.value.code == 'MEDIA_UNAVAILABLE'
+    assert caught.value.status_code == 413
+    assert 'download limit' in str(caught.value)
+    assert 'private' not in str(caught.value)
