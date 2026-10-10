@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 
-from ..reporting.errors import ErrorCode, QuantroError
+from ..shared.errors import ErrorCode, QuantroError
 
 
 def _retryable(exc):

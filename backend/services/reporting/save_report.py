@@ -17,9 +17,13 @@ from functools import cache
 from typing import Any, Protocol
 from urllib.parse import quote
 
+from ..shared.contracts import validate_contract_result
+from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
+from ..shared.errors import Stage as _ContractStage
+from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.types import JobCompletionResult, ReportV2, parse_stage_output
+from ..shared.types import JobCompletionResult as _ReturnModel
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
-from .errors import ErrorCode, QuantroError, Stage, normalize_exception
-from .types import JobCompletionResult, ReportV2, parse_stage_output
 
 _DEFAULT_REPORT_BASE_URL = "http://localhost:3000"
 
@@ -115,37 +119,41 @@ def save_report_and_complete_job(
     report_store: ReportStore | None = None,
     job_store: JobStore | None = None,
 ) -> JobCompletionResult:
-    if isinstance(report, Mapping):
-        report = parse_stage_output(ReportV2, report, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
-    if report.job_id != job_id:
-        raise QuantroError(
-            code=ErrorCode.PROCESSING_FAILED,
-            stage=Stage.SAVE_REPORT_AND_COMPLETE_JOB,
-            message="job_id mismatch",
-        )
-
+    # aligned with shared/types.py on 2026-10-10
     try:
-        report_store = report_store if report_store is not None else get_report_store()
-        job_store = job_store if job_store is not None else get_job_store()
-    except Exception as exc:
-        raise normalize_exception(Stage.SAVE_REPORT_AND_COMPLETE_JOB, exc) from exc
-    report_id = report_id_for_job(job_id)
+        if isinstance(report, Mapping):
+            report = parse_stage_output(ReportV2, report, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
+        if report.job_id != job_id:
+            raise QuantroError(
+                code=ErrorCode.PROCESSING_FAILED,
+                stage=Stage.SAVE_REPORT_AND_COMPLETE_JOB,
+                message="job_id mismatch",
+            )
 
-    try:
-        report_store.put(report_id, report.model_dump_json())
-    except Exception as exc:
-        raise normalize_exception(Stage.SAVE_REPORT_AND_COMPLETE_JOB, exc) from exc
+        try:
+            report_store = report_store if report_store is not None else get_report_store()
+            job_store = job_store if job_store is not None else get_job_store()
+        except Exception as exc:
+            raise normalize_exception(Stage.SAVE_REPORT_AND_COMPLETE_JOB, exc) from exc
+        report_id = report_id_for_job(job_id)
 
-    completed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-    try:
-        job_store.mark_completed(job_id, report_id, completed_at)
-    except Exception as exc:
-        raise normalize_exception(Stage.SAVE_REPORT_AND_COMPLETE_JOB, exc) from exc
+        try:
+            report_store.put(report_id, report.model_dump_json())
+        except Exception as exc:
+            raise normalize_exception(Stage.SAVE_REPORT_AND_COMPLETE_JOB, exc) from exc
 
-    return JobCompletionResult(
-        job_id=job_id,
-        status="completed",
-        report_id=report_id,
-        report_url=_report_url(report_id),
-        completed_at=completed_at,
-    )
+        completed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        try:
+            job_store.mark_completed(job_id, report_id, completed_at)
+        except Exception as exc:
+            raise normalize_exception(Stage.SAVE_REPORT_AND_COMPLETE_JOB, exc) from exc
+
+        return validate_contract_result(_ReturnModel, JobCompletionResult(
+            job_id=job_id,
+            status="completed",
+            report_id=report_id,
+            report_url=_report_url(report_id),
+            completed_at=completed_at,
+        ), _ContractStage.SAVE_REPORT_AND_COMPLETE_JOB, json_native=False)
+    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+        raise _normalize_contract_exception(_ContractStage.SAVE_REPORT_AND_COMPLETE_JOB, exc) from None

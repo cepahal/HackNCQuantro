@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from backend.routes.common import get_tiger_store, not_found, quantro_error_response
 from backend.services.pipeline.run_ingest import run_ingest
 from backend.services.reporting.build_report import sanitize_report
-from backend.services.reporting.errors import ErrorCode, QuantroError, Stage
+from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.storage.tiger import TigerStore
 
 router = APIRouter()

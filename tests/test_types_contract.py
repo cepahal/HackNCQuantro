@@ -1,5 +1,4 @@
 import json
-from typing import get_type_hints
 
 import pytest
 from pydantic import ValidationError
@@ -87,7 +86,8 @@ def test_enum_has_exact_contract_values(enum):
     ids=lambda m: m.__name__,
 )
 def test_post_models_match_retrieval_owner_contract(ours, theirs):
-    assert set(ours.model_fields) == set(get_type_hints(theirs))
+    assert ours is theirs
+    assert set(ours.model_fields) == set(theirs.model_fields)
 
 
 @pytest.mark.parametrize(

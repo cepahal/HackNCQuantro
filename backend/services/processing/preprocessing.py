@@ -3,6 +3,10 @@
 Call from the backend. Generated frame files belong to the job and must be
 removed by job cleanup after reporting. No database credentials are needed.
 """
+
+from ..shared.contracts import contract_input, validate_contract_result
+from ..shared.types import MediaFeatures as _ReturnModel
+from ..shared.errors import Stage as _ContractStage, normalize_exception as _normalize_contract_exception
 import json
 import math
 from pathlib import Path
@@ -10,7 +14,7 @@ import subprocess
 import tempfile
 
 
-from ..reporting.errors import QuantroError, Stage
+from ..shared.errors import QuantroError, Stage
 from ..specialist.gemini import client_and_model, generate_json
 
 
@@ -142,14 +146,20 @@ def _sentences(data, start, end, media_id, first_index):
 
 def extract_media_features(media, options=None):
     """Extract v2 features, normalizing invalid input and media failures."""
+    # aligned with shared/types.py on 2026-10-10
+    media = contract_input(media)
+    options = contract_input(options)
     try:
-        return _extract_media_features(media, options)
-    except QuantroError:
-        raise
-    except (KeyError, TypeError, ValueError, OSError):
-        raise ExtractionError(
-            "PROCESSING_FAILED", "Media extraction inputs or media metadata are invalid."
-        ) from None
+        try:
+            return validate_contract_result(_ReturnModel, _extract_media_features(media, options), _ContractStage.EXTRACT_MEDIA_FEATURES, json_native=True)
+        except QuantroError:
+            raise
+        except (KeyError, TypeError, ValueError, OSError):
+            raise ExtractionError(
+                "PROCESSING_FAILED", "Media extraction inputs or media metadata are invalid."
+            ) from None
+    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+        raise _normalize_contract_exception(_ContractStage.EXTRACT_MEDIA_FEATURES, exc) from None
 
 
 def _image_features(media, path, options):

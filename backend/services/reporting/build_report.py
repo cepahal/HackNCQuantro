@@ -10,8 +10,11 @@ from author or engagement fields.
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from .errors import ErrorCode, QuantroError, Stage
-from .types import (
+from ..shared.contracts import validate_contract_result
+from ..shared.errors import ErrorCode, QuantroError, Stage
+from ..shared.errors import Stage as _ContractStage
+from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.types import (
     Alignment,
     Comparison,
     ConfidenceLevel,
@@ -22,6 +25,7 @@ from .types import (
     ReportV2,
     parse_stage_output,
 )
+from ..shared.types import ReportV2 as _ReturnModel
 
 NO_VERIFIED_SOURCE_LIMITATION = "No verified source was found for the submitted clip."
 
@@ -90,76 +94,80 @@ def build_report(
     *,
     extra_limitations: Sequence[str] = (),
 ) -> ReportV2:
-    submitted_post = parse_stage_output(Post, submitted_post, Stage.BUILD_REPORT)
-    submitted_features = parse_stage_output(MediaFeatures, submitted_features, Stage.BUILD_REPORT)
-    source_post = parse_stage_output(Post, source_post, Stage.BUILD_REPORT) if source_post is not None else None
-    source_features = (
-        parse_stage_output(MediaFeatures, source_features, Stage.BUILD_REPORT)
-        if source_features is not None else None
-    )
-    alignment = parse_stage_output(Alignment, alignment, Stage.BUILD_REPORT) if alignment is not None else None
-    context = parse_stage_output(Context, context, Stage.BUILD_REPORT) if context is not None else None
-    comparison = parse_stage_output(Comparison, comparison, Stage.BUILD_REPORT) if comparison is not None else None
-    if submitted_post.media.media_id != submitted_features.media_id:
-        raise _build_error("Submitted post and features describe different media")
+    # aligned with shared/types.py on 2026-10-10
+    try:
+        submitted_post = parse_stage_output(Post, submitted_post, Stage.BUILD_REPORT)
+        submitted_features = parse_stage_output(MediaFeatures, submitted_features, Stage.BUILD_REPORT)
+        source_post = parse_stage_output(Post, source_post, Stage.BUILD_REPORT) if source_post is not None else None
+        source_features = (
+            parse_stage_output(MediaFeatures, source_features, Stage.BUILD_REPORT)
+            if source_features is not None else None
+        )
+        alignment = parse_stage_output(Alignment, alignment, Stage.BUILD_REPORT) if alignment is not None else None
+        context = parse_stage_output(Context, context, Stage.BUILD_REPORT) if context is not None else None
+        comparison = parse_stage_output(Comparison, comparison, Stage.BUILD_REPORT) if comparison is not None else None
+        if submitted_post.media.media_id != submitted_features.media_id:
+            raise _build_error("Submitted post and features describe different media")
 
-    matched = source_post is not None and alignment is not None and alignment.status == "verified"
-    report: dict[str, Any] = {
-        "schema_version": "2.1",
-        "job_id": job_id,
-        "submitted": _report_media(submitted_post, submitted_features),
-        "source": None,
-        "alignment": None,
-        "context": None,
-        "comparison": None,
-        "summary": None,
-    }
-
-    if matched:
-        if alignment.match_quality.confidence.level not in {ConfidenceLevel.HIGH, ConfidenceLevel.MODERATE} or not alignment.matches:
-            raise _build_error("A verified source requires an accepted passage and high or moderate match confidence")
-        if source_features is None or context is None or comparison is None:
-            raise _build_error("Missing confidence object for matched report")
-        if source_post.candidate_id is None:
-            raise _build_error("Source post is missing its candidate_id")
-        source_media_ids = {
-            source_post.media.media_id,
-            source_features.media_id,
-            alignment.source_media_id,
-            context.source_media_id,
+        matched = source_post is not None and alignment is not None and alignment.status == "verified"
+        report: dict[str, Any] = {
+            "schema_version": "2.1",
+            "job_id": job_id,
+            "submitted": _report_media(submitted_post, submitted_features),
+            "source": None,
+            "alignment": None,
+            "context": None,
+            "comparison": None,
+            "summary": None,
         }
-        if len(source_media_ids) != 1 or alignment.clip_media_id != submitted_features.media_id:
-            raise _build_error("Source post, features, alignment and context describe different media")
 
-        report.update(
-            outcome=Outcome.MATCHED.value,
-            source=_report_media(source_post, source_features),
-            alignment=alignment.model_dump(mode="json"),
-            context=context.model_dump(mode="json"),
-            comparison=comparison.model_dump(mode="json"),
-            summary=comparison.summary,
-            limitations=merge_limitations(
-                alignment.limitations,
-                alignment.match_quality.confidence.limitations,
-                comparison.limitations,
-                comparison.assessment_confidence.limitations,
-                context.limitations,
-                submitted_post.retrieval.warnings,
-                source_post.retrieval.warnings,
-                submitted_features.warnings,
-                source_features.warnings,
-                extra_limitations,
-            ),
-        )
-    else:
-        report.update(
-            outcome=Outcome.NO_VERIFIED_MATCH.value,
-            limitations=merge_limitations(
-                [NO_VERIFIED_SOURCE_LIMITATION],
-                submitted_post.retrieval.warnings,
-                submitted_features.warnings,
-                extra_limitations,
-            ),
-        )
+        if matched:
+            if alignment.match_quality.confidence.level not in {ConfidenceLevel.HIGH, ConfidenceLevel.MODERATE} or not alignment.matches:
+                raise _build_error("A verified source requires an accepted passage and high or moderate match confidence")
+            if source_features is None or context is None or comparison is None:
+                raise _build_error("Missing confidence object for matched report")
+            if source_post.candidate_id is None:
+                raise _build_error("Source post is missing its candidate_id")
+            source_media_ids = {
+                source_post.media.media_id,
+                source_features.media_id,
+                alignment.source_media_id,
+                context.source_media_id,
+            }
+            if len(source_media_ids) != 1 or alignment.clip_media_id != submitted_features.media_id:
+                raise _build_error("Source post, features, alignment and context describe different media")
 
-    return parse_stage_output(ReportV2, sanitize_report(report), Stage.BUILD_REPORT)
+            report.update(
+                outcome=Outcome.MATCHED.value,
+                source=_report_media(source_post, source_features),
+                alignment=alignment.model_dump(mode="json"),
+                context=context.model_dump(mode="json"),
+                comparison=comparison.model_dump(mode="json"),
+                summary=comparison.summary,
+                limitations=merge_limitations(
+                    alignment.limitations,
+                    alignment.match_quality.confidence.limitations,
+                    comparison.limitations,
+                    comparison.assessment_confidence.limitations,
+                    context.limitations,
+                    submitted_post.retrieval.warnings,
+                    source_post.retrieval.warnings,
+                    submitted_features.warnings,
+                    source_features.warnings,
+                    extra_limitations,
+                ),
+            )
+        else:
+            report.update(
+                outcome=Outcome.NO_VERIFIED_MATCH.value,
+                limitations=merge_limitations(
+                    [NO_VERIFIED_SOURCE_LIMITATION],
+                    submitted_post.retrieval.warnings,
+                    submitted_features.warnings,
+                    extra_limitations,
+                ),
+            )
+
+        return validate_contract_result(_ReturnModel, parse_stage_output(ReportV2, sanitize_report(report), Stage.BUILD_REPORT), _ContractStage.BUILD_REPORT, json_native=False)
+    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+        raise _normalize_contract_exception(_ContractStage.BUILD_REPORT, exc) from None

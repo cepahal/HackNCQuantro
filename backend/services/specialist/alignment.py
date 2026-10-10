@@ -4,10 +4,14 @@ Only fully matched submitted sentences are accepted. Word timestamps are not
 invented. Repeated source passages are left ambiguous. No audio/visual check
 is claimed; accepted transcript matches therefore have moderate confidence.
 """
+
+from ..shared.contracts import contract_input, validate_contract_result
+from ..shared.types import Alignment as _ReturnModel
+from ..shared.errors import Stage as _ContractStage, normalize_exception as _normalize_contract_exception
 from difflib import SequenceMatcher
 import re
 
-from ..reporting.errors import QuantroError, Stage
+from ..shared.errors import QuantroError, Stage
 from .validation import validate_features, merge_ranges
 
 _STOP = set('a an the and or but if then this that those these it its is are was were be been being to of for in on at as i you he she we they my your our their would could should will can do does did so not no with from by'.split())
@@ -35,13 +39,19 @@ def _occurrences(needle, haystack):
 
 
 def verify_and_align(clip_features, candidate_features):
+    # aligned with shared/types.py on 2026-10-10
+    clip_features = contract_input(clip_features)
+    candidate_features = contract_input(candidate_features)
     try:
-        duration = validate_features(clip_features)
-        validate_features(candidate_features)
-        return _align(clip_features, candidate_features, duration)
-    except (KeyError, TypeError, ValueError):
-        raise QuantroError('PROCESSING_FAILED', Stage.VERIFY_AND_ALIGN,
-                           'Media features failed alignment validation.') from None
+        try:
+            duration = validate_features(clip_features)
+            validate_features(candidate_features)
+            return validate_contract_result(_ReturnModel, _align(clip_features, candidate_features, duration), _ContractStage.VERIFY_AND_ALIGN, json_native=True)
+        except (KeyError, TypeError, ValueError):
+            raise QuantroError('PROCESSING_FAILED', Stage.VERIFY_AND_ALIGN,
+                               'Media features failed alignment validation.') from None
+    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+        raise _normalize_contract_exception(_ContractStage.VERIFY_AND_ALIGN, exc) from None
 
 
 def _align(clip, source, duration):

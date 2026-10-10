@@ -95,7 +95,7 @@ def test_media_unavailable_returns_404_and_marks_job_failed(client, store, monke
 
     assert response.status_code == 404
     assert response.json() == {"error": {"code": "MEDIA_UNAVAILABLE", "stage": "retrieve_post",
-                                         "message": "The media could not be retrieved.", "retryable": False}}
+                                         "message": "The submitted video could not be retrieved.", "retryable": False}}
     job = store.get_job("job_2")
     assert (job["status"], job["error_code"], job["error_stage"]) == ("failed", "MEDIA_UNAVAILABLE", "retrieve_post")
     assert job["post_json"] is None and job["features_json"] is None

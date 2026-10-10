@@ -17,7 +17,7 @@ import stat
 from pathlib import Path
 from typing import Protocol, cast
 
-from .post_contract import Post
+from ..shared.types import Post
 
 ROOT = Path(__file__).resolve().parents[3]
 MAX_MEDIA_BYTES = 100_000_000

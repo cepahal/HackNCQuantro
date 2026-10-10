@@ -1,7 +1,7 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from backend.services.reporting.errors import ErrorCode, QuantroError
+from backend.services.shared.errors import ErrorCode, QuantroError
 from backend.services.storage.tiger import TigerStore
 
 _STATUS_BY_CODE = {

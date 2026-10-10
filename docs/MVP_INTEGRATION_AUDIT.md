@@ -1,5 +1,16 @@
 # Quantro v2 repository audit and integration handoff
 
+> Reconciliation update, 2026-10-10: canonical definitions have moved to
+> `backend/services/shared/types.py` and `shared/errors.py`. Legacy modules now
+> re-export the same classes, rather than defining competing models. Public
+> contract bodies enforce output validation and shared errors; JSON-native
+> upstream boundaries remain dicts. The four Section C files moved into
+> `backend/services/_archive/` with dated headers. Startup checks all 13
+> callables. `tests/test_contract_shapes.py` pins exact fields, invalid-input
+> errors, canonical class identity, schema version and null serialization.
+> File/line locations below describe the original audit snapshot and should be
+> resolved by function name after this consolidation. Provider gates remain.
+
 Date: 2026-10-10. Repository: `cepahal/HackNCQuantro`, branch `main`.
 First action was `git pull --ff-only origin main`, which returned up to date at
 `c32d418545299858eced93f089d6476f2be53c3e`. The initial request was read-only;

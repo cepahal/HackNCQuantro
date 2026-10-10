@@ -10,10 +10,23 @@ is kept in its own block, apart from the confidence blocks.
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from pydantic import BaseModel
-
-from .errors import ErrorCode, QuantroError, Stage
-from .types import ConfidenceLevel, Outcome, ReportV2, parse_stage_output
+from ..shared.contracts import validate_contract_result
+from ..shared.errors import ErrorCode, QuantroError, Stage
+from ..shared.errors import Stage as _ContractStage
+from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.types import (
+    AssessmentBlock,
+    ClipCoverageBlock,
+    ConfidenceLevel,
+    DisplayModel,
+    MediaPanel,
+    Outcome,
+    PosterInfo,
+    PosterInfoBlock,
+    ReportV2,
+    parse_stage_output,
+)
+from ..shared.types import DisplayModel as _ReturnModel
 
 SOURCE_MATCH_LABEL = "Source-match confidence"
 CLIP_COVERAGE_LABEL = "Submitted clip aligned"
@@ -33,52 +46,6 @@ _LEVEL_LABELS: dict[ConfidenceLevel, str] = {
     ConfidenceLevel.NOT_ASSESSED: NOT_ASSESSED,
 }
 _POSTER_COUNT_FIELDS = ("followers_count", "following_count", "posts_count")
-
-
-class AssessmentBlock(BaseModel):
-    label: str
-    value: str
-    basis: list[str]
-    limitations: list[str]
-
-
-class ClipCoverageBlock(BaseModel):
-    label: str
-    value: str
-    description: str
-
-
-class MediaPanel(BaseModel):
-    post: dict[str, Any]
-    transcript: dict[str, Any] | None
-    media_playback_url: str | None
-
-
-class PosterInfo(BaseModel):
-    followers_count: int | str
-    following_count: int | str
-    posts_count: int | str
-
-
-class PosterInfoBlock(BaseModel):
-    submitted: PosterInfo
-    source: PosterInfo | None
-
-
-class DisplayModel(BaseModel):
-    source_match: AssessmentBlock | None
-    clip_coverage: ClipCoverageBlock | None
-    context_assessment: AssessmentBlock | None
-    confidence_note: str
-    no_source_message: str | None
-    context_unavailable_message: str | None
-    submitted_panel: MediaPanel
-    source_panel: MediaPanel | None
-    poster_info: PosterInfoBlock
-    matches: list[dict[str, Any]]
-    edit_analysis: dict[str, Any] | None
-    findings: list[dict[str, Any]]
-    limitations: list[str]
 
 
 def _display_error(message: str) -> QuantroError:
@@ -235,26 +202,30 @@ def build_display_model(
 
 
 def display_report(report: ReportV2 | Mapping[str, Any]) -> DisplayModel:
-    if not isinstance(report, ReportV2):
-        report = parse_stage_output(ReportV2, report, Stage.DISPLAY_REPORT)
-    data = report.model_dump(mode="json")
-    submitted, source = data["submitted"], data["source"]
-    alignment, comparison = data["alignment"] or {}, data["comparison"] or {}
-    match_quality = alignment.get("match_quality") or {}
-    return build_display_model(
-        outcome=data["outcome"],
-        submitted_post=submitted["post"],
-        submitted_transcript=submitted["transcript"],
-        submitted_playback_url=submitted["post"]["media"]["playback_url"],
-        source_post=source["post"] if source else None,
-        source_transcript=source["transcript"] if source else None,
-        source_playback_url=source["post"]["media"]["playback_url"] if source else None,
-        match_confidence=match_quality.get("confidence"),
-        clip_coverage_ratio=match_quality.get("clip_coverage_ratio"),
-        matched_clip_seconds=match_quality.get("matched_clip_seconds"),
-        assessment_confidence=comparison.get("assessment_confidence"),
-        matches=alignment.get("matches") or [],
-        edit_analysis=alignment.get("edit_analysis"),
-        findings=comparison.get("findings") or [],
-        limitations=data["limitations"],
-    )
+    # aligned with shared/types.py on 2026-10-10
+    try:
+        if not isinstance(report, ReportV2):
+            report = parse_stage_output(ReportV2, report, Stage.DISPLAY_REPORT)
+        data = report.model_dump(mode="json")
+        submitted, source = data["submitted"], data["source"]
+        alignment, comparison = data["alignment"] or {}, data["comparison"] or {}
+        match_quality = alignment.get("match_quality") or {}
+        return validate_contract_result(_ReturnModel, build_display_model(
+            outcome=data["outcome"],
+            submitted_post=submitted["post"],
+            submitted_transcript=submitted["transcript"],
+            submitted_playback_url=submitted["post"]["media"]["playback_url"],
+            source_post=source["post"] if source else None,
+            source_transcript=source["transcript"] if source else None,
+            source_playback_url=source["post"]["media"]["playback_url"] if source else None,
+            match_confidence=match_quality.get("confidence"),
+            clip_coverage_ratio=match_quality.get("clip_coverage_ratio"),
+            matched_clip_seconds=match_quality.get("matched_clip_seconds"),
+            assessment_confidence=comparison.get("assessment_confidence"),
+            matches=alignment.get("matches") or [],
+            edit_analysis=alignment.get("edit_analysis"),
+            findings=comparison.get("findings") or [],
+            limitations=data["limitations"],
+        ), _ContractStage.DISPLAY_REPORT, json_native=False)
+    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+        raise _normalize_contract_exception(_ContractStage.DISPLAY_REPORT, exc) from None
