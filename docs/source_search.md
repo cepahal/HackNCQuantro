@@ -33,8 +33,8 @@ Runtime performs no DDL. Connection TLS and transaction ownership follow
 [retrieve_post](retrieve_post.md).
 
 Set `TIGERDATA_DSN` privately in root `.env.local` or the process environment.
-`TIGERDATA_SSL_ROOT_CERT` defaults to `system`. Settings load in increasing
-precedence: `backend/.env`, root `.env`, root `.env.local`, process environment.
+`TIGERDATA_SSL_ROOT_CERT` defaults to `system`. Settings precedence, highest first:
+process environment, `.secrets/.env`, root `.env.local`, root `.env`, `backend/.env`.
 Keep credentials out of tracked files. A present blank `TIGERDATA_DSN` remains
 an explicit configuration failure rather than silently selecting another DB.
 

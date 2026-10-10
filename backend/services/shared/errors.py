@@ -83,6 +83,21 @@ class QuantroError(Exception):
         return result
 
 
+class JobConflictError(QuantroError):
+    """A job ID reused for a different URL, or re-ingested after it completed; routes answer 409."""
+
+    http_status = 409
+    status_code = 409
+
+    def __init__(self, message: str = "This job ID already belongs to a different submitted URL.") -> None:
+        super().__init__(ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_POST, message)
+
+
+# Codes whose raise sites default to retryable=True (transient infrastructure failures).
+# Persisted jobs keep only the code, so status responses derive retryability from it.
+RETRYABLE_CODES = frozenset({ErrorCode.STORAGE_FAILED, ErrorCode.SEARCH_FAILED, ErrorCode.MESSAGE_SEND_FAILED})
+
+
 _DEFAULT_CODE_BY_STAGE: dict[Stage, ErrorCode] = {
     Stage.RETRIEVE_POST: ErrorCode.MEDIA_UNAVAILABLE,
     Stage.EXTRACT_MEDIA_FEATURES: ErrorCode.PROCESSING_FAILED,
@@ -116,4 +131,4 @@ def normalize_exception(stage: Stage | str, exc: BaseException) -> QuantroError:
     return normalized
 
 
-__all__ = ["ErrorCode", "QuantroError", "Stage", "normalize_exception"]
+__all__ = ["RETRYABLE_CODES", "ErrorCode", "JobConflictError", "QuantroError", "Stage", "normalize_exception"]

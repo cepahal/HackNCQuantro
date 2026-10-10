@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -15,6 +16,7 @@ from backend.services.messaging.inbound import (
     extract_url,
     is_outbound_echo,
     parse_inbound,
+    message_timestamp,
 )
 from backend.services.messaging.photon import PhotonProvider
 from backend.services.reporting.run_analysis import run_analysis
@@ -142,6 +144,9 @@ async def photon_webhook(
         return request_error_response(
             400, stage=Stage.RUN_ANALYSIS, message="Invalid Photon payload"
         )
+    timestamp = message_timestamp(payload)
+    if timestamp is not None and abs((datetime.now(UTC) - timestamp).total_seconds()) > 300:
+        return request_error_response(401, stage=Stage.RUN_ANALYSIS, message="The signed message timestamp is stale.")
     if is_outbound_echo(payload, provider.sender_id):
         return JSONResponse(content={"status": "ignored"})
 

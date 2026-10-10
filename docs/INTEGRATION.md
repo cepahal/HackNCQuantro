@@ -74,10 +74,12 @@ Abdullah's Tiger Data post corpus (`quantro_retrieval.posts`) with
 ## Environment variables
 
 Real values belong in the git-ignored repo-root `.secrets/.env` or `.env.local`.
-`.env.local` can be a regular private file or a symlink to the vault. The API and
-Tiger CLI load the vault, then `.env.local`, without overriding process variables.
-Retrieval and Gemini also read `.env.local`. The tracked `.env.example` is the
-blank template; keep credentials out of tracked files.
+`.env.local` can be a regular private file or a symlink to the vault. Every entry
+point loads env files once per process through `backend/services/shared/settings.py`:
+`.secrets/.env`, then `.env.local`, then root `.env`, then `backend/.env`, each only
+filling keys that are still unset. Real process variables (Render, CI, the shell)
+always win. The tracked `.env.example` is the blank template; keep credentials out
+of tracked files.
 
 | Variable | Read by | Owner | Notes |
 |---|---|---|---|

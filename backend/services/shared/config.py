@@ -25,7 +25,11 @@ def validate_search_configuration() -> None:
     modes = {os.getenv("APP_ENV", "").lower(), os.getenv("ENVIRONMENT", "").lower()}
     if "test" in modes and "production" not in modes:
         return
-    provider = os.getenv("SEARCH_PROVIDER", "").strip().lower()
+    validate_search_settings(dict(os.environ))
+
+
+def validate_search_settings(settings: dict[str, str]) -> None:
+    provider = settings.get("SEARCH_PROVIDER", "").strip().lower()
     required = {
         "exa": ("EXA_API_KEY",),
         "serpapi": ("SEARCH_PROVIDER_API_KEY",),
@@ -35,7 +39,7 @@ def validate_search_configuration() -> None:
     }
     if provider not in required:
         raise RuntimeError("Configure a supported SEARCH_PROVIDER before API startup: exa, serpapi, brave, google_cse, or tiger.")
-    if any(not os.getenv(name, "").strip() for name in required[provider]):
+    if any(not settings.get(name, "").strip() for name in required[provider]):
         raise RuntimeError("The selected search provider is missing its API credential. Configure it before API startup.")
-    if provider == "google_cse" and not (os.getenv("SEARCH_GOOGLE_CSE_ID", "") or os.getenv("GOOGLE_CSE_ID", "")).strip():
+    if provider == "google_cse" and not (settings.get("SEARCH_GOOGLE_CSE_ID", "") or settings.get("GOOGLE_CSE_ID", "")).strip():
         raise RuntimeError("The selected search provider is missing its search engine identifier. Configure it before API startup.")

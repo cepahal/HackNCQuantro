@@ -30,6 +30,7 @@ for _timing_module in ("backend.services.reporting.run_analysis", "backend.servi
     _timing_logger.propagate = False
 from contextlib import asynccontextmanager
 from importlib import import_module
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -98,6 +99,16 @@ FRONTEND_ORIGIN = (
 ).rstrip("/")
 
 
+def allowed_origins(frontend_origin: str) -> list[str]:
+    origins = [frontend_origin]
+    parts = urlsplit(frontend_origin)
+    twin = {"localhost": "127.0.0.1", "127.0.0.1": "localhost"}.get(parts.hostname or "")
+    if twin is not None:
+        netloc = f"{twin}:{parts.port}" if parts.port else twin
+        origins.append(urlunsplit((parts.scheme, netloc, parts.path, "", "")))
+    return origins
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_contract_functions()
@@ -134,12 +145,14 @@ async def handle_quantro_error(request: Request, error: QuantroError):
 
 @app.exception_handler(RequestValidationError)
 async def handle_validation_error(request: Request, error: RequestValidationError):
-    return request_error_response(422, stage=request_stage(request.url.path))
+    problems = error.errors()
+    code = ErrorCode.INVALID_URL if problems and all(tuple(p.get("loc", ())) == ("body", "url") for p in problems) else ErrorCode.PROCESSING_FAILED
+    return request_error_response(422, stage=request_stage(request.url.path), code=code)
 
 
 @app.exception_handler(HTTPException)
 async def handle_http_error(request: Request, error: HTTPException):
-    return request_error_response(error.status_code, stage=request_stage(request.url.path))
+    return request_error_response(error.status_code, stage=request_stage(request.url.path), headers=error.headers)
 
 
 @app.exception_handler(Exception)
@@ -154,15 +167,10 @@ app.add_middleware(RequestLimitsMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(dict.fromkeys([FRONTEND_ORIGIN] + (
-        [FRONTEND_ORIGIN.replace("localhost", "127.0.0.1")]
-        if FRONTEND_ORIGIN.startswith("http://localhost:") else
-        [FRONTEND_ORIGIN.replace("127.0.0.1", "localhost")]
-        if FRONTEND_ORIGIN.startswith("http://127.0.0.1:") else []
-    ))),
+    allow_origins=allowed_origins(FRONTEND_ORIGIN),
     allow_methods=["GET", "HEAD", "POST"],
     allow_headers=["Content-Type", "Range", "If-None-Match"],
-    expose_headers=["Content-Range", "Accept-Ranges", "ETag"],
+    expose_headers=["Content-Range", "Accept-Ranges", "Content-Length", "ETag"],
 )
 app.include_router(analyze_router)
 app.include_router(ingest_router)

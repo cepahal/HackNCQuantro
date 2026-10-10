@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -25,12 +26,15 @@ def request_stage(path: str) -> Stage:
 
 
 def log_failure(error: QuantroError, exception_type: str | None = None) -> None:
+    unexpected = exception_type is not None
+    cause = error.__cause__ or error.__context__
     exception_type = exception_type or getattr(error, "exception_type", type(error).__name__)
-    logger.warning("Request failed code=%s stage=%s exception_type=%s", error.code.value, error.stage.value, exception_type)
+    logger.log(logging.ERROR if unexpected else logging.WARNING, "Request failed code=%s stage=%s exception_type=%s cause=%s", error.code.value, error.stage.value, exception_type, type(cause).__name__ if cause else "none")
 
 
 def request_error_response(status_code: int, *, stage: Stage = Stage.RUN_ANALYSIS,
-                           message: str | None = None, code: ErrorCode = ErrorCode.PROCESSING_FAILED) -> JSONResponse:
+                           message: str | None = None, code: ErrorCode = ErrorCode.PROCESSING_FAILED,
+                           headers: Mapping[str, str] | None = None) -> JSONResponse:
     safe_messages = {
         400: "The request is invalid.", 401: "Request authentication failed.",
         403: "This request is not permitted.", 404: "The requested resource was not found.",
@@ -40,7 +44,7 @@ def request_error_response(status_code: int, *, stage: Stage = Stage.RUN_ANALYSI
     }
     error = QuantroError(code, stage, message or safe_messages.get(status_code))
     log_failure(error)
-    return JSONResponse(status_code=status_code, content={"error": error.public_dict()})
+    return JSONResponse(status_code=status_code, content={"error": error.public_dict()}, headers=headers)
 
 
 def get_tiger_store(request: Request) -> TigerStore:

@@ -203,3 +203,24 @@ Ruff and generated frontend contracts passed. With the configured FFmpeg path,
 59 media/specialist checks passed and one Windows symlink test skipped. The two
 extra full-suite skips were from the fresh shell lacking the configured tool path. Render secrets were explicitly approved and loaded privately;
 the user also approved the separate $25/month backend compute deployment.
+
+
+### Overlapping audit push and hosted deployment (2026-10-10)
+
+Reconciled teammate `bececa9` without adding parallel settings or request guards:
+`shared/settings.py` and `routes/request_guard.py` are compatibility re-exports.
+Preserved atomic reservations, pooled response-owned media streaming, durable
+message claims, explicit persisted retryability and atomic stale-job expiration.
+Kept the teammate's timestamp parsing, HTTP Allow headers, URL-field error code,
+Content-Length CORS exposure, Exa operator diagnostics and exception causes.
+Added pre-ingest search configuration checks through the existing validation.
+Their audit tests use the canonical run_ingest boundary, stricter 32 KiB limit,
+explicit retryability and persisted expiration; offline webhook tests inject
+in-memory trackers. Complete merged suite: 943 passed, 7 skipped, 45 subtests in
+40.61 seconds, with real FFmpeg available. Ruff, mypy (24 affected source files),
+and generated frontend types passed; focused audit tests: 100 passed.
+
+Render first deployment is live at https://quantro-backend.onrender.com on
+`bececa9`; private Tiger/provider settings and CA were explicitly approved.
+The reconciled commit must be deployed next. Vercel backend URL/rebuild and a
+hosted real analysis/report/playback test remain acceptance gates.

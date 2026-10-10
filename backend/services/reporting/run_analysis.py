@@ -20,12 +20,12 @@ from typing import Any, Literal, TypeVar
 from ..external_apis.build_search_queries import build_search_queries
 from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
 from ..external_apis.retrieve_post import _validate_url
-from ..external_apis.search_candidates import search_candidates
+from ..external_apis.search_candidates import check_search_settings, search_candidates
 from ..pipeline.artifacts import artifact_scope
 from ..pipeline.run_ingest import EXTRACTION_OPTIONS, run_ingest
 from ..processing.preprocessing import extract_media_features
 from ..shared.contracts import validate_contract_result
-from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
+from ..shared.errors import ErrorCode, JobConflictError, QuantroError, Stage, normalize_exception
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
 from ..shared.post_identity import ensure_distinct_source
@@ -72,20 +72,6 @@ _LEVEL_RANK: dict[ConfidenceLevel, int] = {
 }
 
 T = TypeVar("T")
-
-
-class JobConflictError(QuantroError):
-    status_code = 409
-
-    def __init__(self) -> None:
-        super().__init__(ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_POST,
-                         "This job ID already belongs to a different submitted URL.")
-
-
-
-
-
-
 
 
 @dataclass(frozen=True)
@@ -244,6 +230,7 @@ def run_analysis(
             ensure_distinct_source(report.submitted.post, report.source.post if report.source else None, Stage.BUILD_REPORT)
             return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, []), _ContractStage.RUN_ANALYSIS, json_native=False)
 
+        check_search_settings()
         _call(Stage.RETRIEVE_POST, run_ingest, job_id, url, store=store)
         try:
             ingested = store.get_job(job_id)
@@ -258,8 +245,10 @@ def run_analysis(
         except QuantroError as error:
             _mark_failed(store, job_id, error)
             raise
+    except QuantroError:
+        raise
     except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
-        raise _normalize_contract_exception(_ContractStage.RUN_ANALYSIS, exc) from None
+        raise _normalize_contract_exception(_ContractStage.RUN_ANALYSIS, exc) from exc
 
 
 def _analyze(

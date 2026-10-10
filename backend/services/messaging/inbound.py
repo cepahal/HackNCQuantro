@@ -5,6 +5,7 @@ accepted at the top level or nested under "data" / "message".
 """
 
 import re
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 ACK_REPLY = "Got it — analyzing. I'll text you back in a moment."
@@ -15,6 +16,9 @@ _CONVERSATION_KEYS = ("conversation_id", "conversationId", "chat_id", "chatGuid"
 _SENDER_KEYS = ("sender_handle", "sender", "from", "handle")
 _TEXT_KEYS = ("text", "body", "message")
 _MEDIA_KEYS = ("media_urls", "attachments", "media")
+_TIMESTAMP_KEYS = ("timestamp", "sent_at", "created_at")
+# Unix seconds from 2020 to 2100; anything else (e.g. Apple epoch values) is not trusted as a timestamp.
+_PLAUSIBLE_EPOCH_SECONDS = (1_577_836_800, 4_102_444_800)
 _URL = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 _URL_TRAILING = ".,!?;:)]}'\""
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
@@ -58,6 +62,37 @@ def parse_inbound(payload: dict) -> dict:
         "text": _first_str(sources, _TEXT_KEYS) or "",
         "media_urls": _media_urls(sources),
     }
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    if isinstance(value, str):
+        text = value.strip()
+        if len(text) > 64:
+            return None
+        if not text.isdigit():
+            try:
+                parsed = datetime.fromisoformat(text)
+            except ValueError:
+                return None
+            return parsed if parsed.tzinfo is not None else None
+        value = int(text)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    seconds = value / 1000 if value > _PLAUSIBLE_EPOCH_SECONDS[1] else value
+    if not _PLAUSIBLE_EPOCH_SECONDS[0] <= seconds <= _PLAUSIBLE_EPOCH_SECONDS[1]:
+        return None
+    return datetime.fromtimestamp(seconds, UTC)
+
+
+def message_timestamp(payload: dict) -> datetime | None:
+    """The first recognizable timestamp in the signed payload, or None when absent or unparseable."""
+    for source in _sources(payload):
+        for key in _TIMESTAMP_KEYS:
+            if key in source:
+                parsed = _parse_timestamp(source[key])
+                if parsed is not None:
+                    return parsed
+    return None
 
 
 def extract_url(text: str | None) -> str | None:

@@ -14,6 +14,7 @@ from uuid import uuid4
 import httpx
 
 from ..shared.contracts import contract_input, validate_contract_result
+from ..shared.config import validate_search_settings
 from ..shared.errors import QuantroError, Stage
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
@@ -26,6 +27,16 @@ from .retrieve_post import _validate_url
 from .tigerdata_storage import TigerDataPostStore, _environment
 
 logger = logging.getLogger(__name__)
+
+
+def check_search_settings() -> None:
+    settings = _environment()
+    settings["SEARCH_PROVIDER"] = (settings.get("SEARCH_PROVIDER") or "tiger").strip().lower()
+    try:
+        validate_search_settings(settings)
+    except RuntimeError as exc:
+        logger.error("SEARCH_PROVIDER configuration is invalid or missing its credential.")
+        raise QuantroError("SEARCH_FAILED", Stage.SEARCH_CANDIDATES, "The source search is not configured on the server.") from exc
 
 
 def _candidate_url(value: object) -> str:

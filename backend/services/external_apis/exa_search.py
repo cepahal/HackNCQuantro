@@ -1,5 +1,6 @@
 """Bounded Exa web discovery; results remain unverified candidate pages."""
 import ssl
+import logging
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
@@ -9,9 +10,13 @@ from ..shared.errors import QuantroError, Stage
 from .retrieve_post import _validate_url
 
 
+logger = logging.getLogger(__name__)
+
+
 class ExaSearch:
     def __init__(self, api_key: str, *, client=None):
         if not api_key.strip():
+            logger.error("EXA_API_KEY is required when SEARCH_PROVIDER=exa.")
             raise QuantroError('SEARCH_FAILED', Stage.SEARCH_CANDIDATES,
                                'The source search is not configured.')
         self._key = api_key

@@ -12,7 +12,7 @@ from backend.services.reporting.build_report import sanitize_report
 from backend.services.reporting.display_report import display_report
 from backend.services.reporting.run_analysis import run_analysis
 from backend.services.reporting.save_report import report_id_for_job
-from backend.services.shared.errors import ErrorCode, QuantroError, Stage
+from backend.services.shared.errors import RETRYABLE_CODES, ErrorCode, QuantroError, Stage
 from backend.services.shared.post_identity import ensure_distinct_source
 from backend.services.shared.types import ReportV2, parse_stage_output
 from backend.services.storage.tiger import TigerReportStore, TigerStore
@@ -79,7 +79,7 @@ def job_status(job_id: JobId, store: TigerDependency) -> JSONResponse:
         try:
             error = QuantroError(job.get("error_code") or ErrorCode.PROCESSING_FAILED,
                                 job.get("error_stage") or Stage.RUN_ANALYSIS,
-                                message=job.get("error_message"), retryable=bool(job.get("error_retryable")))
+                                message=job.get("error_message"), retryable=(bool(job["error_retryable"]) if job.get("error_retryable") is not None else job.get("error_code") in RETRYABLE_CODES))
         except ValueError:
             error = QuantroError(ErrorCode.PROCESSING_FAILED, Stage.RUN_ANALYSIS)
     return JSONResponse(content={
