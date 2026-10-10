@@ -202,8 +202,8 @@ Tests cover exact v2 Post/error contracts, nullable metadata and provenance,
 downstream handoff, JPEG/MP4, default persistence and injected stores, preservation
 of all v2 metadata, Tiger Data bytes/JSON transaction bindings and rollback, TLS/DSN
 settings, safe failures, and cleanup. Existing Snowflake compatibility tests remain.
-Live Tiger Data authentication, schema setup and persistence remain unverified
-until the team's connection settings and database are configured.
+Live Tiger Data authentication, schema setup and JPG/MP4 persistence were verified
+on 2026-10-10; see the latest verification entry below.
 
 ## Change log
 
@@ -234,3 +234,14 @@ until the team's connection settings and database are configured.
   and storage failure behavior. The root `.env` is tracked, so secrets belong in
   ignored `.env.local` or the process environment. No live cloud persistence or
   S3 integration is claimed; the user will configure connection settings later.
+
+- 2026-10-10: configured the existing Tiger Cloud service using its downloaded
+  credentials in ignored `.env.local`. Applied the idempotent retrieval migration
+  alongside existing public job/post/report tables without changing those tables.
+  Verified TLS hostname/certificate validation, real JPG (6,412 bytes) and MP4
+  (5,510,872 bytes) downloads, committed BYTEA readback, SHA-256 and full Post JSON
+  equality. Verified candidate download with fresh IDs and persisted candidate_id.
+  On this Windows machine, libpq's `system` trust failed; exporting Python's
+  trusted system CA certificates to an ignored PEM and setting the existing
+  `TIGERDATA_SSL_ROOT_CERT` option fixed it with `verify-full` still enforced.
+  The local PEM path is machine-specific and must not be copied to deployments.

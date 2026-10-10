@@ -91,3 +91,22 @@ for downstream extraction; the job owner removes it after all consumers finish.
   separate specialist extractor's JPEG/video-duration limitation is unchanged.
 - Final verification: 392 tests passed, 2 skipped; Ruff lint/format, strict mypy
   and dependency checks passed. Root and backend launch imports both passed.
+
+## Live Tiger Data verification — 2026-10-10
+
+Verified query generation and the actual candidate search SQL against the team's
+Tiger Cloud service. A synthetic search fixture was inserted in a transaction
+and rolled back, leaving no invented source metadata in the corpus. The returned
+candidate was passed to the real downloader; its new Post and JPG bytes committed
+with the same candidate_id and exact returned JSON. Real JPG and MP4 saves were
+also read back and compared byte-for-byte and by SHA-256. Three public sample
+media Posts remain as integration verification records; their local paths refer
+to the machine that downloaded them. Search still covers stored Post metadata,
+not the public web or automatically indexed transcripts.
+
+Private settings are in ignored root `.env.local`. Windows certificate trust was
+configured with the existing `TIGERDATA_SSL_ROOT_CERT` option pointing at a local
+PEM of trusted system CAs; certificate and hostname verification remain enabled.
+Full regression verification: 393 passed, 2 skipped. Live provider transcription,
+S3 hosting, and the team's unfinished analysis orchestrator were not verified by
+these retrieval checks.
