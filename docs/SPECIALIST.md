@@ -155,3 +155,31 @@ They do not make paid API calls, send messages, or upload user media.
 Bhrigu's run_analysis is still a stub, and retrieval/search/frontend work is
 outside Jason's scope. Import these four functions into that orchestrator; call
 functions 7 and 8 only after a verified candidate is selected.
+
+
+## Local transcription and conservative omission assessment
+
+Install `python -m pip install -r backend/requirements-whisper.txt` and set
+`TRANSCRIPTION_PROVIDER=whisper` in ignored `.env.local` to use local CPU Whisper.
+`WHISPER_MODEL=small` defaults to multilingual recognition; `small.en` is an
+English-only option. The first run downloads model weights; later runs reuse the
+cache. `WHISPER_MODEL` can also point to a downloaded faster-whisper model directory.
+No transcription API key is needed. Gemini remains responsible for optional OCR
+and function 8. Empty/unset `TRANSCRIPTION_PROVIDER` preserves Gemini behavior.
+There is no automatic network fallback when Whisper fails.
+
+Whisper segments use the existing sentence-group contract, including incomplete
+utterances. No output fields or timestamps are invented to permit approximate
+matches. Function 6 remains conservative: mistranscribed or ambiguous passages
+can be unmatched. Speech timestamps and transcripts remain estimates.
+
+Function 8 now suppresses definitive material-omission claims from transcript-only
+input. It removes the claim from findings, summary, and confidence basis, returns
+uncertain, and requests recording verification. This deliberately sacrifices
+automatic positive omission verdicts until a recording-corroboration interface
+exists. Changing ASR alone cannot establish that words were edited out.
+
+Public NASA smoke tests showed better wording on the continuous excerpt with
+Whisper small.en than the tested Gemini Flash Lite run, but both made splice-area
+errors. This small test is not a general accuracy benchmark. Test additional real
+recordings, languages, silence, and noisy audio before relying on edit detection.

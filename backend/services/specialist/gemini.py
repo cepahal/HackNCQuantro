@@ -14,14 +14,18 @@ def _retryable(exc):
     )
 
 
-def client_and_model(stage):
+def load_settings():
     from dotenv import load_dotenv
-    from google import genai
     root = Path(__file__).resolve().parents[3]
     load_dotenv(root / '.env')
     load_dotenv(root / 'backend' / '.env')
     # Private local settings override the team's tracked placeholders.
     load_dotenv(root / '.env.local', override=True)
+
+
+def client_and_model(stage):
+    from google import genai
+    load_settings()
     key = os.getenv('GEMINI_API_KEY')
     model = os.getenv('GEMINI_MODEL', 'gemini-flash-latest')
     if not key:

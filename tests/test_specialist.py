@@ -9,6 +9,11 @@ from backend.services.specialist.alignment import verify_and_align
 from backend.services.specialist.context import select_surrounding_context
 from backend.services.reporting.errors import QuantroError
 
+@pytest.fixture(autouse=True)
+def isolate_transcription_provider(monkeypatch):
+    monkeypatch.setattr(p.transcription, 'provider', lambda: 'gemini')
+
+
 TEXT = 'If those numbers were accurate, I would recommend canceling the program.'
 FOLLOWUP = 'But those numbers are not accurate, so that is not my recommendation.'
 
@@ -135,8 +140,9 @@ def test_context_preserves_extraction_warnings(clip, source):
 def test_valid_comparison_caps_confidence(clip, context, comparison):
     comparison['assessment_confidence']['level'] = 'high'
     result = c._validate_result(comparison, clip, context, 'Cancel it')
-    assert result['assessment_confidence']['level'] == 'moderate'
-    assert result['caption_assessment'] == 'contradicted_by_context'
+    assert result['assessment_confidence']['level'] == 'low'
+    assert result['caption_assessment'] == 'uncertain'
+    assert result['findings'] == []
 
 
 @pytest.mark.parametrize('field,value', [('quote', 'Invented quotation'), ('sentence_ids', ['absent']), ('media_id', 'unknown'), ('start_seconds', 17.0)])
@@ -170,7 +176,7 @@ def test_comparison_provider_boundary(clip, context, comparison, monkeypatch):
     monkeypatch.setattr(c, 'client_and_model', lambda stage: (client, 'test-model'))
     monkeypatch.setattr(c, 'generate_json', lambda *args: comparison)
     result = c.compare_context_and_caption(clip, context, 'Cancel it')
-    assert result['context_assessment'] == 'material_context_missing'
+    assert result['context_assessment'] == 'uncertain'
     client.close.assert_called_once()
 
 
@@ -178,7 +184,7 @@ def test_no_findings_cannot_support_definitive_assessment(clip, context, compari
     comparison['findings'] = []
     result = c._validate_result(comparison, clip, context, 'Cancel it')
     assert result['context_assessment'] == 'uncertain'
-    assert 'insufficient' in result['summary']
+    assert 'has not been established' in result['summary']
 
 
 def test_range_union_and_sampling():
@@ -289,3 +295,61 @@ def test_sdk_accepts_structured_output_schemas():
     for schema in (p.TRANSCRIPT_SCHEMA, c.Comparison.model_json_schema()):
         config = types.GenerateContentConfig(response_mime_type='application/json', response_json_schema=schema)
         assert config.response_mime_type == 'application/json'
+
+
+@pytest.mark.parametrize('incomplete', [False, True])
+def test_omission_claim_is_removed_from_all_prose(clip, context, comparison, incomplete):
+    if incomplete:
+        context['windows'][0]['coverage'] = 'partial'
+    result = c._validate_result(comparison, clip, context, None)
+    assert result['context_assessment'] == 'uncertain'
+    assert result['findings'] == []
+    assert result['assessment_confidence']['basis'] == []
+    assert result['caption_assessment'] == 'not_provided'
+    assert 'has not been established' in result['summary']
+
+
+def test_uncertain_result_cannot_retain_an_omission_allegation(clip, context, comparison):
+    comparison['context_assessment'] = 'uncertain'
+    result = c._validate_result(comparison, clip, context, None)
+    assert result['findings'] == []
+    assert result['assessment_confidence']['basis'] == []
+    assert result['assessment_confidence']['level'] == 'low'
+
+
+def test_non_omission_assessment_is_not_blanket_disabled(clip, context, comparison):
+    comparison['context_assessment'] = 'no_material_difference_found'
+    comparison['caption_assessment'] = 'supported_by_context'
+    comparison['summary'] = 'The caption agrees with the cited source statement.'
+    comparison['findings'][0]['type'] = 'supported_caption'
+    comparison['findings'][0]['explanation'] = 'The caption agrees with the source statement.'
+    result = c._validate_result(comparison, clip, context, 'The speaker rejects cancellation.')
+    assert result['context_assessment'] == 'no_material_difference_found'
+    assert result['caption_assessment'] == 'supported_by_context'
+    assert result['findings']
+
+
+def test_invalid_comparison_gets_one_correction_attempt(clip, context, comparison, monkeypatch):
+    from copy import deepcopy
+    invalid = deepcopy(comparison)
+    invalid['findings'][0]['evidence'][0]['quote'] = 'Fabricated words'
+    client = Mock()
+    monkeypatch.setattr(c, 'client_and_model', lambda stage: (client, 'test'))
+    generate = Mock(side_effect=[invalid, comparison])
+    monkeypatch.setattr(c, 'generate_json', generate)
+    result = c.compare_context_and_caption(clip, context, None)
+    assert generate.call_count == 2
+    assert result['context_assessment'] == 'uncertain'
+    client.close.assert_called_once()
+
+
+def test_invalid_comparison_retry_is_bounded(clip, context, comparison, monkeypatch):
+    comparison['findings'][0]['evidence'][0]['quote'] = 'Fabricated words'
+    client = Mock()
+    monkeypatch.setattr(c, 'client_and_model', lambda stage: (client, 'test'))
+    generate = Mock(return_value=comparison)
+    monkeypatch.setattr(c, 'generate_json', generate)
+    with pytest.raises(QuantroError):
+        c.compare_context_and_caption(clip, context, None)
+    assert generate.call_count == 2
+    client.close.assert_called_once()

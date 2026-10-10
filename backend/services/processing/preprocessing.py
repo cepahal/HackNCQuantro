@@ -12,6 +12,7 @@ import tempfile
 
 from ..reporting.errors import QuantroError, Stage
 from ..specialist.gemini import client_and_model, generate_json
+from ..specialist import transcription
 
 
 class ExtractionError(QuantroError):
@@ -244,7 +245,8 @@ def _extract_media_features(media, options=None):
     }
     warnings = result["warnings"]
     make_frames = has_video and (extract_frames or extract_text) and count > 0
-    needs_gemini = has_audio or (make_frames and extract_text)
+    speech_provider = transcription.provider() if has_audio else 'gemini'
+    needs_gemini = (has_audio and speech_provider == 'gemini') or (make_frames and extract_text)
     client = None
     if needs_gemini:
         client, model = client_and_model(Stage.EXTRACT_MEDIA_FEATURES)
@@ -253,7 +255,7 @@ def _extract_media_features(media, options=None):
         if has_audio:
             languages = set()
             transcript = result["transcript"]
-            warnings.append("Gemini transcript timestamps are estimates; they have not been independently aligned to audio.")
+            warnings.append(f"{speech_provider} transcript words and timestamps are estimates; they are not independent recording verification.")
             warnings.append("Speaker identities are not assessed. Incomplete utterances at chunk boundaries are preserved.")
             with tempfile.TemporaryDirectory(prefix="quantro_audio_") as temp:
                 audio_path = Path(temp) / "segment.wav"
@@ -276,7 +278,13 @@ def _extract_media_features(media, options=None):
                             "If there is no speech, return an empty sentences array."
                         )
                         try:
-                            data = _ask(client, model, audio_path, "audio/wav", prompt, TRANSCRIPT_SCHEMA)
+                            if speech_provider == 'whisper':
+                                try:
+                                    data = transcription.transcribe(audio_path)
+                                except Exception:
+                                    raise ExtractionError("TRANSCRIPTION_FAILED", "Local Whisper failed; check the optional Whisper installation and model availability.") from None
+                            else:
+                                data = _ask(client, model, audio_path, "audio/wav", prompt, TRANSCRIPT_SCHEMA)
                             sentences = _sentences(data, start, end, media["media_id"], len(transcript["sentences"]) + 1)
                         except (QuantroError, ValueError, KeyError, TypeError) as exc:
                             raise ExtractionError("TRANSCRIPTION_FAILED", "Audio transcription failed validation or the provider request failed.", getattr(exc, "retryable", False)) from None
