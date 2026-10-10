@@ -22,7 +22,6 @@ export default function AlgorithmAnimation() {
   const view = useInView(scope, { once: false, amount: 0.25 });
   const reduced = useReducedMotion();
   const [step, setStep] = useState(0);
-  const [replay, setReplay] = useState(0);
   const running = useRef(false);
 
   useEffect(() => {
@@ -143,7 +142,7 @@ export default function AlgorithmAnimation() {
       cancelled = true;
       running.current = false;
     };
-  }, [view, reduced, animate, replay, scope]);
+  }, [view, reduced, animate, scope]);
 
   return (
     <div>
@@ -170,7 +169,6 @@ export default function AlgorithmAnimation() {
         </div>
       </div>
       <p className="stage-caption" aria-live="polite">{captions[step]}</p>
-      <button className="btn btn-outline" onClick={() => { setStep(0); setReplay((value) => value + 1); }}>Replay</button>
       <p className="sr-only">A source clip is found, aligned to a timeline, and separated into gaps so missing context can be restored.</p>
     </div>
   );
