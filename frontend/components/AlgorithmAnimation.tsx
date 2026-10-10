@@ -5,10 +5,10 @@ import { useAnimate, useInView, useReducedMotion } from "framer-motion";
 
 const captions = [
   "Searching for the source.",
-  "Original found.",
+  "Candidate source found.",
   "Mapping each clip to its timestamp.",
-  "Matching the missing moments.",
-  "Adding the missing context back.",
+  "Checking unmatched intervals.",
+  "Showing surrounding context.",
 ];
 const markerPositions = [39, 44, 53, 59, 62];
 const fragmentOffsets = [[0, 0], [14, 0], [7, 7], [0, 14], [14, 14]];
