@@ -41,7 +41,7 @@ export default function AlgorithmAnimation() {
     const targetEndX = stageWidth * 0.5 - 14;
     const targetEndY = stageHeight * 0.65 - 14;
     const gridWidth = (mobile ? 20 : 28) * 5 + (mobile ? 6 : 8) * 4;
-    const outsideGridX = stageWidth * 0.43 + gridWidth + 60;
+    const outsideGridX = stageWidth * 0.43 + gridWidth + 88;
     const curvePoints = [
       [targetStartX, targetStartY],
       [outsideGridX, targetStartY],
@@ -69,6 +69,7 @@ export default function AlgorithmAnimation() {
             x: 0, y: 0, scaleX: 1, scaleY: 1, borderRadius: 7,
             backgroundColor: "#101116", opacity: 1,
           }, { duration: 0 }),
+          animate(".stage-status", { opacity: 1 }, { duration: 0 }),
           ...fragmentOffsets.map(([x, y], index) =>
             animate(`.stage-fragment-${index}`, {
               left: `calc(43% - 139px + ${x}px)`, top: `calc(25% + ${sourceOffset + 1 + y}px)`,
@@ -120,7 +121,7 @@ export default function AlgorithmAnimation() {
             left: `calc(${position}% - 6px)`, top: "calc(65% - 20px)",
           }, { duration: 0.9, ease: "easeInOut", delay: index * 0.06 }),
         ));
-        await pause(350);
+        await pause(750);
 
         if (cancelled) break;
         setStep(4);
@@ -130,6 +131,10 @@ export default function AlgorithmAnimation() {
           }),
         ));
         await pause(1800);
+        await animate(".stage-target, .stage-fragment, .stage-gap, .stage-status", {
+          opacity: 0,
+        }, { duration: 0.65, ease: "easeInOut" });
+        await pause(400);
       }
     };
 
