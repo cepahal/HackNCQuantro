@@ -1,7 +1,7 @@
 """Conservative, deterministic transcript alignment (function 6).
 
-Only fully matched submitted sentences are accepted. Word timestamps are not
-invented. Repeated source passages are left ambiguous. No audio/visual check
+Only exact distinctive passages are accepted. With optional ASR word times,
+partial sentences can match; otherwise only whole sentences match. Timing is not invented. Repeated source passages are left ambiguous. No audio/visual check
 is claimed; accepted transcript matches therefore have moderate confidence.
 """
 
@@ -24,8 +24,18 @@ def _flatten(features):
         words = re.findall(r"\w+(?:['’]\w+)?", sentence['text'].casefold())
         start = len(tokens)
         tokens.extend(words)
-        owners.extend([sentence] * len(words))
-        spans.append((start, len(tokens), sentence))
+        if sentence.get('words'):
+            offset = start
+            for word in sentence['words']:
+                word_tokens = re.findall(r"\w+(?:['’]\w+)?", word['text'].casefold())
+                owner = dict(sentence, start_seconds=word['start_seconds'], end_seconds=word['end_seconds'])
+                owners.extend([owner] * len(word_tokens))
+                if word_tokens:
+                    spans.append((offset, offset + len(word_tokens), owner))
+                offset += len(word_tokens)
+        else:
+            owners.extend([sentence] * len(words))
+            spans.append((start, len(tokens), sentence))
     return tokens, owners, spans
 
 
@@ -60,7 +70,7 @@ def _align(clip, source, duration):
     unprocessed = any(f['transcript']['status'] == 'unavailable' or not f['transcript']['processed_ranges'] or not f['transcript']['sentences'] for f in (clip, source))
     limits = ['The earliest original upload was not established.',
               'Visual and audio matching were not performed.',
-              'Matching uses whole transcript sentences; timestamps retain transcription precision.']
+              'Matching uses supplied word timestamps where available, otherwise whole sentences; ASR timing remains approximate.']
     if unprocessed:
         limits.append('Usable speech is unavailable in at least one recording; transcript alignment was not assessed.')
     for features in (clip, source):
@@ -93,13 +103,13 @@ def _align(clip, source, duration):
                 'match_id': f'match_{len(matches) + 1:03d}',
                 'clip_start_seconds': min(s['start_seconds'] for s in clip_sentences),
                 'clip_end_seconds': max(s['end_seconds'] for s in clip_sentences),
-                'source_start_seconds': min(s['start_seconds'] for s in refs),
-                'source_end_seconds': max(s['end_seconds'] for s in refs),
+                'source_start_seconds': min(s['start_seconds'] for s in source_owners[source_left:source_right]),
+                'source_end_seconds': max(s['end_seconds'] for s in source_owners[source_left:source_right]),
                 'evidence': [{
                     'method': 'transcript_alignment',
-                    'clip_refs': [s['sentence_id'] for s in clip_sentences],
+                    'clip_refs': list(dict.fromkeys(s['sentence_id'] for s in clip_sentences)),
                     'source_refs': [s['sentence_id'] for s in refs],
-                    'description': 'A distinctive word sequence matches exactly after case and punctuation normalization. Source bounds use enclosing sentence timestamps.',
+                    'description': 'A distinctive word sequence matches exactly after case and punctuation normalization. Bounds use supplied word timestamps where available, otherwise enclosing sentences. Unmatched words are excluded.',
                 }],
             })
     if ambiguous:
@@ -120,11 +130,16 @@ def _align(clip, source, duration):
             unmatched.append({'start_seconds': cursor, 'end_seconds': duration})
         for previous, following in zip(matches, matches[1:]):
             start, end = previous['source_end_seconds'], following['source_start_seconds']
-            if end - start >= 1.0:
+            # Ordinary pauses/unmatched speech in BOTH recordings are not a
+            # source-only gap. Require at least one second of excess source time.
+            clip_gap = max(0.0, following['clip_start_seconds'] - previous['clip_end_seconds'])
+            if end - start - clip_gap >= 1.0:
                 gaps.append({'start_seconds': start, 'end_seconds': end,
                              'before_match_id': previous['match_id'], 'after_match_id': following['match_id']})
             elif following['source_start_seconds'] < previous['source_start_seconds']:
                 limits.append('Matched source passages occur in a different order; deletion counts are not established.')
+    if gaps:
+        limits.append('Source gaps are approximate unmatched intervals, not confirmed cuts; pauses and ASR errors can affect their boundaries.')
     if len(matches) == 1:
         limits.append('Only single-passage alignment was evaluated.')
     level = 'not_assessed' if unprocessed else ('moderate' if matches else 'low')

@@ -98,7 +98,8 @@ this implementation does not verify image matches.
 
 A deterministic, conservative transcript baseline: case/punctuation-normalized
 exact word-sequence matching across sentence boundaries. An accepted passage
-must contain fully matched clip sentences, at least eight words, at least four
+uses supplied ASR word timestamps when present, otherwise fully matched clip
+sentences. It must contain at least eight words, at least four
 unique non-stopwords, and a unique location in the candidate transcript. These
 are documented heuristic thresholds, not calibrated probabilities. Short or
 approximate matches can be missed intentionally. Repeated passages are ambiguous.
@@ -106,12 +107,15 @@ approximate matches can be missed intentionally. Repeated passages are ambiguous
 No visual/audio corroboration is claimed; accepted matches are moderate.
 Unprocessed input returns not_assessed. Processed but unverified input returns
 no_verified_match, empty matches, and null coverage metrics. Accepted coverage
-uses the union of clip intervals. Enclosing source sentence boundaries retain
-transcription precision; word-level timestamps are never interpolated.
+uses the union of clip intervals. Bounds use supplied word timestamps where
+available and enclosing sentence boundaries otherwise; timestamps are never
+interpolated. Optional sentence `words` metadata contains text, start_seconds,
+and end_seconds. Providers without word timing keep the previous JSON shape.
 
 Edit analysis describes observed gaps only. When both transcripts are complete,
-status is assessed; otherwise it is not_assessed. Source gaps of at least one
-second use start_seconds, end_seconds, before_match_id and after_match_id.
+status is assessed; otherwise it is not_assessed. Source gaps must exceed the
+corresponding clip gap by at least one second, avoiding shared pauses. They use
+start_seconds, end_seconds, before_match_id and after_match_id.
 Unmatched clip intervals use start_seconds/end_seconds. These list item shapes
 fill in details not specified in the sample contract. Confirm them with the UI
 owner. Confirmed insertion/deletion counts always remain null: a gap is not proof
@@ -169,8 +173,10 @@ and function 8. Empty/unset `TRANSCRIPTION_PROVIDER` preserves Gemini behavior.
 There is no automatic network fallback when Whisper fails.
 
 Whisper segments use the existing sentence-group contract, including incomplete
-utterances. No output fields or timestamps are invented to permit approximate
-matches. Function 6 remains conservative: mistranscribed or ambiguous passages
+utterances. Optional word timing comes directly from Whisper; invalid
+zero-duration word timing falls back to segment boundaries. No timestamps are
+invented to permit approximate matches. Function 6 remains conservative:
+mistranscribed or ambiguous passages
 can be unmatched. Speech timestamps and transcripts remain estimates.
 
 Function 8 now suppresses definitive material-omission claims from transcript-only
@@ -183,3 +189,14 @@ Public NASA smoke tests showed better wording on the continuous excerpt with
 Whisper small.en than the tested Gemini Flash Lite run, but both made splice-area
 errors. This small test is not a general accuracy benchmark. Test additional real
 recordings, languages, silence, and noisy audio before relying on edit detection.
+
+## Word-timing regression (2026-10-10)
+
+On the controlled NASA excerpt, local Whisper small.en plus function 6 returns
+no source gaps for the continuous 2–24 second excerpt. For the stitched excerpt
+(source 2–10 followed by 16–24), it estimates a source gap of 9.74–16.56 seconds
+against the known 10–16 second removal. These are approximate ASR boundaries,
+not confirmed cut times. Confirmed insertion/deletion counts remain null.
+The observed transcripts are retained in tests/fixtures/nasa_word_alignment.json
+for offline regression tests, including transcription mismatches and repeated
+passages. This is one controlled example, not a general detection benchmark.

@@ -29,6 +29,13 @@ def transcribe(path):
     for segment in segments:
         if not segment.text.strip():
             continue
+        # Retain the complete token sequence or no word timings. Zero-length
+        # estimates cannot support interval matching; never invent durations.
+        raw_words = getattr(segment, 'words', None) or []
+        words = [{'text': w.word.strip(), 'start_seconds': float(w.start),
+                  'end_seconds': float(w.end)} for w in raw_words]
+        if any(not w['text'] or w['end_seconds'] <= w['start_seconds'] for w in words):
+            words = []
         sentences.append({'text': segment.text.strip(),
-            'start_seconds': float(segment.start), 'end_seconds': float(segment.end)})
+            'start_seconds': float(segment.start), 'end_seconds': float(segment.end), 'words': words})
     return {'language': info.language, 'sentences': sentences}

@@ -24,6 +24,7 @@ from pydantic import (
     StrictBool,
     StrictStr,
     ValidationError,
+    model_serializer,
 )
 
 from .errors import ErrorCode, QuantroError, Stage
@@ -158,12 +159,28 @@ class TimeRange(ContractModel):
     end_seconds: Seconds
 
 
+class TranscriptWord(ContractModel):
+    """Optional ASR timing; never interpolated from sentence boundaries."""
+    text: str
+    start_seconds: Seconds
+    end_seconds: Seconds
+
+
 class TranscriptSentence(ContractModel):
     sentence_id: str
     start_seconds: Seconds
     end_seconds: Seconds
     text: str
     speaker_id: str | None = None
+    words: list[TranscriptWord] = Field(default_factory=list, strict=True)
+
+    @model_serializer(mode="wrap")
+    def serialize_optional_words(self, handler):
+        result = handler(self)
+        # Preserve legacy JSON when a provider has no word timing.
+        if not self.words:
+            result.pop("words", None)
+        return result
 
 
 class Transcript(ContractModel):
@@ -514,6 +531,7 @@ __all__ = [
     "TimeRange",
     "Transcript",
     "TranscriptSentence",
+    "TranscriptWord",
     "TranscriptStatus",
     "UtcTimestamp",
     "VisualText",

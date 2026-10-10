@@ -1,0 +1,991 @@
+{
+  "source": {
+    "media_id": "source",
+    "duration_seconds": 28.291666,
+    "language": "en",
+    "transcript": {
+      "status": "complete",
+      "processed_ranges": [
+        {
+          "start_seconds": 0.0,
+          "end_seconds": 28.291666
+        }
+      ],
+      "sentences": [
+        {
+          "sentence_id": "source_sentence_0001",
+          "start_seconds": 0.0,
+          "end_seconds": 4.8,
+          "text": "We choose to go to the moon in this decade and do the other things.",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "We",
+              "start_seconds": 0.0,
+              "end_seconds": 1.1
+            },
+            {
+              "text": "choose",
+              "start_seconds": 1.1,
+              "end_seconds": 1.52
+            },
+            {
+              "text": "to",
+              "start_seconds": 1.52,
+              "end_seconds": 1.86
+            },
+            {
+              "text": "go",
+              "start_seconds": 1.86,
+              "end_seconds": 2.06
+            },
+            {
+              "text": "to",
+              "start_seconds": 2.06,
+              "end_seconds": 2.18
+            },
+            {
+              "text": "the",
+              "start_seconds": 2.18,
+              "end_seconds": 2.34
+            },
+            {
+              "text": "moon",
+              "start_seconds": 2.34,
+              "end_seconds": 2.64
+            },
+            {
+              "text": "in",
+              "start_seconds": 2.64,
+              "end_seconds": 2.9
+            },
+            {
+              "text": "this",
+              "start_seconds": 2.9,
+              "end_seconds": 3.12
+            },
+            {
+              "text": "decade",
+              "start_seconds": 3.12,
+              "end_seconds": 3.52
+            },
+            {
+              "text": "and",
+              "start_seconds": 3.52,
+              "end_seconds": 3.84
+            },
+            {
+              "text": "do",
+              "start_seconds": 3.84,
+              "end_seconds": 4.02
+            },
+            {
+              "text": "the",
+              "start_seconds": 4.02,
+              "end_seconds": 4.2
+            },
+            {
+              "text": "other",
+              "start_seconds": 4.2,
+              "end_seconds": 4.4
+            },
+            {
+              "text": "things.",
+              "start_seconds": 4.4,
+              "end_seconds": 4.8
+            }
+          ]
+        },
+        {
+          "sentence_id": "source_sentence_0002",
+          "start_seconds": 5.26,
+          "end_seconds": 8.6,
+          "text": "Not because they are easy, but because they are hard.",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "Not",
+              "start_seconds": 5.26,
+              "end_seconds": 5.56
+            },
+            {
+              "text": "because",
+              "start_seconds": 5.56,
+              "end_seconds": 6.04
+            },
+            {
+              "text": "they",
+              "start_seconds": 6.04,
+              "end_seconds": 6.36
+            },
+            {
+              "text": "are",
+              "start_seconds": 6.36,
+              "end_seconds": 6.5
+            },
+            {
+              "text": "easy,",
+              "start_seconds": 6.5,
+              "end_seconds": 6.96
+            },
+            {
+              "text": "but",
+              "start_seconds": 7.02,
+              "end_seconds": 7.36
+            },
+            {
+              "text": "because",
+              "start_seconds": 7.36,
+              "end_seconds": 7.8
+            },
+            {
+              "text": "they",
+              "start_seconds": 7.8,
+              "end_seconds": 8.02
+            },
+            {
+              "text": "are",
+              "start_seconds": 8.02,
+              "end_seconds": 8.18
+            },
+            {
+              "text": "hard.",
+              "start_seconds": 8.18,
+              "end_seconds": 8.6
+            }
+          ]
+        },
+        {
+          "sentence_id": "source_sentence_0003",
+          "start_seconds": 9.34,
+          "end_seconds": 16.04,
+          "text": "Because that goal will serve to organize and measure the best of our energies and skills.",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "Because",
+              "start_seconds": 9.34,
+              "end_seconds": 9.74
+            },
+            {
+              "text": "that",
+              "start_seconds": 9.74,
+              "end_seconds": 10.1
+            },
+            {
+              "text": "goal",
+              "start_seconds": 10.1,
+              "end_seconds": 10.46
+            },
+            {
+              "text": "will",
+              "start_seconds": 10.46,
+              "end_seconds": 11.54
+            },
+            {
+              "text": "serve",
+              "start_seconds": 11.54,
+              "end_seconds": 11.9
+            },
+            {
+              "text": "to",
+              "start_seconds": 11.9,
+              "end_seconds": 12.16
+            },
+            {
+              "text": "organize",
+              "start_seconds": 12.16,
+              "end_seconds": 12.58
+            },
+            {
+              "text": "and",
+              "start_seconds": 12.58,
+              "end_seconds": 13.1
+            },
+            {
+              "text": "measure",
+              "start_seconds": 13.1,
+              "end_seconds": 13.48
+            },
+            {
+              "text": "the",
+              "start_seconds": 13.48,
+              "end_seconds": 13.68
+            },
+            {
+              "text": "best",
+              "start_seconds": 13.68,
+              "end_seconds": 14.02
+            },
+            {
+              "text": "of",
+              "start_seconds": 14.02,
+              "end_seconds": 14.82
+            },
+            {
+              "text": "our",
+              "start_seconds": 14.82,
+              "end_seconds": 15.0
+            },
+            {
+              "text": "energies",
+              "start_seconds": 15.0,
+              "end_seconds": 15.32
+            },
+            {
+              "text": "and",
+              "start_seconds": 15.32,
+              "end_seconds": 15.6
+            },
+            {
+              "text": "skills.",
+              "start_seconds": 15.6,
+              "end_seconds": 16.04
+            }
+          ]
+        },
+        {
+          "sentence_id": "source_sentence_0004",
+          "start_seconds": 16.56,
+          "end_seconds": 20.08,
+          "text": "Because that challenge is one that we're willing to accept,",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "Because",
+              "start_seconds": 16.56,
+              "end_seconds": 17.16
+            },
+            {
+              "text": "that",
+              "start_seconds": 17.16,
+              "end_seconds": 17.52
+            },
+            {
+              "text": "challenge",
+              "start_seconds": 17.52,
+              "end_seconds": 18.0
+            },
+            {
+              "text": "is",
+              "start_seconds": 18.0,
+              "end_seconds": 18.3
+            },
+            {
+              "text": "one",
+              "start_seconds": 18.3,
+              "end_seconds": 18.6
+            },
+            {
+              "text": "that",
+              "start_seconds": 18.6,
+              "end_seconds": 18.84
+            },
+            {
+              "text": "we're",
+              "start_seconds": 18.84,
+              "end_seconds": 19.12
+            },
+            {
+              "text": "willing",
+              "start_seconds": 19.12,
+              "end_seconds": 19.28
+            },
+            {
+              "text": "to",
+              "start_seconds": 19.28,
+              "end_seconds": 19.54
+            },
+            {
+              "text": "accept,",
+              "start_seconds": 19.54,
+              "end_seconds": 20.08
+            }
+          ]
+        },
+        {
+          "sentence_id": "source_sentence_0005",
+          "start_seconds": 20.6,
+          "end_seconds": 26.3,
+          "text": "one we are unwilling to postpone, and one we intend to win, and the others too.",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "one",
+              "start_seconds": 20.6,
+              "end_seconds": 21.06
+            },
+            {
+              "text": "we",
+              "start_seconds": 21.06,
+              "end_seconds": 21.26
+            },
+            {
+              "text": "are",
+              "start_seconds": 21.26,
+              "end_seconds": 21.48
+            },
+            {
+              "text": "unwilling",
+              "start_seconds": 21.48,
+              "end_seconds": 21.8
+            },
+            {
+              "text": "to",
+              "start_seconds": 21.8,
+              "end_seconds": 22.16
+            },
+            {
+              "text": "postpone,",
+              "start_seconds": 22.16,
+              "end_seconds": 22.7
+            },
+            {
+              "text": "and",
+              "start_seconds": 23.16,
+              "end_seconds": 23.7
+            },
+            {
+              "text": "one",
+              "start_seconds": 23.7,
+              "end_seconds": 23.96
+            },
+            {
+              "text": "we",
+              "start_seconds": 23.96,
+              "end_seconds": 24.18
+            },
+            {
+              "text": "intend",
+              "start_seconds": 24.18,
+              "end_seconds": 24.56
+            },
+            {
+              "text": "to",
+              "start_seconds": 24.56,
+              "end_seconds": 24.76
+            },
+            {
+              "text": "win,",
+              "start_seconds": 24.76,
+              "end_seconds": 25.0
+            },
+            {
+              "text": "and",
+              "start_seconds": 25.38,
+              "end_seconds": 25.68
+            },
+            {
+              "text": "the",
+              "start_seconds": 25.68,
+              "end_seconds": 25.8
+            },
+            {
+              "text": "others",
+              "start_seconds": 25.8,
+              "end_seconds": 25.98
+            },
+            {
+              "text": "too.",
+              "start_seconds": 25.98,
+              "end_seconds": 26.3
+            }
+          ]
+        }
+      ]
+    },
+    "frames": [],
+    "visual_text": [],
+    "warnings": [
+      "whisper transcript words and timestamps are estimates; they are not independent recording verification.",
+      "Speaker identities are not assessed. Incomplete utterances at chunk boundaries are preserved."
+    ]
+  },
+  "TEST_continuous_trim": {
+    "media_id": "TEST_continuous_trim",
+    "duration_seconds": 22.0,
+    "language": "en",
+    "transcript": {
+      "status": "complete",
+      "processed_ranges": [
+        {
+          "start_seconds": 0.0,
+          "end_seconds": 22.0
+        }
+      ],
+      "sentences": [
+        {
+          "sentence_id": "TEST_continuous_trim_sentence_0001",
+          "start_seconds": 0.0,
+          "end_seconds": 4.92,
+          "text": "to the moon in this decade and do the other things, not because they are easy,",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "to",
+              "start_seconds": 0.0,
+              "end_seconds": 0.18
+            },
+            {
+              "text": "the",
+              "start_seconds": 0.18,
+              "end_seconds": 0.32
+            },
+            {
+              "text": "moon",
+              "start_seconds": 0.32,
+              "end_seconds": 0.68
+            },
+            {
+              "text": "in",
+              "start_seconds": 0.68,
+              "end_seconds": 0.9
+            },
+            {
+              "text": "this",
+              "start_seconds": 0.9,
+              "end_seconds": 1.12
+            },
+            {
+              "text": "decade",
+              "start_seconds": 1.12,
+              "end_seconds": 1.54
+            },
+            {
+              "text": "and",
+              "start_seconds": 1.54,
+              "end_seconds": 1.84
+            },
+            {
+              "text": "do",
+              "start_seconds": 1.84,
+              "end_seconds": 2.02
+            },
+            {
+              "text": "the",
+              "start_seconds": 2.02,
+              "end_seconds": 2.2
+            },
+            {
+              "text": "other",
+              "start_seconds": 2.2,
+              "end_seconds": 2.4
+            },
+            {
+              "text": "things,",
+              "start_seconds": 2.4,
+              "end_seconds": 2.8
+            },
+            {
+              "text": "not",
+              "start_seconds": 3.14,
+              "end_seconds": 3.56
+            },
+            {
+              "text": "because",
+              "start_seconds": 3.56,
+              "end_seconds": 4.04
+            },
+            {
+              "text": "they",
+              "start_seconds": 4.04,
+              "end_seconds": 4.36
+            },
+            {
+              "text": "are",
+              "start_seconds": 4.36,
+              "end_seconds": 4.5
+            },
+            {
+              "text": "easy,",
+              "start_seconds": 4.5,
+              "end_seconds": 4.92
+            }
+          ]
+        },
+        {
+          "sentence_id": "TEST_continuous_trim_sentence_0002",
+          "start_seconds": 4.92,
+          "end_seconds": 11.46,
+          "text": "but because they are hard, because that goal will serve to organize and measure",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "but",
+              "start_seconds": 4.92,
+              "end_seconds": 5.34
+            },
+            {
+              "text": "because",
+              "start_seconds": 5.34,
+              "end_seconds": 5.8
+            },
+            {
+              "text": "they",
+              "start_seconds": 5.8,
+              "end_seconds": 6.02
+            },
+            {
+              "text": "are",
+              "start_seconds": 6.02,
+              "end_seconds": 6.16
+            },
+            {
+              "text": "hard,",
+              "start_seconds": 6.16,
+              "end_seconds": 6.58
+            },
+            {
+              "text": "because",
+              "start_seconds": 7.24,
+              "end_seconds": 7.72
+            },
+            {
+              "text": "that",
+              "start_seconds": 7.72,
+              "end_seconds": 8.12
+            },
+            {
+              "text": "goal",
+              "start_seconds": 8.12,
+              "end_seconds": 8.5
+            },
+            {
+              "text": "will",
+              "start_seconds": 8.5,
+              "end_seconds": 9.54
+            },
+            {
+              "text": "serve",
+              "start_seconds": 9.54,
+              "end_seconds": 9.92
+            },
+            {
+              "text": "to",
+              "start_seconds": 9.92,
+              "end_seconds": 10.16
+            },
+            {
+              "text": "organize",
+              "start_seconds": 10.16,
+              "end_seconds": 10.54
+            },
+            {
+              "text": "and",
+              "start_seconds": 10.54,
+              "end_seconds": 11.1
+            },
+            {
+              "text": "measure",
+              "start_seconds": 11.1,
+              "end_seconds": 11.46
+            }
+          ]
+        },
+        {
+          "sentence_id": "TEST_continuous_trim_sentence_0003",
+          "start_seconds": 11.46,
+          "end_seconds": 17.12,
+          "text": "the best of our energies and skills, because that challenge is one that we're",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "the",
+              "start_seconds": 11.46,
+              "end_seconds": 11.66
+            },
+            {
+              "text": "best",
+              "start_seconds": 11.66,
+              "end_seconds": 12.02
+            },
+            {
+              "text": "of",
+              "start_seconds": 12.02,
+              "end_seconds": 12.84
+            },
+            {
+              "text": "our",
+              "start_seconds": 12.84,
+              "end_seconds": 12.98
+            },
+            {
+              "text": "energies",
+              "start_seconds": 12.98,
+              "end_seconds": 13.3
+            },
+            {
+              "text": "and",
+              "start_seconds": 13.3,
+              "end_seconds": 13.6
+            },
+            {
+              "text": "skills,",
+              "start_seconds": 13.6,
+              "end_seconds": 14.02
+            },
+            {
+              "text": "because",
+              "start_seconds": 14.16,
+              "end_seconds": 15.14
+            },
+            {
+              "text": "that",
+              "start_seconds": 15.14,
+              "end_seconds": 15.52
+            },
+            {
+              "text": "challenge",
+              "start_seconds": 15.52,
+              "end_seconds": 16.0
+            },
+            {
+              "text": "is",
+              "start_seconds": 16.0,
+              "end_seconds": 16.28
+            },
+            {
+              "text": "one",
+              "start_seconds": 16.28,
+              "end_seconds": 16.6
+            },
+            {
+              "text": "that",
+              "start_seconds": 16.6,
+              "end_seconds": 16.84
+            },
+            {
+              "text": "we're",
+              "start_seconds": 16.84,
+              "end_seconds": 17.12
+            }
+          ]
+        },
+        {
+          "sentence_id": "TEST_continuous_trim_sentence_0004",
+          "start_seconds": 17.12,
+          "end_seconds": 21.98,
+          "text": "willing to accept, one we are unwilling to postpone, and one",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "willing",
+              "start_seconds": 17.12,
+              "end_seconds": 17.28
+            },
+            {
+              "text": "to",
+              "start_seconds": 17.28,
+              "end_seconds": 17.52
+            },
+            {
+              "text": "accept,",
+              "start_seconds": 17.52,
+              "end_seconds": 18.08
+            },
+            {
+              "text": "one",
+              "start_seconds": 18.78,
+              "end_seconds": 19.06
+            },
+            {
+              "text": "we",
+              "start_seconds": 19.06,
+              "end_seconds": 19.28
+            },
+            {
+              "text": "are",
+              "start_seconds": 19.28,
+              "end_seconds": 19.48
+            },
+            {
+              "text": "unwilling",
+              "start_seconds": 19.48,
+              "end_seconds": 19.8
+            },
+            {
+              "text": "to",
+              "start_seconds": 19.8,
+              "end_seconds": 20.16
+            },
+            {
+              "text": "postpone,",
+              "start_seconds": 20.16,
+              "end_seconds": 20.7
+            },
+            {
+              "text": "and",
+              "start_seconds": 21.3,
+              "end_seconds": 21.72
+            },
+            {
+              "text": "one",
+              "start_seconds": 21.72,
+              "end_seconds": 21.98
+            }
+          ]
+        }
+      ]
+    },
+    "frames": [],
+    "visual_text": [],
+    "warnings": [
+      "whisper transcript words and timestamps are estimates; they are not independent recording verification.",
+      "Speaker identities are not assessed. Incomplete utterances at chunk boundaries are preserved."
+    ]
+  },
+  "TEST_stitched_clip": {
+    "media_id": "TEST_stitched_clip",
+    "duration_seconds": 16.0,
+    "language": "en",
+    "transcript": {
+      "status": "complete",
+      "processed_ranges": [
+        {
+          "start_seconds": 0.0,
+          "end_seconds": 16.0
+        }
+      ],
+      "sentences": [
+        {
+          "sentence_id": "TEST_stitched_clip_sentence_0001",
+          "start_seconds": 0.0,
+          "end_seconds": 4.94,
+          "text": "to the moon and this decade and do the other things not because they are easy",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "to",
+              "start_seconds": 0.0,
+              "end_seconds": 0.18
+            },
+            {
+              "text": "the",
+              "start_seconds": 0.18,
+              "end_seconds": 0.32
+            },
+            {
+              "text": "moon",
+              "start_seconds": 0.32,
+              "end_seconds": 0.68
+            },
+            {
+              "text": "and",
+              "start_seconds": 0.68,
+              "end_seconds": 0.9
+            },
+            {
+              "text": "this",
+              "start_seconds": 0.9,
+              "end_seconds": 1.1
+            },
+            {
+              "text": "decade",
+              "start_seconds": 1.1,
+              "end_seconds": 1.54
+            },
+            {
+              "text": "and",
+              "start_seconds": 1.54,
+              "end_seconds": 1.84
+            },
+            {
+              "text": "do",
+              "start_seconds": 1.84,
+              "end_seconds": 2.02
+            },
+            {
+              "text": "the",
+              "start_seconds": 2.02,
+              "end_seconds": 2.2
+            },
+            {
+              "text": "other",
+              "start_seconds": 2.2,
+              "end_seconds": 2.4
+            },
+            {
+              "text": "things",
+              "start_seconds": 2.4,
+              "end_seconds": 2.82
+            },
+            {
+              "text": "not",
+              "start_seconds": 2.82,
+              "end_seconds": 3.56
+            },
+            {
+              "text": "because",
+              "start_seconds": 3.56,
+              "end_seconds": 4.04
+            },
+            {
+              "text": "they",
+              "start_seconds": 4.04,
+              "end_seconds": 4.36
+            },
+            {
+              "text": "are",
+              "start_seconds": 4.36,
+              "end_seconds": 4.5
+            },
+            {
+              "text": "easy",
+              "start_seconds": 4.5,
+              "end_seconds": 4.94
+            }
+          ]
+        },
+        {
+          "sentence_id": "TEST_stitched_clip_sentence_0002",
+          "start_seconds": 4.94,
+          "end_seconds": 10.82,
+          "text": "but because they are hard because that's because that challenge is one that",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "but",
+              "start_seconds": 4.94,
+              "end_seconds": 5.34
+            },
+            {
+              "text": "because",
+              "start_seconds": 5.34,
+              "end_seconds": 5.8
+            },
+            {
+              "text": "they",
+              "start_seconds": 5.8,
+              "end_seconds": 6.04
+            },
+            {
+              "text": "are",
+              "start_seconds": 6.04,
+              "end_seconds": 6.18
+            },
+            {
+              "text": "hard",
+              "start_seconds": 6.18,
+              "end_seconds": 6.62
+            },
+            {
+              "text": "because",
+              "start_seconds": 6.62,
+              "end_seconds": 7.76
+            },
+            {
+              "text": "that's",
+              "start_seconds": 7.76,
+              "end_seconds": 8.18
+            },
+            {
+              "text": "because",
+              "start_seconds": 8.18,
+              "end_seconds": 9.12
+            },
+            {
+              "text": "that",
+              "start_seconds": 9.12,
+              "end_seconds": 9.52
+            },
+            {
+              "text": "challenge",
+              "start_seconds": 9.52,
+              "end_seconds": 10.0
+            },
+            {
+              "text": "is",
+              "start_seconds": 10.0,
+              "end_seconds": 10.28
+            },
+            {
+              "text": "one",
+              "start_seconds": 10.28,
+              "end_seconds": 10.6
+            },
+            {
+              "text": "that",
+              "start_seconds": 10.6,
+              "end_seconds": 10.82
+            }
+          ]
+        },
+        {
+          "sentence_id": "TEST_stitched_clip_sentence_0003",
+          "start_seconds": 10.82,
+          "end_seconds": 15.94,
+          "text": "we're willing to accept one we are unwilling to postpone and one",
+          "speaker_id": null,
+          "words": [
+            {
+              "text": "we're",
+              "start_seconds": 10.82,
+              "end_seconds": 11.12
+            },
+            {
+              "text": "willing",
+              "start_seconds": 11.12,
+              "end_seconds": 11.28
+            },
+            {
+              "text": "to",
+              "start_seconds": 11.28,
+              "end_seconds": 11.52
+            },
+            {
+              "text": "accept",
+              "start_seconds": 11.52,
+              "end_seconds": 12.06
+            },
+            {
+              "text": "one",
+              "start_seconds": 12.06,
+              "end_seconds": 13.04
+            },
+            {
+              "text": "we",
+              "start_seconds": 13.04,
+              "end_seconds": 13.28
+            },
+            {
+              "text": "are",
+              "start_seconds": 13.28,
+              "end_seconds": 13.5
+            },
+            {
+              "text": "unwilling",
+              "start_seconds": 13.5,
+              "end_seconds": 13.8
+            },
+            {
+              "text": "to",
+              "start_seconds": 13.8,
+              "end_seconds": 14.16
+            },
+            {
+              "text": "postpone",
+              "start_seconds": 14.16,
+              "end_seconds": 14.68
+            },
+            {
+              "text": "and",
+              "start_seconds": 14.68,
+              "end_seconds": 15.7
+            },
+            {
+              "text": "one",
+              "start_seconds": 15.7,
+              "end_seconds": 15.94
+            }
+          ]
+        }
+      ]
+    },
+    "frames": [],
+    "visual_text": [],
+    "warnings": [
+      "whisper transcript words and timestamps are estimates; they are not independent recording verification.",
+      "Speaker identities are not assessed. Incomplete utterances at chunk boundaries are preserved."
+    ]
+  }
+}

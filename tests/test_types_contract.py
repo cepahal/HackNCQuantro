@@ -21,7 +21,7 @@ EXPECTED_FIELDS = {
     t.Retrieval: {"retrieved_at", "provider", "metadata_source_urls", "unavailable_fields", "warnings"},
     t.Post: {"post_id", "candidate_id", "post_url", "platform", "title", "caption", "author",
              "engagement", "published_at", "media", "retrieval"},
-    t.TranscriptSentence: {"sentence_id", "start_seconds", "end_seconds", "text", "speaker_id"},
+    t.TranscriptSentence: {"sentence_id", "start_seconds", "end_seconds", "text", "speaker_id", "words"},
     t.Transcript: {"status", "processed_ranges", "sentences"},
     t.Frame: {"frame_id", "timestamp_seconds", "image_path", "image_url"},
     t.VisualText: {"frame_id", "timestamp_seconds", "text"},

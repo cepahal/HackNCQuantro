@@ -142,6 +142,17 @@ def _sentences(data, start, end, media_id, first_index):
             "text": item["text"],
             "speaker_id": None,
         })
+        if item.get('words'):
+            words = []
+            for word in item['words']:
+                wleft, wright = _number(word['start_seconds']), _number(word['end_seconds'])
+                if left <= wleft < right < wright <= right + END_OVERSHOOT_TOLERANCE_SECONDS:
+                    wright = right
+                if not left <= wleft < wright <= right or not isinstance(word['text'], str):
+                    raise ValueError('Invalid word timing')
+                words.append({'text': word['text'], 'start_seconds': start + wleft,
+                              'end_seconds': start + wright})
+            sentences[-1]['words'] = words
     return sentences
 
 

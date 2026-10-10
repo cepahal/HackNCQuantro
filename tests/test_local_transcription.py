@@ -29,7 +29,7 @@ def test_local_provider_preserves_spoken_segments(monkeypatch):
     monkeypatch.setattr(t, '_model', lambda name: model)
     result = t.transcribe('local.wav')
     assert result == {'language': 'en', 'sentences': [
-        {'start_seconds': 1.2, 'end_seconds': 3.4, 'text': 'Do not cancel it.'}]}
+        {'start_seconds': 1.2, 'end_seconds': 3.4, 'text': 'Do not cancel it.', 'words': []}]}
     assert model.transcribe.call_args.kwargs['condition_on_previous_text'] is False
 
 
@@ -64,3 +64,17 @@ def test_local_failure_does_not_fall_back_to_network(tmp_path, monkeypatch):
             'extract_frames': False, 'extract_visual_text': False})
     assert error.value.code.value == 'TRANSCRIPTION_FAILED'
     assert 'private details' not in str(error.value)
+
+
+@pytest.mark.parametrize('word_end, expected_count', [(2.0, 1), (1.2, 0)])
+def test_local_word_timing_preserved_or_discarded(monkeypatch, word_end, expected_count):
+    model = Mock()
+    model.transcribe.return_value = (iter([SimpleNamespace(
+        start=1.2, end=2.0, text=' Hello.',
+        words=[SimpleNamespace(start=1.2, end=word_end, word=' Hello.')],
+    )]), SimpleNamespace(language='en'))
+    monkeypatch.setattr(t, '_model', lambda name: model)
+    words = t.transcribe('local.wav')['sentences'][0]['words']
+    assert len(words) == expected_count
+    if words:
+        assert words == [{'text': 'Hello.', 'start_seconds': 1.2, 'end_seconds': 2.0}]

@@ -1,5 +1,6 @@
 """Validation shared by the specialist stages; no network calls."""
 import math
+import re
 
 
 def number(value):
@@ -53,4 +54,17 @@ def validate_features(features):
         seen.add(identity)
         if not isinstance(sentence['text'], str) or not sentence['text'].strip():
             raise ValueError('Sentence text must be nonempty.')
+        if sentence.get('words'):
+            pieces = []
+            previous = start
+            for word in sentence['words']:
+                left, right = number(word['start_seconds']), number(word['end_seconds'])
+                if not start <= left < right <= end or left < previous:
+                    raise ValueError('Invalid word timing.')
+                previous = right
+                if not isinstance(word['text'], str) or not word['text'].strip():
+                    raise ValueError('Invalid word text.')
+                pieces.extend(re.findall(r"\w+(?:['’]\w+)?", word['text'].casefold()))
+            if pieces != re.findall(r"\w+(?:['’]\w+)?", sentence['text'].casefold()):
+                raise ValueError('Word timing must cover the exact transcript text.')
     return duration
