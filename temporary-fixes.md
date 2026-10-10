@@ -164,3 +164,24 @@ instance, independently billed from the Pro workspace. Public deployment,
 private Tiger TLS variables, the production backend URL and Vercel redeployment
 remain operator acceptance gates; no hosted memory or cloud-IP download success
 is implied by local tests. See `docs/HOSTING.md` for current configuration steps.
+
+
+### Latest main reconciliation (2026-10-10)
+
+Merged teammate backend commit `45ebd9e` and frontend changes through `fa73a3a`.
+Preserved optional word-timestamp recovery, contextual search, known-size stream
+selection, homepage design and cursor. Retained unknown-size stream fallback
+behind the actual download byte cap; added two regression cases. Kept our atomic
+job reservation, durable media streaming, typed errors, source identity checks,
+caption grounding and durable Spectrum recovery; these are complementary fixes.
+
+Backend verification after the backend merge: 911 passed, 7 skipped, 45 subtests.
+Mypy (43 files), Ruff F/E9, generated frontend types, dependency and media runtime
+checks passed. Latest frontend merge: 40 tests passed; fixed its unescaped JSX
+apostrophe and restored the configured messaging destination in the homepage note.
+Frontend lint, typecheck and production build all passed after the fix.
+
+Render has a paid Pro workspace, but no backend service is deployed yet. The
+prepared service uses one 1 CPU / 2 GB instance, private Tiger TLS configuration,
+and Exa. Service deployment and the Vercel production URL/rebuild remain gates.
+No credentials are committed.
