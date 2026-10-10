@@ -8,6 +8,8 @@ import backend.services.reporting.run_analysis as analysis_module
 import backend.services.reporting.send_summary as send_summary_module
 from backend.main import app
 from backend.routes.common import get_tiger_store
+from backend.services.reporting.display_report import display_report
+from backend.services.reporting.errors import QuantroError
 from backend.services.reporting.send_summary import InMemoryDeliveryTracker, SendReceipt
 from backend.services.storage.tiger import TigerStore
 
@@ -283,6 +285,38 @@ def test_tied_sources_are_disclosed(client, store, upstream):
     assert "Multiple plausible sources remain." in report["limitations"]
     assert ("Another plausible source was not selected: https://www.youtube.com/watch?v=src2"
             in report["limitations"])
+
+
+def test_display_report_renders_a_matched_pipeline_report(client, store, upstream):
+    _run(client, "job_display")
+
+    model = display_report(client.get("/reports/report_job_display").json())
+
+    assert model.source_match.value == "Moderate"
+    assert model.clip_coverage.value == "90%"
+    assert model.context_assessment.value == "Moderate"
+    assert model.no_source_message is None
+    assert model.source_panel.media_playback_url == "https://cdn.example/src_media_1.mp4"
+    assert model.poster_info.submitted.followers_count == "Unavailable"
+    assert [match["match_id"] for match in model.matches] == ["match_001"]
+    assert model.findings[0]["finding_id"] == "finding_001"
+
+
+def test_display_report_renders_no_verified_match(client, store, upstream):
+    upstream["candidates"] = []
+    _run(client, "job_display_none")
+
+    model = display_report(client.get("/reports/report_job_display_none").json())
+
+    assert model.no_source_message == "No verified source found"
+    assert model.source_match is None and model.source_panel is None
+    assert model.limitations[0] == "No verified source was found for the submitted clip."
+
+
+def test_display_report_rejects_non_report_input():
+    with pytest.raises(QuantroError) as caught:
+        display_report({"job_id": "x"})
+    assert caught.value.stage.value == "display_report"
 
 
 def test_unknown_report_returns_404(client):

@@ -13,7 +13,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from .errors import ErrorCode, QuantroError, Stage
-from .types import ConfidenceLevel, Outcome
+from .types import ConfidenceLevel, Outcome, ReportV2, parse_stage_output
 
 SOURCE_MATCH_LABEL = "Source-match confidence"
 CLIP_COVERAGE_LABEL = "Submitted clip aligned"
@@ -234,8 +234,27 @@ def build_display_model(
     return model
 
 
-def display_report(report: Any) -> DisplayModel:
-    raise NotImplementedError(
-        "Map ReportV2 fields into build_display_model once the v2 contract paths for "
-        "clip_coverage_ratio, matched_clip_seconds, playback_url and matches are confirmed"
+def display_report(report: ReportV2 | Mapping[str, Any]) -> DisplayModel:
+    if not isinstance(report, ReportV2):
+        report = parse_stage_output(ReportV2, report, Stage.DISPLAY_REPORT)
+    data = report.model_dump(mode="json")
+    submitted, source = data["submitted"], data["source"]
+    alignment, comparison = data["alignment"] or {}, data["comparison"] or {}
+    match_quality = alignment.get("match_quality") or {}
+    return build_display_model(
+        outcome=data["outcome"],
+        submitted_post=submitted["post"],
+        submitted_transcript=submitted["transcript"],
+        submitted_playback_url=submitted["post"]["media"]["playback_url"],
+        source_post=source["post"] if source else None,
+        source_transcript=source["transcript"] if source else None,
+        source_playback_url=source["post"]["media"]["playback_url"] if source else None,
+        match_confidence=match_quality.get("confidence"),
+        clip_coverage_ratio=match_quality.get("clip_coverage_ratio"),
+        matched_clip_seconds=match_quality.get("matched_clip_seconds"),
+        assessment_confidence=comparison.get("assessment_confidence"),
+        matches=alignment.get("matches") or [],
+        edit_analysis=alignment.get("edit_analysis"),
+        findings=comparison.get("findings") or [],
+        limitations=data["limitations"],
     )
