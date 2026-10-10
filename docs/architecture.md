@@ -20,8 +20,9 @@ The four empty merge scaffolds formerly under `services/_archive/` were deleted
    Data, and returns the internal Post with local media path.
 3. Extraction produces contract MediaFeatures. Requested transcription/OCR
    provider failures are errors; missing speech is explicitly unavailable.
-4. Query generation searches the stored Tiger Post metadata corpus. Candidate
-   downloads reuse retrieval. The submitted URL is excluded from source selection.
+4. Query generation feeds the configured search provider: Exa public-web search
+   or the legacy Tiger Post metadata corpus. Candidate webpages are attempted
+   through the guarded downloader; unsupported media is skipped with warnings. The submitted URL is excluded from source selection.
 5. Transcript alignment verifies candidates conservatively. Only a verified
    candidate proceeds to surrounding context and caption comparison.
 6. Report schema 2.1 retains provenance, complete transcript data, confidence
@@ -79,7 +80,7 @@ Delivery state is independent of analysis. Ambiguous sends are not automatically
 replayed. Interrupted/overflowed intake records require operator inspection.
 Attachments are retained at intake; automatic analysis currently requires a URL.
 
-See its README and `docs/RUNBOOK.md` for operator steps. Live model generation is
-currently paused at the user's request after the configured key returned depleted
-prepaid credits. Real iMessage round-trip and a public deployment remain live
-verification gates; local storage/browser checks do not imply those passed.
+See its README and `docs/RUNBOOK.md` for operator steps. Local Whisper and Exa
+production function calls were verified on 2026-10-10; see `docs/PROVIDERS.md` for
+deployment settings and limits. The user reports a successful team Photon round
+trip; the new deployed Exa-to-verified-source path still needs a live check.

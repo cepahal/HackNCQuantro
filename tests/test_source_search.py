@@ -250,6 +250,7 @@ def test_search_failure_is_not_empty_success(error: Exception) -> None:
 def test_default_search_owns_connection(
     monkeypatch: pytest.MonkeyPatch, post: Post
 ) -> None:
+    monkeypatch.setattr("backend.services.external_apis.search_candidates._environment", lambda: {"SEARCH_PROVIDER": "tiger"})
     provider = Provider([(post, [QUERY])])
     monkeypatch.setattr(TigerDataPostStore, "from_env", lambda: provider)
     result = search_candidates([QUERY], 1)

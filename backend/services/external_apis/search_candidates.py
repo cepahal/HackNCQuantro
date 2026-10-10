@@ -1,4 +1,4 @@
-"""Search the Tiger Data corpus; a returned candidate is not a verified match."""
+"""Search the configured Exa web provider or explicit Tiger Data corpus."""
 
 import hashlib
 import logging
@@ -16,7 +16,8 @@ from ..shared.types import (
 )
 from ..shared.types import CandidateList as _ReturnModel
 from .retrieve_post import _validate_url
-from .tigerdata_storage import TigerDataPostStore
+from .tigerdata_storage import TigerDataPostStore, _environment
+from .exa_search import ExaSearch
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +51,9 @@ def search_candidates(
 ) -> CandidateList:
     """Accept function 3's object or its queries array; return the exact v2 envelope.
 
-    The default provider searches already stored post titles/captions/authors in
-    Tiger Data. Curate source recordings into that corpus using retrieve_post.
-    No search key is required, and no public-web discovery is implied.
+    SEARCH_PROVIDER=exa selects public web discovery. SEARCH_PROVIDER=tiger
+    (legacy default) searches stored Post metadata. No silent fallback occurs.
+    Candidate pages are attempted by the guarded retrieval worker downstream.
     """
     # aligned with shared/types.py on 2026-10-10
     queries = contract_input(queries)
@@ -87,10 +88,17 @@ def search_candidates(
                 "candidates": [],
                 "warnings": warnings + ["No search queries were available."],
             }, _ContractStage.SEARCH_CANDIDATES, json_native=True)
-        owned: TigerDataPostStore | None = None
+        owned: TigerDataPostStore | ExaSearch | None = None
         try:
             if provider is None:
-                owned = TigerDataPostStore.from_env()
+                settings = _environment()
+                name = (settings.get("SEARCH_PROVIDER") or "tiger").strip().lower()
+                if name == "exa":
+                    owned = ExaSearch(settings.get("EXA_API_KEY", ""))
+                elif name == "tiger":
+                    owned = TigerDataPostStore.from_env()
+                else:
+                    raise QuantroError("SEARCH_FAILED", Stage.SEARCH_CANDIDATES, "SEARCH_PROVIDER must be exa or tiger.")
                 provider = owned
             rows = provider.find_posts(normalized, limit)
             if not isinstance(rows, list) or len(rows) > limit:
@@ -104,7 +112,7 @@ def search_candidates(
                 url = metadata["post_url"]
                 if not isinstance(url, str):
                     raise TypeError
-                url, _ = _validate_url(url)
+                url, _ = _validate_url(url, allow_webpage=True)
                 if url in seen:
                     raise ValueError("Provider must deduplicate sources before limiting.")
                 seen.add(url)
@@ -129,11 +137,15 @@ def search_candidates(
                         "discovered_by_queries": [q for q in normalized if q in matched],
                     }
                 )
-            if owned is not None:
+            if isinstance(provider, ExaSearch):
+                warnings.extend(provider.warnings)
+            elif owned is not None:
                 warnings.append(
                     "Search covers the stored Tiger Data corpus only; results are unverified possible sources."
                 )
             return validate_contract_result(_ReturnModel, {"candidates": candidates, "warnings": warnings}, _ContractStage.SEARCH_CANDIDATES, json_native=True)
+        except QuantroError:
+            raise
         except Exception as error:  # noqa: BLE001 - redact SQL, DSNs and provider diagnostics
             raise QuantroError(
                 "SEARCH_FAILED",

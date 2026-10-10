@@ -1,5 +1,9 @@
 # Source-search handoff: functions 3, 4 and 5
 
+Update 2026-10-10: `SEARCH_PROVIDER=exa` now selects production web search.
+See [provider deployment](PROVIDERS.md) for keys, bounded calls and candidate-page
+retrieval. The corpus instructions below apply to `SEARCH_PROVIDER=tiger` only.
+
 These callables implement the team's v2 query/candidate/Post contracts. All are
 synchronous; use a worker thread when calling from async code.
 
@@ -34,7 +38,7 @@ precedence: `backend/.env`, root `.env`, root `.env.local`, process environment.
 Keep credentials out of tracked files. A present blank `TIGERDATA_DSN` remains
 an explicit configuration failure rather than silently selecting another DB.
 
-The production search provider is **Tiger Data's stored Post corpus**, searching
+The legacy/default-unset search provider is **Tiger Data's stored Post corpus**, searching
 retrieved titles, captions/descriptions and author display names/handles. Populate
 it with known accessible source recordings by calling `retrieve_post(source_url)`.
 No separate corpus table, Snowflake account or web-search API key is required.

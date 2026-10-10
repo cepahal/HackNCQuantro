@@ -12,7 +12,11 @@ services:
       - key: REPORT_STORE
         value: tiger
       - key: TRANSCRIPTION_PROVIDER
-        value: gemini
+        value: whisper
+      - key: SEARCH_PROVIDER
+        value: exa
+      - key: EXA_API_KEY
+        sync: false
       - key: TIGERDATA_SSL_ROOT_CERT
         value: /etc/ssl/certs/ca-certificates.crt
       - key: REPORT_BASE_URL

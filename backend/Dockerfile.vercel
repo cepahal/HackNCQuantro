@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 # ffmpeg/ffprobe: media preprocessing. ca-certificates: Tiger Postgres uses sslmode=verify-full.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+    && apt-get install -y --no-install-recommends ffmpeg ca-certificates libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Every module imports through the `backend.` package, and main.py puts its parent
@@ -12,10 +12,14 @@ WORKDIR /app/backend
 COPY requirements.txt requirements-specialist.txt requirements-whisper.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Local Whisper is optional and heavy; build with --build-arg INSTALL_WHISPER=1 to use
-# TRANSCRIPTION_PROVIDER=whisper.
-ARG INSTALL_WHISPER=0
+# Ship the chosen ASR and model with the backend; no runtime model download.
+# Opt out only when deploying with TRANSCRIPTION_PROVIDER=gemini.
+ARG INSTALL_WHISPER=1
 RUN if [ "$INSTALL_WHISPER" = "1" ]; then pip install --no-cache-dir -r requirements-whisper.txt; fi
+
+ARG WHISPER_BUILD_MODEL=small.en
+RUN if [ "$INSTALL_WHISPER" = "1" ]; then python -c "from faster_whisper.utils import download_model; download_model('$WHISPER_BUILD_MODEL', output_dir='/opt/quantro/whisper')"; fi
+ENV WHISPER_MODEL=/opt/quantro/whisper
 
 COPY . .
 

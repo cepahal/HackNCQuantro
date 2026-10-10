@@ -91,6 +91,7 @@ def retrieve_candidate_media(
                 output_dir=output_dir,
                 timeout_seconds=timeout_seconds,
                 max_bytes=max_bytes,
+                allow_webpage=True,
             ), _ContractStage.RETRIEVE_CANDIDATE_MEDIA, json_native=True)
         except RetrievalError as error:
             try:

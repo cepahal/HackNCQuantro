@@ -69,7 +69,7 @@ class RetrievalError(QuantroError):
         }
 
 
-def _validate_url(url: str) -> tuple[str, str]:
+def _validate_url(url: str, *, allow_webpage: bool = False) -> tuple[str, str]:
     if not isinstance(url, str) or not url.strip() or len(url) > 8192:
         raise RetrievalError(
             "INVALID_URL", "Provide a valid public post URL.", status_code=400
@@ -107,6 +107,8 @@ def _validate_url(url: str) -> tuple[str, str]:
             return url, platform
     if parsed.path.lower().endswith((".mp4", ".jpg", ".jpeg")):
         return url, "direct"
+    if allow_webpage:
+        return url, "web"
     raise RetrievalError(
         "UNSUPPORTED_PLATFORM", "This post platform is not supported.", status_code=400
     )
@@ -396,6 +398,7 @@ def retrieve_post(
     output_dir: str | Path | None = None,
     timeout_seconds: float = 120,
     max_bytes: int = 100_000_000,
+    allow_webpage: bool = False,
 ) -> Post:
     """Retrieve JPG/MP4, persist bytes and metadata in Tiger Data, then return the Post.
 
@@ -406,7 +409,7 @@ def retrieve_post(
     # aligned with shared/types.py on 2026-10-10
     url = contract_input(url)
     try:
-        url, platform = _validate_url(url)
+        url, platform = _validate_url(url, allow_webpage=allow_webpage)
         try:
             timeout = float(timeout_seconds)
         except (ValueError, TypeError, OverflowError):
