@@ -1354,3 +1354,26 @@ def test_invalid_media_never_opens_default_tigerdata_store(
     assert default_store.posts == []
     assert default_store.close_calls == 0
     assert_clean(tmp_path)
+
+
+def test_youtube_split_fallback_is_used_for_missing_combined_format(monkeypatch, tmp_path):
+    downloader = install(monkeypatch, returncode=1, stderr='Requested format is not available')
+    calls = []
+    def split(url, workspace, max_bytes, deadline):
+        calls.append((url, workspace, max_bytes, deadline))
+        return json.dumps(downloader.metadata)
+    monkeypatch.setattr(retrieval, '_retrieve_split_media', split)
+    result = retrieve_post(POST_URL, output_dir=tmp_path)
+    assert result['media']['mime_type'] == 'video/mp4'
+    assert len(calls) == 1 and calls[0][0] == POST_URL
+
+
+def test_split_fallback_failure_cleans_workspace(monkeypatch, tmp_path):
+    install(monkeypatch, returncode=1, stderr='Requested format is not available')
+    def split(url, workspace, max_bytes, deadline):
+        (workspace / 'video.mp4').write_bytes(b'partial')
+        raise RetrievalError('MEDIA_UNAVAILABLE', 'Separate stream failed')
+    monkeypatch.setattr(retrieval, '_retrieve_split_media', split)
+    with pytest.raises(RetrievalError):
+        retrieve_post(POST_URL, output_dir=tmp_path)
+    assert_clean(tmp_path)

@@ -223,6 +223,60 @@ def _direct_image_main(arguments: list[str]) -> None:
     )
 
 
+def _split_media_main(arguments: list[str]) -> None:
+    """Download two direct MP4-family streams; never invoke a merger in this worker."""
+    from yt_dlp import YoutubeDL
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--split-media", required=True)
+    parser.add_argument("--workspace", type=Path, required=True)
+    parser.add_argument("--max-bytes", type=int, required=True)
+    args = parser.parse_args(arguments)
+    if not args.workspace.is_absolute() or not args.workspace.is_dir() or args.max_bytes < 1:
+        raise ValueError("Invalid split download workspace or budget")
+    completed_bytes = 0
+
+    def budget(progress):
+        if completed_bytes + progress.get("downloaded_bytes", 0) > args.max_bytes:
+            raise ValueError("Combined media exceeds download limit")
+
+    options = {
+        "format": "bv[ext=mp4][vcodec^=avc1][height<=720][protocol=https]+ba[ext=m4a][protocol=https]",
+        "quiet": True, "no_warnings": True, "noprogress": True,
+        "noplaylist": True, "playlist_items": "1", "proxy": "",
+        "cachedir": False, "socket_timeout": 15, "retries": 1,
+        "extractor_retries": 1, "max_filesize": args.max_bytes,
+        "compat_opts": {"prefer-legacy-http-handler", "no-certifi"},
+        "progress_hooks": [budget], "buffersize": 65536, "noresizebuffer": True,
+    }
+    with YoutubeDL(options) as downloader:
+        info = downloader.extract_info(args.split_media, download=False)
+        if not isinstance(info, dict) or "entries" in info or info.get("is_live") or info.get("live_status") in {"is_live", "is_upcoming", "post_live"}:
+            raise ValueError("Only single finished videos are supported")
+        streams = info.get("requested_formats", [])
+        if len(streams) != 2:
+            raise ValueError("Expected one video and one audio stream")
+        for stream, name, extension in zip(streams, ("video.mp4", "audio.m4a"), ("mp4", "m4a")):
+            if stream.get("protocol") != "https" or stream.get("ext") != extension or stream.get("has_drm"):
+                raise ValueError("Unsupported split stream")
+            if urlsplit(stream.get("url", "")).scheme != "https":
+                raise ValueError("Split streams must use HTTPS")
+            path = args.workspace / name
+            if path.exists() or path.is_symlink():
+                raise ValueError("Split output already exists")
+            downloader.params["max_filesize"] = args.max_bytes - completed_bytes
+            if downloader.params["max_filesize"] <= 0:
+                raise ValueError("Combined media exceeds download limit")
+            success, _ = downloader.dl(str(path), {**info, **stream, "requested_formats": None})
+            if not success or path.is_symlink() or not path.is_file():
+                raise ValueError("Stream download failed")
+            completed_bytes += path.stat().st_size
+            if completed_bytes > args.max_bytes:
+                raise ValueError("Combined media exceeds download limit")
+        info.update(ext="mp4", vcodec=streams[0].get("vcodec"), acodec=streams[1].get("acodec"))
+        print(json.dumps(downloader.sanitize_info(info)))
+
+
 def main() -> None:
     for name in tuple(os.environ):
         if name.lower().endswith("_proxy"):
@@ -231,6 +285,9 @@ def main() -> None:
     sys.addaudithook(_audit_network)
     if sys.argv[1:2] == ["--direct-image"]:
         _direct_image_main(sys.argv[1:])
+        return
+    if sys.argv[1:2] == ["--split-media"]:
+        _split_media_main(sys.argv[1:])
         return
     runpy.run_module("yt_dlp", run_name="__main__")
 
