@@ -9,7 +9,6 @@ from backend.services.reporting.errors import ErrorCode, QuantroError, Stage
 from backend.services.reporting.save_report import (
     InMemoryJobStore,
     InMemoryReportStore,
-    SnowflakeReportStore,
     get_job_store,
     get_report_store,
     save_report_and_complete_job,
@@ -70,7 +69,7 @@ def test_report_base_url_falls_back_when_unset(stores, monkeypatch):
         "job_1", FakeReport(job_id="job_1"), report_store=report_store, job_store=job_store
     )
 
-    assert result.report_url == "https://app.example/reports/report_job_1"
+    assert result.report_url == "http://localhost:3000/reports/report_job_1"
 
 
 def test_repeated_calls_are_idempotent(stores):
@@ -141,8 +140,18 @@ def test_report_store_selection_from_env(monkeypatch, tmp_path):
     assert isinstance(get_job_store(), InMemoryJobStore)
 
     monkeypatch.setenv("REPORT_STORE", "snowflake")
-    assert isinstance(get_report_store(), SnowflakeReportStore)
+    with pytest.raises(ValueError, match="'tiger' or 'memory'"):
+        get_report_store()
 
     monkeypatch.setenv("REPORT_STORE", "postgres")
     with pytest.raises(ValueError):
         get_report_store()
+
+
+def test_unsupported_report_store_is_a_safe_storage_error(monkeypatch):
+    monkeypatch.setenv("REPORT_STORE", "snowflake")
+    with pytest.raises(QuantroError) as caught:
+        save_report_and_complete_job("job_unsupported", FakeReport(job_id="job_unsupported"))
+    assert caught.value.code is ErrorCode.STORAGE_FAILED
+    assert caught.value.stage is Stage.SAVE_REPORT_AND_COMPLETE_JOB
+    assert "snowflake" not in caught.value.message

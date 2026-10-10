@@ -33,7 +33,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import URL, Engine, make_url
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.exc import ArgumentError, OperationalError, ProgrammingError
 
 _SECURE_SSL_MODES = {"require", "verify-ca", "verify-full"}
 _LOOPBACK_HOSTS = {None, "", "localhost", "127.0.0.1", "::1"}
@@ -48,7 +48,7 @@ class TigerConfigError(RuntimeError):
 def _engine_url(database_url: str) -> URL:
     try:
         url = make_url(database_url)
-    except Exception:
+    except (ArgumentError, TypeError, ValueError):
         raise TigerConfigError("TIGER_DATABASE_URL is not a valid database URL.") from None
 
     if url.get_backend_name() in {"postgres", "postgresql"}:
@@ -109,6 +109,19 @@ class TigerStore:
     @classmethod
     def from_env(cls) -> "TigerStore":
         database_url = os.getenv("TIGER_DATABASE_URL", "").strip()
+        if not database_url:
+            database_url = (os.getenv("TIGERDATA_DSN") or os.getenv("DATABASE_URL") or "").strip()
+            if database_url:
+                try:
+                    url = make_url(database_url)
+                    if url.get_backend_name() in {"postgres", "postgresql"}:
+                        database_url = url.update_query_dict({
+                            "sslmode": "verify-full",
+                            "sslrootcert": os.getenv("TIGERDATA_SSL_ROOT_CERT") or url.query.get("sslrootcert") or "system",
+                            "connect_timeout": "10",
+                        }).render_as_string(hide_password=False)
+                except (ArgumentError, TypeError, ValueError):
+                    raise TigerConfigError("TIGERDATA_DSN is not a valid database URL.") from None
         if not database_url:
             raise TigerConfigError(
                 "TIGER_DATABASE_URL is not set. Add it to backend/.env before starting the API."
@@ -328,6 +341,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from dotenv import load_dotenv
 
     load_dotenv(Path(__file__).resolve().parents[3] / ".secrets" / ".env")
+    load_dotenv(Path(__file__).resolve().parents[3] / ".env.local")
     load_dotenv()
     try:
         store = TigerStore.from_env()
@@ -356,7 +370,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("error: Quantro tables not found; boot the API once (it creates them) "
               "or check TIGER_TABLE_PREFIX", file=sys.stderr)
         return 1
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - CLI boundary never prints connection credentials.
         print(f"error: could not query Tiger Data ({type(error).__name__})", file=sys.stderr)
         return 1
     finally:

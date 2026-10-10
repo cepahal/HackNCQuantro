@@ -21,6 +21,29 @@ DSN = "postgresql://example_user:private_password@db.example.com:5432/quantro"
 MODULE = "backend.services.external_apis.tigerdata_storage"
 
 
+def test_read_media_uses_bound_id_and_ends_transaction() -> None:
+    connection = FakeConnection()
+    digest = hashlib.sha256(JPEG).hexdigest()
+    connection.returned = ("image/jpeg", memoryview(JPEG), digest)
+    result = TigerDataPostStore(connection).read_media("media_123")
+    assert result == ("image/jpeg", JPEG, digest)
+    assert connection.calls[0][1] == ("media_123",)
+    assert connection.rollbacks == 1 and connection.commits == 0
+    assert connection.cursors[0].closed
+
+
+def test_read_media_missing_and_failure_are_safe() -> None:
+    connection = FakeConnection()
+    connection.returned = None
+    store = TigerDataPostStore(connection)
+    assert store.read_media("missing") is None
+    connection.failure.add("execute")
+    with pytest.raises(StorageError, match="could not read") as error:
+        store.read_media("media_123")
+    assert "private_password" not in str(error.value)
+    assert connection.commits == 0
+
+
 class FakeCursor:
     def __init__(self, connection: "FakeConnection") -> None:
         self.connection = connection

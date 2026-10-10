@@ -1,8 +1,8 @@
 """First end-to-end slice: URL -> Post -> MediaFeatures -> Tiger Data.
 
 Runs retrieve_post and extract_media_features, validates both outputs against
-the v2 contract, and persists them for the later pipeline stages. Job rows are
-only written once a post was retrieved, so an unreadable URL leaves no trace.
+the v2 contract, and persists them for the later pipeline stages. Failed submitted
+retrievals retain a failed job row so clients can inspect the failing stage.
 """
 
 from dataclasses import dataclass
@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from ..external_apis.retrieve_post import RetrievalError, retrieve_post
 from ..processing.preprocessing import extract_media_features
-from ..reporting.errors import ErrorCode, QuantroError, Stage
+from ..reporting.errors import ErrorCode, QuantroError, Stage, normalize_exception
 from ..reporting.types import MediaFeatures, Post, TranscriptStatus, parse_stage_output
 from ..storage.tiger import TigerStore
 
@@ -44,9 +44,14 @@ class IngestResult(BaseModel):
 
 
 def _retrieval_error(exc: Exception) -> QuantroError:
+    if isinstance(exc, QuantroError):
+        return exc
     if isinstance(exc, RetrievalError) and exc.code in _PASSTHROUGH_RETRIEVAL_CODES:
-        return QuantroError(code=exc.code, stage=Stage.RETRIEVE_POST, message=exc.message)
-    return QuantroError(code=ErrorCode.MEDIA_UNAVAILABLE, stage=Stage.RETRIEVE_POST)
+        return QuantroError(code=exc.code, stage=Stage.RETRIEVE_POST, message=exc.message, retryable=exc.retryable)
+    return QuantroError(
+        code=ErrorCode.MEDIA_UNAVAILABLE, stage=Stage.RETRIEVE_POST,
+        retryable=exc.retryable if isinstance(exc, RetrievalError) else isinstance(exc, (TimeoutError, ConnectionError)),
+    )
 
 
 def _storage_error(stage: Stage) -> QuantroError:
@@ -73,22 +78,33 @@ def run_ingest(job_id: str, url: str, *, store: TigerStore | None = None) -> Ing
 def ingest_post_and_features(job_id: str, url: str, *, store: TigerStore) -> IngestOutput:
     """run_ingest, also returning the validated models for the rest of run_analysis."""
     try:
-        raw_post = retrieve_post(url)
-    except Exception as exc:
-        raise _retrieval_error(exc) from exc
-    post = parse_stage_output(Post, raw_post, Stage.RETRIEVE_POST)
-
-    try:
         store.upsert_job(job_id, url, "running")
     except Exception as exc:
         raise _storage_error(Stage.RETRIEVE_POST) from exc
 
     try:
+        raw_post = retrieve_post(url)
+        post = parse_stage_output(Post, raw_post, Stage.RETRIEVE_POST)
+    except Exception as exc:
+        error = _retrieval_error(exc)
+        try:
+            store.set_job_status(job_id, "failed", error.code.value, error.stage.value)
+        except Exception as storage_exc:
+            raise _storage_error(Stage.RETRIEVE_POST) from storage_exc
+        raise error from exc
+
+    try:
         raw_features = extract_media_features(post.media.model_dump(mode="json"), dict(EXTRACTION_OPTIONS))
         features = parse_stage_output(MediaFeatures, raw_features, Stage.EXTRACT_MEDIA_FEATURES)
     except Exception as exc:
-        error = QuantroError(
-            code=ErrorCode.TRANSCRIPTION_FAILED, stage=Stage.EXTRACT_MEDIA_FEATURES, retryable=True
+        error = (
+            normalize_exception(Stage.EXTRACT_MEDIA_FEATURES, exc)
+            if isinstance(exc, QuantroError)
+            else QuantroError(
+                code=ErrorCode.TRANSCRIPTION_FAILED,
+                stage=Stage.EXTRACT_MEDIA_FEATURES,
+                retryable=isinstance(exc, (TimeoutError, ConnectionError)),
+            )
         )
         try:
             store.upsert_job(job_id, url, "failed", error.code.value, error.stage.value)
@@ -102,7 +118,12 @@ def ingest_post_and_features(job_id: str, url: str, *, store: TigerStore) -> Ing
         )
         store.upsert_job(job_id, url, "ingested")
     except Exception as exc:
-        raise _storage_error(Stage.EXTRACT_MEDIA_FEATURES) from exc
+        error = _storage_error(Stage.EXTRACT_MEDIA_FEATURES)
+        try:
+            store.set_job_status(job_id, "failed", error.code.value, error.stage.value)
+        except Exception as storage_exc:
+            raise _storage_error(Stage.EXTRACT_MEDIA_FEATURES) from storage_exc
+        raise error from exc
 
     result = IngestResult(
         job_id=job_id,

@@ -7,9 +7,12 @@ each (job_id, conversation_id) pair is sent at most once; repeats return the
 original message_id instead of messaging the user again.
 """
 
+import hashlib
+import re
 import threading
 from dataclasses import dataclass
 from typing import Protocol
+from urllib.parse import urlsplit
 
 from ..external_apis.photon import send_summary_request
 from .errors import ErrorCode, QuantroError, Stage
@@ -109,6 +112,20 @@ def _send_failed(message: str) -> QuantroError:
     )
 
 
+def _delivery_job_id(report_url: str) -> str:
+    """Keep the public three-argument call idempotent using the saved report URL."""
+    try:
+        path = urlsplit(report_url).path
+    except (TypeError, ValueError):
+        return ""
+    match = re.fullmatch(r"/reports/report_([A-Za-z0-9_-]{1,128})/?", path)
+    if match:
+        return match.group(1)
+    if isinstance(report_url, str):
+        return "delivery_" + hashlib.sha256(report_url.encode("utf-8")).hexdigest()[:32]
+    return ""
+
+
 def send_summary(
     conversation_id: str,
     summary: str,
@@ -118,6 +135,8 @@ def send_summary(
     provider: MessagingProvider | None = None,
     tracker: DeliveryTracker | None = None,
 ) -> DeliveryResult:
+    if job_id is None:
+        job_id = _delivery_job_id(report_url)
     provider = provider if provider is not None else get_messaging_provider()
     tracker = tracker if tracker is not None else get_delivery_tracker()
 

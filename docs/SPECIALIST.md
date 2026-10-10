@@ -27,6 +27,9 @@ GEMINI_MODEL=gemini-flash-latest
 The Gemini SDK uses system-trusted root certificates with certificate and hostname
 verification enabled. This supports local trusted network certificates without
 disabling TLS verification.
+SDK construction and request failures are normalized to safe stage errors.
+Network timeouts and transient provider errors are retryable; HTTP 402 billing
+failures require an account fix and are not marked retryable.
 
 2026-10-10 configuration handoff: added private local environment loading and
 verified system TLS. The configured SDK authenticated successfully using model
@@ -77,11 +80,19 @@ raises TRANSCRIPTION_FAILED rather than pretending that interval was silent.
 Frames are sampled at interval midpoints and saved as JPEGs. Timestamps are
 requested positions with frame-level uncertainty. OCR may need frames even when
 extract_frames is false, so those backing frames are returned for evidence IDs.
-Optional frame/OCR failures become warnings; they are not silently claimed as
-successful processing. Generated frame directories persist for downstream
+Frame sampling failures become warnings; they are not silently claimed as
+successful processing. When visible-text extraction is requested, provider or
+response-validation failures are errors. Set `extract_visual_text=false` to skip
+OCR explicitly. Generated frame directories persist for downstream
 matching; the job owner must remove them after analysis. Temporary WAVs are
 removed automatically. No arbitrary recording-duration cap is imposed; the
 orchestrator should impose its job time/cost limits before extraction.
+
+JPEGs retain the same feature field structure. They have duration 0, unavailable
+speech, and at most one frame at timestamp 0, with optional visible-text extraction.
+These timestamps describe a still image, not a recording timeline. Transcript
+alignment returns not_assessed for images and recordings without usable speech;
+this implementation does not verify image matches.
 
 ### Function 6
 

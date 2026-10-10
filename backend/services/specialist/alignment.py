@@ -47,10 +47,12 @@ def verify_and_align(clip_features, candidate_features):
 def _align(clip, source, duration):
     a, _, spans = _flatten(clip)
     b, source_owners, _ = _flatten(source)
-    unprocessed = any(f['transcript']['status'] == 'unavailable' or not f['transcript']['processed_ranges'] for f in (clip, source))
+    unprocessed = any(f['transcript']['status'] == 'unavailable' or not f['transcript']['processed_ranges'] or not f['transcript']['sentences'] for f in (clip, source))
     limits = ['The earliest original upload was not established.',
               'Visual and audio matching were not performed.',
               'Matching uses whole transcript sentences; timestamps retain transcription precision.']
+    if unprocessed:
+        limits.append('Usable speech is unavailable in at least one recording; transcript alignment was not assessed.')
     for features in (clip, source):
         limits.extend(features.get('warnings', []))
         if features['transcript']['status'] != 'complete':
@@ -135,7 +137,7 @@ def _align(clip, source, duration):
             'scope': 'between_matched_passages', 'minimum_gap_seconds': 1.0,
             'source_gaps': gaps, 'unmatched_clip_ranges': unmatched,
             'counts': {
-                'matched_passages': len(matches), 'source_gaps': len(gaps) if assessed else None,
+                'matched_passages': len(matches) if matches else None, 'source_gaps': len(gaps) if assessed else None,
                 'unmatched_clip_segments': len(unmatched) if assessed else None,
                 'confirmed_added_segments': None, 'confirmed_deleted_segments': None,
             },

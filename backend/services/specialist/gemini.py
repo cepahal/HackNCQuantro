@@ -3,7 +3,15 @@ import os
 import ssl
 from pathlib import Path
 
-from ..reporting.errors import QuantroError, ErrorCode
+import httpx
+
+from ..reporting.errors import ErrorCode, QuantroError
+
+
+def _retryable(exc):
+    return getattr(exc, 'code', None) in (429, 500, 502, 503, 504) or isinstance(
+        exc, (TimeoutError, ConnectionError, httpx.TimeoutException, httpx.NetworkError)
+    )
 
 
 def client_and_model(stage):
@@ -19,10 +27,14 @@ def client_and_model(stage):
     if not key:
         raise QuantroError(ErrorCode.PROCESSING_FAILED, stage,
                            'GEMINI_API_KEY is not configured.')
-    return genai.Client(api_key=key, http_options={
-        'timeout': 120000,
-        'client_args': {'verify': ssl.create_default_context()},
-    }), model
+    try:
+        client = genai.Client(api_key=key, http_options={
+            'timeout': 120000,
+            'client_args': {'verify': ssl.create_default_context()},
+        })
+    except Exception as exc:  # noqa: BLE001 - SDK construction must not expose credentials or connection details.
+        raise QuantroError(ErrorCode.PROCESSING_FAILED, stage, retryable=_retryable(exc)) from None
+    return client, model
 
 
 def generate_json(client, model, contents, schema, stage, code=ErrorCode.PROCESSING_FAILED):
@@ -39,7 +51,5 @@ def generate_json(client, model, contents, schema, stage, code=ErrorCode.PROCESS
         if getattr(reason, 'value', reason) != 'STOP':
             raise ValueError('Generation did not complete')
         return json.loads(response.text)
-    except Exception as exc:
-        status = getattr(exc, 'code', None)
-        retryable = status in (429, 500, 502, 503, 504) or isinstance(exc, (TimeoutError, ConnectionError))
-        raise QuantroError(code, stage, retryable=retryable) from None
+    except Exception as exc:  # noqa: BLE001 - Normalize provider and transport failures without diagnostics.
+        raise QuantroError(code, stage, retryable=_retryable(exc)) from None

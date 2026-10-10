@@ -22,8 +22,13 @@ export function readConfig(env: NodeJS.ProcessEnv, args: string[]) {
   if (!/^\d+$/.test(portText) || !Number.isInteger(port) || port < 1024 || port > 65535) {
     throw new Error("PHOTON_BRIDGE_PORT must be a port from 1024 to 65535.");
   }
+  const backendPortText = env.PHOTON_BACKEND_PORT?.trim() || "8000";
+  const backendPort = Number(backendPortText);
+  if (!/^\d+$/.test(backendPortText) || !Number.isInteger(backendPort) || backendPort < 1024 || backendPort > 65535) {
+    throw new Error("PHOTON_BACKEND_PORT must be a local backend port from 1024 to 65535.");
+  }
   return {
-    cloud, token, projectId, projectSecret, port,
+    cloud, token, projectId, projectSecret, port, backendPort,
     directory: resolve(repository, env.PHOTON_DATA_DIR?.trim() || ".data/photon"),
   };
 }

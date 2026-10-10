@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -36,8 +37,12 @@ def test_get_job_reports_for_unknown_job_is_empty(store):
 
 
 def test_list_recent_jobs_orders_by_update_and_limits(store):
-    for job_id in ("job_a", "job_b", "job_c"):
+    for index, job_id in enumerate(("job_a", "job_b", "job_c")):
         store.upsert_job(job_id, f"https://x.com/{job_id}", "ingested")
+        with store._engine.begin() as connection:
+            connection.execute(store.jobs.update().where(store.jobs.c.id == job_id).values(
+                updated_at=datetime(2020, 1, 1, tzinfo=UTC) + timedelta(seconds=index),
+            ))
     store.set_job_status("job_a", "completed")
     store.save_report("report_job_a", {"job_id": "job_a"}, "job_a")
 
@@ -46,6 +51,14 @@ def test_list_recent_jobs_orders_by_update_and_limits(store):
     assert [job["id"] for job in jobs] == ["job_a", "job_c"]
     assert jobs[0]["report_id"] == "report_job_a" and jobs[0]["status"] == "completed"
     assert "post_json" not in jobs[0]
+
+
+def test_list_recent_jobs_breaks_equal_timestamp_ties_by_job_id(store):
+    for job_id in ("job_c", "job_b"):
+        store.upsert_job(job_id, f"https://x.com/{job_id}", "running")
+    with store._engine.begin() as connection:
+        connection.execute(store.jobs.update().values(updated_at=datetime(2020, 1, 1, tzinfo=UTC)))
+    assert [job["id"] for job in store.list_recent_jobs()] == ["job_b", "job_c"]
 
 
 @pytest.mark.parametrize("limit", [0, 501, True])
@@ -92,3 +105,24 @@ def test_cli_show_unknown_job_and_bad_config(db_url, monkeypatch, capsys):
     assert tiger.main(["list"]) == 2
     err = capsys.readouterr().err
     assert "sslmode" in err and "pw" not in err
+
+
+def test_retrieval_dsn_fallback_uses_verified_tls(monkeypatch):
+    monkeypatch.delenv("TIGER_DATABASE_URL", raising=False)
+    monkeypatch.setenv("TIGERDATA_DSN", "postgresql://user:test-password@db.example.com/quantro?sslmode=disable")
+    monkeypatch.setenv("TIGERDATA_SSL_ROOT_CERT", "C:/private/tiger-ca.pem")
+    store = TigerStore.from_env()
+    try:
+        assert store._engine.url.query["sslmode"] == "verify-full"
+        assert store._engine.url.query["sslrootcert"] == "C:/private/tiger-ca.pem"
+        assert store._engine.url.query["connect_timeout"] == "10"
+    finally:
+        store.close()
+
+
+def test_explicit_tiger_database_url_wins_over_fallback(monkeypatch, db_url):
+    monkeypatch.setenv("TIGER_DATABASE_URL", db_url)
+    monkeypatch.setenv("TIGERDATA_DSN", "invalid")
+    store = TigerStore.from_env()
+    assert store._engine.dialect.name == "sqlite"
+    store.close()

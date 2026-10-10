@@ -14,7 +14,7 @@ URL ─► retrieve_post ─► extract_media_features ─► Tiger Data
                                                   quantro_posts post_json + features_json (internal, keeps local paths)
         │
         ▼
-build_search_queries ─► search_candidates(limit=5)
+build_search_queries ─► search_candidates(limit=5) ─► exclude the submitted post itself
 (Abdullah)              (Abdullah)
         │                 ├─ raises            → SEARCH_FAILED (retryable). Job failed. No report. Never "no match".
         │                 └─ [] candidates     → outcome = no_verified_match, jump to build_report
@@ -45,7 +45,9 @@ GET /reports/{report_id} → sanitized ReportV2 JSON (no local_path / image_path
 ```
 
 `report_id` is always `report_<job_id>`, so re-running a job returns the same report
-and never adds rows. Every stage failure is a `QuantroError {code, stage, message,
+and never adds rows. Completed jobs reuse the saved report without downloading,
+transcribing, or searching again; a different URL needs a new job ID. Failed submitted
+retrievals retain a failed job row. Every stage failure is a `QuantroError {code, stage, message,
 retryable}`, and the job row records `error_code` and `error_stage`.
 
 ## Upstream functions
@@ -61,7 +63,8 @@ retryable}`, and the job row records `error_code` and `error_stage`.
 | 7 | `select_surrounding_context(alignment, candidate_features, options)` | `backend.services.specialist.context` | Jason |
 | 8 | `compare_context_and_caption(clip_features, context, caption)` | `backend.services.specialist.comparison` | Jason |
 
-`run_analysis.py` imports all eight directly. Their outputs (`{queries, warnings}`,
+`run_analysis.py` calls all eight; submitted retrieval is delegated through
+`pipeline/run_ingest.py`. Their outputs (`{queries, warnings}`,
 `{candidates, warnings}`, Post, MediaFeatures, Alignment, Context, Comparison) are
 validated against `backend/services/reporting/types.py` at the reporting boundary.
 Search covers Abdullah's Tiger Data post corpus (`quantro_retrieval.posts`), not the
@@ -69,16 +72,17 @@ public web: seed it with `retrieve_post(source_url)` for each demo source.
 
 ## Environment variables
 
-Real values live only in the git-ignored repo-root `.secrets/.env`. Root `.env.local`
-(also git-ignored) is a symlink to it, because Abdullah's storage and Jason's Gemini
-adapter read `.env.local`; the API and the Tiger CLI load `.secrets/.env` directly.
-The tracked root `.env` is a blank template, so never fill it in.
+Real values belong in the git-ignored repo-root `.secrets/.env` or `.env.local`.
+`.env.local` can be a regular private file or a symlink to the vault. The API and
+Tiger CLI load the vault, then `.env.local`, without overriding process variables.
+Retrieval and Gemini also read `.env.local`. The tracked `.env.example` is the
+blank template; keep credentials out of tracked files.
 
 | Variable | Read by | Owner | Notes |
 |---|---|---|---|
-| `TIGER_DATABASE_URL` | `storage/tiger.py` (API startup, CLI) | Bhrigu | Required. Remote hosts need `sslmode=require` (or `verify-ca`/`verify-full`). |
+| `TIGER_DATABASE_URL` | `storage/tiger.py` (API startup, CLI) | Bhrigu | Preferred operational URL. Falls back to `TIGERDATA_DSN`, then `DATABASE_URL`; fallback Postgres connections enforce `verify-full`, `TIGERDATA_SSL_ROOT_CERT`, and a 10-second connection timeout. |
 | `TIGER_TABLE_PREFIX` | `storage/tiger.py` | Bhrigu | Default `quantro_`. Lowercase letters, digits, `_`. |
-| `REPORT_STORE` | `save_report.get_report_store()` | Bhrigu | `tiger` (default), `memory` (tests), `snowflake` (stub). The API routes always use the Tiger store. |
+| `REPORT_STORE` | `save_report.get_report_store()` | Bhrigu | `tiger` (default) or `memory` (tests). The API routes always use the Tiger store. Snowflake report persistence is unsupported; selecting it fails with a storage error. |
 | `REPORT_BASE_URL` | `save_report.py`, CORS in `main.py` | Bhrigu | Frontend origin; report links are `{REPORT_BASE_URL}/reports/{report_id}`. |
 | `TIGERDATA_DSN` (fallback `DATABASE_URL`) | `external_apis/tigerdata_storage.py` | Abdullah | Retrieval media store and the search corpus (`quantro_retrieval.posts`). Same Tiger service as `TIGER_DATABASE_URL`; the code enforces `verify-full` TLS. |
 | `TIGERDATA_SSL_ROOT_CERT` | `external_apis/tigerdata_storage.py` | Abdullah | Default `system`. |
@@ -111,7 +115,9 @@ cd backend && python -m services.storage.tiger show <job_id> # full job, post, f
   - The password was rotated after the old one leaked to git.
   - Your network can reach the Tiger service.
 - **Note:** retrieval uses a different variable, `TIGERDATA_DSN`. A working API with
-  failing retrieval usually means that one is missing from `.secrets/.env`.
+  failing retrieval usually means that one is missing from the private environment.
+  Setting `TIGERDATA_DSN` also supplies the operational store when `TIGER_DATABASE_URL`
+  is absent; setting only `TIGER_DATABASE_URL` does not supply retrieval credentials.
 
 ### 2. Transcription key missing
 
@@ -148,8 +154,11 @@ cd backend && python -m services.storage.tiger show <job_id> # full job, post, f
   - For real iMessage, `SPECTRUM_PROJECT_ID`/`SPECTRUM_PROJECT_SECRET` belong to the
     Photon project whose sender line you expect. The old `PHOTON_SENDER_ID`,
     `PHOTON_API_KEY` and `PHOTON_BASE_URL` are no longer read.
-  - Re-running the job re-attempts the send. Deliveries are de-duplicated per
-    `(job_id, conversation_id)` only after a successful send.
+  - Re-running a completed job reuses its saved report and re-attempts delivery.
+    The Photon bridge durably tracks the payload and confirmed or uncertain
+    delivery state per `(job_id, conversation_id)`; an uncertain outcome is never
+    automatically re-sent. The public three-argument `send_summary` call derives
+    its stable identity from the report URL when `job_id` is not supplied.
 
 ### 5. JSONB too large
 

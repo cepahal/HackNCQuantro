@@ -22,9 +22,11 @@ def validate_features(features):
     if not isinstance(features['media_id'], str) or not features['media_id']:
         raise ValueError('media_id is required.')
     duration = number(features['duration_seconds'])
-    if duration <= 0:
-        raise ValueError('Duration must be positive.')
+    if duration < 0:
+        raise ValueError('Duration cannot be negative.')
     transcript = features['transcript']
+    if duration == 0 and transcript['status'] != 'unavailable':
+        raise ValueError('Zero-duration media cannot have a processed transcript.')
     if transcript['status'] not in ('complete', 'partial', 'unavailable'):
         raise ValueError('Invalid transcript status.')
     processed = []

@@ -15,6 +15,7 @@ import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, TypeVar
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel
 
@@ -29,7 +30,7 @@ from ..specialist.context import select_surrounding_context
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from .build_report import build_report
 from .errors import ErrorCode, QuantroError, Stage, normalize_exception
-from .save_report import save_report_and_complete_job
+from .save_report import report_id_for_job, save_report_and_complete_job
 from .send_summary import DeliveryTracker, MessagingProvider, send_summary
 from .types import (
     Alignment,
@@ -40,6 +41,7 @@ from .types import (
     MediaFeatures,
     Outcome,
     Post,
+    ReportV2,
     parse_stage_output,
 )
 
@@ -147,6 +149,18 @@ def _candidate_label(candidate: dict[str, Any], index: int) -> str:
     return candidate_id if isinstance(candidate_id, str) and candidate_id else f"#{index}"
 
 
+def _normalized_post_url(value: str) -> str:
+    try:
+        url = urlsplit(value)
+        host = (url.hostname or "").lower()
+        port = url.port
+        if port is not None and (url.scheme.lower(), port) not in {("http", 80), ("https", 443)}:
+            host = f"{host}:{port}"
+        return urlunsplit((url.scheme.lower(), host, url.path.rstrip("/") or "/", urlencode(sorted(parse_qsl(url.query))), ""))
+    except (TypeError, ValueError):
+        return value
+
+
 def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures) -> _AssessedSource:
     raw_post = _call(Stage.RETRIEVE_CANDIDATE_MEDIA, retrieve_candidate_media, candidate)
     post = parse_stage_output(Post, raw_post, Stage.RETRIEVE_CANDIDATE_MEDIA)
@@ -170,7 +184,7 @@ def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures) -
 def _mark_failed(store: TigerStore, job_id: str, error: QuantroError) -> None:
     try:
         store.set_job_status(job_id, "failed", error.code.value, error.stage.value)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Preserve the original stage error and redact storage details.
         logger.warning("Could not record failure for job %s (%s)", job_id, type(exc).__name__)
 
 
@@ -184,13 +198,34 @@ def run_analysis(
     tracker: DeliveryTracker | None = None,
 ) -> AnalysisResult:
     if store is None:
-        owned_store = TigerStore.from_env()
         try:
+            owned_store = TigerStore.from_env()
+        except Exception as exc:
+            raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
+        try:
+            owned_store.ensure_schema()
             return run_analysis(
                 job_id, url, conversation_id, store=owned_store, provider=provider, tracker=tracker
             )
+        except QuantroError:
+            raise
+        except Exception as exc:
+            raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
         finally:
             owned_store.close()
+
+    try:
+        existing_job = store.get_job(job_id)
+        existing_report = store.get_report(report_id_for_job(job_id)) if existing_job and existing_job["status"] == "completed" else None
+    except Exception as exc:
+        raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
+    if existing_job and existing_job["status"] == "completed":
+        if _normalized_post_url(existing_job["url"]) != _normalized_post_url(url):
+            raise QuantroError(ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_POST, "This job ID already belongs to a different submitted URL.")
+        if existing_report is None:
+            raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
+        report = parse_stage_output(ReportV2, existing_report, Stage.BUILD_REPORT)
+        return _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, [])
 
     ingested = ingest_post_and_features(job_id, url, store=store)
     try:
@@ -222,13 +257,22 @@ def _analyze(
 
     try:
         raw_search = search_candidates(queries.queries, limit=SEARCH_LIMIT)
+    except QuantroError:
+        raise
     except Exception as exc:
         raise QuantroError(
             code=ErrorCode.SEARCH_FAILED, stage=Stage.SEARCH_CANDIDATES, retryable=True
         ) from exc
     search = parse_stage_output(_CandidateSearch, raw_search, Stage.SEARCH_CANDIDATES)
     warnings.extend(search.warnings)
-    candidates = search.candidates[:SEARCH_LIMIT]
+    submitted_url = _normalized_post_url(submitted_post.post_url)
+    eligible_candidates = [
+        candidate for candidate in search.candidates
+        if _normalized_post_url(candidate.get("url", "")) != submitted_url
+    ]
+    candidates = eligible_candidates[:SEARCH_LIMIT]
+    if len(eligible_candidates) < len(search.candidates):
+        warnings.append("The submitted post was excluded from its own source candidates.")
 
     viable: list[_AssessedSource] = []
     skipped = 0
@@ -299,9 +343,30 @@ def _analyze(
         comparison,
         extra_limitations=extra_limitations,
     )
+    return _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, warnings)
+
+
+def _complete_and_deliver(
+    job_id: str,
+    report: ReportV2,
+    conversation_id: str | None,
+    store: TigerStore,
+    provider: MessagingProvider | None,
+    tracker: DeliveryTracker | None,
+    warnings: list[str],
+) -> AnalysisResult:
     saved = save_report_and_complete_job(
         job_id, report, report_store=TigerReportStore(store), job_store=TigerJobStore(store)
     )
+    try:
+        saved_report = store.get_report(saved.report_id)
+    except Exception as exc:
+        raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB, retryable=True) from exc
+    if saved_report is None:
+        raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
+    report = parse_stage_output(ReportV2, saved_report, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
+    if report.job_id != job_id:
+        raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
 
     delivery, delivery_warning = deliver_summary_after_save(
         job_id,

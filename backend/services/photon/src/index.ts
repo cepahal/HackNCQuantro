@@ -6,6 +6,7 @@ import { readConfig } from "./config.ts";
 import { createReceiver, hasConversation } from "./receive.ts";
 import { createBridgeServer } from "./server.ts";
 import { BridgeError, createSummarySender } from "./summary.ts";
+import { createAnalysisDispatcher } from "./analysis.ts";
 
 async function main(): Promise<void> {
   const config = readConfig(process.env, process.argv.slice(2));
@@ -19,7 +20,11 @@ async function main(): Promise<void> {
 
   const directory = join(config.directory, "inbox");
   const conversations = new Map<string, Space>();
-  const receive = createReceiver({ directory });
+  const analysis = createAnalysisDispatcher({ directory: join(config.directory, "analysis"), backendPort: config.backendPort });
+  const receive = createReceiver({ directory, onSaved: (record, eventKey, space) => {
+    conversations.set(space.id, space);
+    analysis.enqueue(record, eventKey, space);
+  } });
   const sendSummary = createSummarySender({
     deliveryDirectory: join(config.directory, "deliveries"),
     resolveConversation: async (id) => {

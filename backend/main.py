@@ -7,6 +7,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # The git-ignored .secrets/.env vault wins; dotenv never overrides a key that is already set.
 load_dotenv(_REPO_ROOT / ".secrets" / ".env")
+load_dotenv(_REPO_ROOT / ".env.local")
 load_dotenv()
 
 # `uvicorn main:app` from backend/ loads this file as top-level `main`; every module
@@ -17,11 +18,14 @@ if not __package__:
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routes.analyze import router as analyze_router
+from backend.routes.common import quantro_error_response
 from backend.routes.ingest import router as ingest_router
+from backend.routes.media import router as media_router
+from backend.services.reporting.errors import QuantroError
 from backend.services.storage.tiger import TigerStore
 
 FRONTEND_ORIGIN = os.getenv("REPORT_BASE_URL", "http://localhost:3000").rstrip("/")
@@ -39,11 +43,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Quantro API", lifespan=lifespan)
+
+
+@app.exception_handler(QuantroError)
+async def handle_quantro_error(request: Request, error: QuantroError):
+    return quantro_error_response(error)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_ORIGIN],
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Range"],
 )
 app.include_router(analyze_router)
 app.include_router(ingest_router)
+app.include_router(media_router)

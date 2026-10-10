@@ -145,7 +145,11 @@ async function saveAttachment(attachment: Attachment, path: string, remaining: n
 }
 
 /** Persist local intake before acknowledgement. This does not fetch submitted URLs or run analysis. */
-export function createReceiver(options: { directory: string; maxAttachmentBytes?: number }) {
+export function createReceiver(options: {
+  directory: string;
+  maxAttachmentBytes?: number;
+  onSaved?: (record: IntakeRecord, eventKey: string, space: Space) => void;
+}) {
   const directory = resolve(options.directory);
   const maxBytes = options.maxAttachmentBytes ?? MAX_ATTACHMENT_BYTES;
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > MAX_ATTACHMENT_BYTES) throw new Error("Attachment limit must be between 1 byte and 25 MiB.");
@@ -181,6 +185,7 @@ export function createReceiver(options: { directory: string; maxAttachmentBytes?
     const eventKey = createHash("sha256").update(JSON.stringify([message.platform, line, space.id, message.id])).digest("hex");
     const eventDirectory = join(directory, eventKey);
     let claimed = false;
+    let record: IntakeRecord;
     try {
       await mkdir(directory, { recursive: true, mode: 0o700 });
       try {
@@ -190,7 +195,7 @@ export function createReceiver(options: { directory: string; maxAttachmentBytes?
         if (error instanceof Error && "code" in error && error.code === "EEXIST") return;
         throw error;
       }
-      const record: IntakeRecord = {
+      record = {
         schema_version: "photon-intake-1", conversation_id: space.id, message_id: message.id,
         receiving_line: line, input_type: attachments.length ? "attachment" : "url",
         input_url: inputUrl, text, attachments: [], status: "received", received_at: new Date().toISOString(),
@@ -213,7 +218,12 @@ export function createReceiver(options: { directory: string; maxAttachmentBytes?
       await send(space, RETRY);
       return;
     }
-    await send(space, RECEIPT);
+    await send(space, options.onSaved
+      ? (record.input_type === "url"
+        ? "Received. Your URL is saved and queued for analysis. I’ll send the report here when it is ready."
+        : "Your attachment is saved. Automatic analysis currently accepts public post URLs; send a URL to start an investigation.")
+      : RECEIPT);
+    if (record.input_type === "url") options.onSaved?.(record, eventKey, space);
   };
 }
 

@@ -1,175 +1,77 @@
-# Architecture
+# Quantro architecture
 
-## Submitted-post retrieval module
+The canonical app is `backend/` (FastAPI/Python) and `frontend/` (Next.js).
+`backend/services/reporting/run_analysis.py` connects the contract functions;
+`docs/MVP_INTEGRATION_AUDIT.md` records exact imports, types, routes and live gates.
 
-`backend/services/external_apis/retrieve_post.py` accepts a URL trigger, downloads
-one supported JPG/MP4, persists it, and returns the team's complete v2
-Post/MediaAsset contract for extraction. Default `retrieve_post(url)` requires
-configured Tiger Data storage and returns success only after its transaction
-commits. `handle_post_trigger(url)` returns the shared error envelope on failure.
+## Request flow
 
-`tigerdata_storage.py` performs one bound insert into `quantro_retrieval.posts`,
-storing actual media bytes in `BYTEA` and the unchanged full Post in `JSONB`, with
-post/media IDs, MIME type, SHA-256, byte count and creation time. The insert's
-returned post ID is verified before commit. Failure rolls back, returns
-`STORAGE_FAILED`, and cleans up the local download. Successful files remain on
-the shared backend filesystem until downstream consumers finish.
+1. Website submits `{url}` to `POST /analyze/{job_id}/run`. Photon URL intake
+   submits the same request with its real `conversation_id`.
+2. Retrieval downloads one accessible JPEG/MP4, commits its bytes/Post to Tiger
+   Data, and returns the internal Post with local media path.
+3. Extraction produces contract MediaFeatures. Requested transcription/OCR
+   provider failures are errors; missing speech is explicitly unavailable.
+4. Query generation searches the stored Tiger Post metadata corpus. Candidate
+   downloads reuse retrieval. The submitted URL is excluded from source selection.
+5. Transcript alignment verifies candidates conservatively. Only a verified
+   candidate proceeds to surrounding context and caption comparison.
+6. Report schema 2.1 retains provenance, complete transcript data, confidence
+   limitations and evidence. Filesystem paths are removed from public results.
+7. Report is saved before the job is completed. Repeated completed requests reuse
+   it; concurrent first-save-wins requests deliver the actual stored report.
+8. The frontend loads `GET /reports/{report_id}` and displays the saved result.
+   With a conversation ID, summary delivery runs after save; delivery failure
+   does not discard a successfully saved report.
 
-Apply `backend/services/external_apis/tigerdata_schema.sql` once before use;
-runtime performs no DDL. Configuration loads root `.env`, ignored `.env.local`,
-then process values in that precedence. The current root `.env` is tracked, so
-credentials belong in `.env.local` or the process environment. Default connections
-use `TIGERDATA_DSN` (absent-only `DATABASE_URL` fallback), verified TLS, and bounded
-connection/query timeouts. No S3 integration or live cloud save is claimed.
+No-match is a normal corpus-search outcome, not a provider-error substitute.
+Confidence, coverage and context assessment remain separate; there is no overall
+credibility score.
 
-Callers can inject `storage=store` for tests or a managed connection and own that
-store's lifecycle. An injected database connection must be dedicated, idle on
-entry, and have autocommit disabled; the store commits or rolls back its transaction.
-The default Tiger Data connection is closed by retrieval.
-The Snowflake helper remains available for compatibility and is not the default.
-No HTTP routes or other stages are implemented by this module.
-See [retrieve_post handoff](retrieve_post.md) for configuration and exact fields.
+## Tiger Data storage
 
-## Source discovery modules (v2 functions 3–5)
+`external_apis/tigerdata_storage.py` stores original media bytes in BYTEA and the
+unchanged internal Post in JSONB in `quantro_retrieval.posts`. Bound SQL, SHA-256,
+byte limits, verified TLS and commit-before-success protect this handoff. Apply
+`external_apis/tigerdata_schema.sql` for this media/corpus store; it also contains
+the full-text index used by source search. Retrieval never creates the schema.
 
-`build_search_queries.py` derives bounded searches from MediaFeatures and the
-submitted Post. `search_candidates.py` searches the existing Tiger Data Post
-corpus through `TigerDataPostStore.find_posts`; a GIN index supports bound
-full-text queries over title, caption and author clues. Results retain actual
-query provenance and are unverified candidate sources, with normal empty results.
-`retrieve_candidate_media.py` reuses submitted-post downloading and commits the
-candidate relationship alongside its fresh Post and media bytes before success.
-No separate corpus or external web-search service is assumed. See
-[source-search setup and contracts](source_search.md).
+`services/storage/tiger.py` manages jobs, extracted features, reports and delivery
+state through SQLAlchemy in the same Tiger service. Its tables use the configurable
+`quantro_` prefix and are initialized at API startup. Configure `TIGERDATA_DSN`
+for retrieval and either the same DSN or `TIGER_DATABASE_URL` for job/report state.
+Private values belong in ignored root `.env.local` or the process environment;
+see the audit for the existing loader precedence differences.
 
-## Photon transport
+`GET /media/{media_id}` reads real stored JPEG/MP4 bytes for browser playback,
+including HTTP byte ranges, when the Post has no public playback_url. IDs are
+validated and SQL parameters are bound. No S3 upload is implemented or claimed.
+The optional SnowflakePostStore remains a real compatibility adapter; Tiger is
+the active default. REPORT_STORE supports tiger and explicit local memory only.
 
-`backend/services/photon/` is a Node 24 sidecar using the official Spectrum SDK.
-It receives iMessage submissions into private `.data/photon/inbox/<event-hash>/request.json`
-records and acknowledges only saved inputs. This is an intake boundary; backend job creation
-and analysis are not implemented by the sidecar.
+## Frontend and API
 
-After a report is saved, the existing `reporting.send_summary` stage uses `PhotonProvider`
-and `external_apis.photon.send_summary_request` to call the
-new authenticated loopback-only `POST /send-summary` bridge. Its body is
-`{conversation_id, summary, report_url}` and a stable job ID is supplied in `Idempotency-Key`.
-The response is `{conversation_id, message_id, status: "accepted"}`. Delivery state is
-persisted independently of analysis; ambiguous sends are not automatically retried.
+`frontend/lib/api.ts` uses `NEXT_PUBLIC_API_BASE_URL` (localhost:8000 by default).
+The homepage handles URL submission, loading, safe errors and saved results.
+`/reports/[report_id]` loads persisted reports. The UI shows transcripts, poster
+metadata, source/context confidence, clip coverage, matching/edit information,
+findings and limitations; unknown fields are displayed as unavailable.
 
-See [transport contracts and operator steps](../backend/services/photon/README.md).
-The main backend endpoints and the specialist pipeline below retain their existing ownership.
+API routes are `/analyze/{job_id}/run`, `/reports/{report_id}`,
+`/ingest/{job_id}` (POST/GET), and `/media/{media_id}`. CORS uses REPORT_BASE_URL,
+default localhost:3000. There is no generic POST /analyze route.
 
-## High-level flow
+## Photon
 
-USER
-  |
-  v
-FRONTEND
-  |
-  | HTTP request
-  v
-BACKEND API
-  |
-  | validates and processes input
-  v
-SPECIALIST / CORE LOGIC
-  |
-  | ML / AI / algorithm / external model
-  v
-BACKEND
-  |
-  | combines results into JSON
-  v
-FRONTEND
-  |
-  v
-USER SEES RESULT
+`backend/services/photon/` is the Node 24 Spectrum sidecar. It persists inbound
+URL events before dispatching them to the backend, using stable event-derived
+job IDs and a bounded serialized queue. Private loopback `POST /send-summary`
+uses PHOTON_BRIDGE_TOKEN and Idempotency-Key and returns provider acceptance.
+Delivery state is independent of analysis. Ambiguous sends are not automatically
+replayed. Interrupted/overflowed intake records require operator inspection.
+Attachments are retained at intake; automatic analysis currently requires a URL.
 
-
-## Example request flow
-
-1. User enters or uploads data in the frontend.
-2. Frontend sends request to backend route.
-3. Backend validates the input.
-4. Backend calls any preprocessing function.
-5. Backend calls specialist/core analysis function.
-6. Specialist function returns structured result.
-7. Backend combines that result with other data.
-8. Backend returns JSON to frontend.
-9. Frontend displays result.
-
-
-## Component responsibilities
-
-Frontend
-- User input
-- File upload/forms
-- Loading states
-- Result display
-- Error display
-- Visualizations
-
-Backend
-- API routes
-- Request validation
-- Authentication if needed
-- Database if needed
-- Calls specialist functions
-- Combines results
-- Returns structured JSON
-
-Specialist
-- ML models
-- AI calls
-- algorithms
-- embeddings
-- ranking
-- computer vision
-- data processing
-- technically novel component
-
-Integration/generalist
-- deployment
-- testing
-- API wiring
-- external services
-- environment variables
-- end-to-end debugging
-- demo reliability
-
-
-## API contract
-
-POST /analyze
-
-INPUT
-
-Depends on project.
-
-Examples:
-- text
-- image
-- audio
-- video
-- JSON data
-
-OUTPUT
-
-{
-  "success": true,
-  "result": {},
-  "error": null
-}
-
-The exact result structure must be agreed on before development.
-
-
-## Team rule
-
-Every major component must have a defined:
-
-INPUT
-OUTPUT
-OWNER
-
-before implementation begins.
+See its README and `docs/RUNBOOK.md` for operator steps. Live model generation is
+currently paused at the user's request after the configured key returned depleted
+prepaid credits. Real iMessage round-trip and a public deployment remain live
+verification gates; local storage/browser checks do not imply those passed.

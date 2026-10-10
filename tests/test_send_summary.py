@@ -78,3 +78,12 @@ def test_check_and_record_reserves_pair_once():
     assert tracker.check_and_record("conv_1", "job_1") is True
     assert tracker.check_and_record("conv_1", "job_1") is False
     assert tracker.check_and_record("conv_1", "job_2") is True
+
+
+def test_three_argument_delivery_uses_report_identity_for_deduplication():
+    tracker = InMemoryDeliveryTracker()
+    provider = FakeProvider()
+    first = send_summary("conv_1", "Summary", "https://app.example/reports/report_job_1", provider=provider, tracker=tracker)
+    second = send_summary("conv_1", "Summary", "https://app.example/reports/report_job_1", provider=provider, tracker=tracker)
+    assert first.model_dump() == second.model_dump()
+    assert len(provider.sent) == 1

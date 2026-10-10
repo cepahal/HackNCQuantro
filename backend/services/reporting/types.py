@@ -234,7 +234,7 @@ class SourceGap(ContractModel):
 
 
 class EditCounts(ContractModel):
-    matched_passages: Count
+    matched_passages: Count | None = None
     source_gaps: Count | None = None
     unmatched_clip_segments: Count | None = None
     confirmed_added_segments: Count | None = None

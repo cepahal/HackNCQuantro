@@ -317,6 +317,48 @@ class TigerDataPostStore:
                         type(error).__name__,
                     )
 
+    def read_media(self, media_id: str) -> tuple[str, bytes, str] | None:
+        """Read stored media by its opaque ID, never by a filesystem path."""
+        if not isinstance(media_id, str) or not _MEDIA_ID.fullmatch(media_id):
+            raise StorageError("The media identifier is invalid.")
+        connection = self._connection
+        if connection is None:
+            raise StorageError("The Tiger Data connection is closed.")
+        cursor: Cursor | None = None
+        try:
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT mime_type, media_bytes, sha256 FROM quantro_retrieval.posts "
+                "WHERE media_id = %s",
+                (media_id,),
+            )
+            row = cursor.fetchone()
+            connection.rollback()
+            if row is None:
+                return None
+            mime, data, digest = row
+            if (
+                mime not in ("image/jpeg", "video/mp4")
+                or not isinstance(data, (bytes, memoryview))
+                or not 0 < len(data) <= MAX_MEDIA_BYTES
+                or not isinstance(digest, str)
+                or re.fullmatch(r"[a-f0-9]{64}", digest) is None
+            ):
+                raise StorageError("The stored media is invalid.")
+            return cast(str, mime), bytes(data), digest
+        except Exception:  # noqa: BLE001 - redact database diagnostics
+            try:
+                connection.rollback()
+            except Exception as error:  # noqa: BLE001 - preserve the safe read failure
+                logger.warning("Media read rollback failed (%s)", type(error).__name__)
+            raise StorageError("Tiger Data could not read the stored media.") from None
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as error:  # noqa: BLE001 - preserve the safe read result
+                    logger.warning("Media cursor close failed (%s)", type(error).__name__)
+
     def close(self) -> None:
         """Release only a connection opened or explicitly owned by this store."""
         if self._owns_connection and self._connection is not None:

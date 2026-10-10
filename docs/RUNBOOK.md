@@ -19,9 +19,10 @@ cp .env.example .secrets/.env && chmod 600 .secrets/.env   # tracked blank templ
 ln -s .secrets/.env .env.local                             # teammates' modules and the Photon sidecar read .env.local
 ```
 
-Secrets live only in the repo-root `.secrets/.env`. `.secrets/`, `.env` and `.env.local`
-are all git-ignored; `.env.example` is the only tracked template and stays blank. The
-vault needs at least:
+Secrets live in the repo-root `.secrets/.env` or `.env.local`, both git-ignored.
+On Windows, `.env.local` may be a regular private file instead of a symlink.
+The API and CLI read both locations; `.env.example` remains a blank tracked template.
+The private environment needs at least:
 
 ```bash
 TIGER_DATABASE_URL=postgres://<user>:<password>@<host>:<port>/tsdb?sslmode=require
@@ -33,7 +34,10 @@ GEMINI_MODEL=gemini-flash-latest
 ```
 
 Retrieval and search also need `TIGERDATA_DSN` (the same Tiger URL) and
-`TIGERDATA_SSL_ROOT_CERT=system`. See [retrieve_post.md](retrieve_post.md) and
+`TIGERDATA_SSL_ROOT_CERT=system`, or the absolute path to the service's trusted CA
+bundle on systems that need it. The operational store falls back to `TIGERDATA_DSN`
+when `TIGER_DATABASE_URL` is absent, with full certificate and hostname verification.
+See [retrieve_post.md](retrieve_post.md) and
 [source_search.md](source_search.md).
 
 ### Verify the Tiger Data connection
@@ -47,6 +51,9 @@ python -m services.storage.tiger list     # recent jobs as JSON ([] on a fresh d
 ```
 
 The API creates `quantro_jobs`, `quantro_posts` and `quantro_reports` on first boot.
+`REPORT_STORE` supports `tiger` and `memory` only. Snowflake report persistence is
+unsupported; use Tiger Data for the MVP. The separate optional Snowflake media
+adapter does not provide a report store.
 
 ### Frontend (Node 20+)
 
@@ -56,8 +63,10 @@ npm install
 npm run dev                 # http://localhost:3000
 ```
 
-`frontend/package.json` and the pages are still empty placeholders (Grant), so these
-commands fail until the Next.js app is initialized.
+The Next.js app includes URL submission and `/reports/{report_id}` rendering. For
+a production demo, run `npm run build` followed by `npm start`. Its API origin is
+`NEXT_PUBLIC_API_BASE_URL` (default `http://localhost:8000`); set it in private
+`frontend/.env.local` before building when deploying to another origin.
 
 ## 2. Smoke test
 
@@ -138,6 +147,9 @@ Errors come back as `{"error": {"code", "stage", "message", "retryable"}}`. Stat
 codes: 400 bad URL or platform, 404 media unavailable, 502 transcription failed, 500
 search, processing or storage failure, 422 bad request body or job ID. Re-running the
 same `job_id` is safe and returns the same `report_id`.
+Completed jobs reuse their saved report and skip expensive upstream analysis.
+Use a new job ID to analyze another URL. Failed retrievals remain visible as failed
+jobs, and browser-facing ingest JSON omits local media and frame file paths.
 
 ## 4. Verify before pushing
 

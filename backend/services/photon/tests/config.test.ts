@@ -8,6 +8,7 @@ test("terminal mode does not need cloud credentials", () => {
   const result = readConfig(env, []);
   assert.equal(result.cloud, false);
   assert.equal(result.port, 8766);
+  assert.equal(result.backendPort, 8000);
   assert.match(result.directory, /[\\/]\.data[\\/]photon$/);
 });
 
@@ -26,5 +27,6 @@ test("rejects unsupported args and invalid bridge ports", () => {
   assert.throws(() => readConfig(env, ["--other"]));
   for (const port of ["0", "80", "65536", "8766junk", "12.5"]) {
     assert.throws(() => readConfig({ ...env, PHOTON_BRIDGE_PORT: port }, []));
+    assert.throws(() => readConfig({ ...env, PHOTON_BACKEND_PORT: port }, []));
   }
 });

@@ -5,7 +5,6 @@ from unittest.mock import Mock, call, patch
 from backend.services.reporting.errors import ErrorCode, QuantroError, Stage
 from backend.services.reporting.run_analysis import deliver_summary_after_save
 
-
 stage = importlib.import_module("backend.services.reporting.send_summary")
 
 
@@ -48,30 +47,21 @@ class PhotonReportingTests(unittest.TestCase):
                     "message": "Delivery could not be confirmed.",
                     "retryable": retryable,
                 }}
-                with patch.object(stage, "send_summary_request", return_value=error) as request:
-                    with self.assertRaises(QuantroError) as caught:
-                        stage.send_summary(
-                            *self.arguments, job_id="job_stable_001", provider=stage.PhotonProvider()
-                        )
+                with patch.object(stage, "send_summary_request", return_value=error) as request, self.assertRaises(QuantroError) as caught:
+                    stage.send_summary(
+                        *self.arguments, job_id="job_stable_001", provider=stage.PhotonProvider()
+                    )
                 self.assertIs(caught.exception.code, ErrorCode.MESSAGE_SEND_FAILED)
                 self.assertIs(caught.exception.stage, Stage.SEND_SUMMARY)
                 self.assertIs(caught.exception.retryable, retryable)
                 self.assertEqual(caught.exception.message, error["error"]["message"])
                 request.assert_called_once_with(*self.arguments, job_id="job_stable_001")
 
-    def test_missing_job_uses_helper_validation_and_is_not_retryable(self):
-        error = {"error": {
-            "code": "INVALID_IDEMPOTENCY_KEY",
-            "stage": "send_summary",
-            "message": "Provide a valid job ID for summary delivery.",
-            "retryable": False,
-        }}
-        with patch.object(stage, "send_summary_request", return_value=error) as request:
-            with self.assertRaises(QuantroError) as caught:
-                stage.send_summary(*self.arguments, provider=stage.PhotonProvider())
-        request.assert_called_once_with(*self.arguments, job_id="")
-        self.assertIs(caught.exception.code, ErrorCode.MESSAGE_SEND_FAILED)
-        self.assertIs(caught.exception.retryable, False)
+    def test_three_argument_contract_derives_stable_job_from_report_url(self):
+        with patch.object(stage, "send_summary_request", return_value=self.accepted) as request:
+            result = stage.send_summary(*self.arguments, provider=stage.PhotonProvider())
+        request.assert_called_once_with(*self.arguments, job_id="001")
+        self.assertEqual(result.model_dump(), self.accepted)
 
     def test_post_save_delivery_failure_returns_warning_without_retry(self):
         error = {"error": {
@@ -80,11 +70,10 @@ class PhotonReportingTests(unittest.TestCase):
             "message": "Verify delivery before requesting another send.",
             "retryable": False,
         }}
-        with patch.object(stage, "send_summary_request", return_value=error) as request:
-            with self.assertLogs("backend.services.reporting.run_analysis", level="WARNING") as logs:
-                delivery, warning = deliver_summary_after_save(
-                    "job_stable_001", *self.arguments, provider=stage.PhotonProvider()
-                )
+        with patch.object(stage, "send_summary_request", return_value=error) as request, self.assertLogs("backend.services.reporting.run_analysis", level="WARNING") as logs:
+            delivery, warning = deliver_summary_after_save(
+                "job_stable_001", *self.arguments, provider=stage.PhotonProvider()
+            )
         self.assertIsNone(delivery)
         self.assertEqual(warning, error["error"]["message"])
         self.assertIn("MESSAGE_SEND_FAILED", logs.output[0])

@@ -7,13 +7,14 @@ report. It copies upstream confidence verbatim and never derives credibility
 from author or engagement fields.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from .errors import ErrorCode, QuantroError, Stage
 from .types import (
     Alignment,
     Comparison,
+    ConfidenceLevel,
     Context,
     MediaFeatures,
     Outcome,
@@ -79,16 +80,26 @@ def _report_media(post: Post, features: MediaFeatures) -> dict[str, Any]:
 
 def build_report(
     job_id: str,
-    submitted_post: Post,
-    submitted_features: MediaFeatures,
-    source_post: Post | None,
-    source_features: MediaFeatures | None,
-    alignment: Alignment | None,
-    context: Context | None,
-    comparison: Comparison | None,
+    submitted_post: Post | Mapping[str, Any],
+    submitted_features: MediaFeatures | Mapping[str, Any],
+    source_post: Post | Mapping[str, Any] | None,
+    source_features: MediaFeatures | Mapping[str, Any] | None,
+    alignment: Alignment | Mapping[str, Any] | None,
+    context: Context | Mapping[str, Any] | None,
+    comparison: Comparison | Mapping[str, Any] | None,
     *,
     extra_limitations: Sequence[str] = (),
 ) -> ReportV2:
+    submitted_post = parse_stage_output(Post, submitted_post, Stage.BUILD_REPORT)
+    submitted_features = parse_stage_output(MediaFeatures, submitted_features, Stage.BUILD_REPORT)
+    source_post = parse_stage_output(Post, source_post, Stage.BUILD_REPORT) if source_post is not None else None
+    source_features = (
+        parse_stage_output(MediaFeatures, source_features, Stage.BUILD_REPORT)
+        if source_features is not None else None
+    )
+    alignment = parse_stage_output(Alignment, alignment, Stage.BUILD_REPORT) if alignment is not None else None
+    context = parse_stage_output(Context, context, Stage.BUILD_REPORT) if context is not None else None
+    comparison = parse_stage_output(Comparison, comparison, Stage.BUILD_REPORT) if comparison is not None else None
     if submitted_post.media.media_id != submitted_features.media_id:
         raise _build_error("Submitted post and features describe different media")
 
@@ -105,6 +116,8 @@ def build_report(
     }
 
     if matched:
+        if alignment.match_quality.confidence.level not in {ConfidenceLevel.HIGH, ConfidenceLevel.MODERATE} or not alignment.matches:
+            raise _build_error("A verified source requires an accepted passage and high or moderate match confidence")
         if source_features is None or context is None or comparison is None:
             raise _build_error("Missing confidence object for matched report")
         if source_post.candidate_id is None:
@@ -127,10 +140,14 @@ def build_report(
             summary=comparison.summary,
             limitations=merge_limitations(
                 alignment.limitations,
+                alignment.match_quality.confidence.limitations,
                 comparison.limitations,
+                comparison.assessment_confidence.limitations,
                 context.limitations,
                 submitted_post.retrieval.warnings,
                 source_post.retrieval.warnings,
+                submitted_features.warnings,
+                source_features.warnings,
                 extra_limitations,
             ),
         )
@@ -140,6 +157,7 @@ def build_report(
             limitations=merge_limitations(
                 [NO_VERIFIED_SOURCE_LIMITATION],
                 submitted_post.retrieval.warnings,
+                submitted_features.warnings,
                 extra_limitations,
             ),
         )

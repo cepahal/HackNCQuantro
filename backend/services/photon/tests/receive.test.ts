@@ -85,6 +85,23 @@ test("public URL intake is durable before acknowledgement and never fetched", as
   assert.match(chat.sent[0] ?? "", /saved for analysis.*pipeline is not connected/);
 });
 
+test("connected intake dispatches the durable URL once after its acknowledgement", async (t) => {
+  const path = await directory(t); const channel = space();
+  const calls: string[] = [];
+  const receive = createReceiver({ directory: path, onSaved: (record, eventKey, savedSpace) => {
+    assert.equal(record.conversation_id, channel.value.id);
+    assert.equal(record.input_url, "https://example.com/post");
+    assert.equal(savedSpace, channel.value);
+    assert.match(eventKey, /^[a-f0-9]{64}$/);
+    assert.match(channel.sent[0] ?? "", /queued for analysis/);
+    calls.push(eventKey);
+  } });
+  const input = message({ type: "text", text: "https://example.com/post" }, channel.value);
+  await receive(channel.value, input); await receive(channel.value, input);
+  assert.equal(calls.length, 1);
+  assert.equal((await records(path)).length, 1);
+});
+
 test("invalid, ambiguous, credential-bearing and local URLs never become intake", async (t) => {
   const path = await directory(t);
   const chat = space();

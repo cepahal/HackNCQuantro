@@ -41,7 +41,8 @@ No separate corpus table, Snowflake account or web-search API key is required.
 This does not search the public web or index transcripts automatically. If the
 corpus has no matching descriptions, an empty result is the correct outcome.
 The submitted post or a repost can appear in the corpus; search establishes no
-original-source claim. Alignment and context analysis still decide evidence.
+original-source claim. The orchestrator filters the submitted URL before source
+selection. Alignment and context analysis still decide evidence.
 
 ## Exact outputs and behavior
 
@@ -107,6 +108,7 @@ not the public web or automatically indexed transcripts.
 Private settings are in ignored root `.env.local`. Windows certificate trust was
 configured with the existing `TIGERDATA_SSL_ROOT_CERT` option pointing at a local
 PEM of trusted system CAs; certificate and hostname verification remain enabled.
-Full regression verification: 393 passed, 2 skipped. Live provider transcription,
-S3 hosting, and the team's unfinished analysis orchestrator were not verified by
-these retrieval checks.
+Those retrieval checks did not verify transcription or S3 hosting. The orchestrator
+and frontend are now connected; see [the integration audit](MVP_INTEGRATION_AUDIT.md)
+for current verification and provider gates. Discovery remains the stored corpus,
+not an unimplemented public-web search provider.

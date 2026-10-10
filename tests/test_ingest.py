@@ -85,7 +85,7 @@ def test_happy_path_returns_ingest_result_and_persists(client, store, upstream):
     assert store.get_job("job_1")["status"] == "ingested"
 
 
-def test_media_unavailable_returns_404_and_writes_nothing(client, store, monkeypatch):
+def test_media_unavailable_returns_404_and_marks_job_failed(client, store, monkeypatch):
     def fail(url):
         raise RetrievalError("MEDIA_UNAVAILABLE", "The submitted video could not be retrieved.")
 
@@ -96,7 +96,9 @@ def test_media_unavailable_returns_404_and_writes_nothing(client, store, monkeyp
     assert response.status_code == 404
     assert response.json() == {"error": {"code": "MEDIA_UNAVAILABLE", "stage": "retrieve_post",
                                          "message": "The media could not be retrieved.", "retryable": False}}
-    assert store.get_job("job_2") is None
+    job = store.get_job("job_2")
+    assert (job["status"], job["error_code"], job["error_stage"]) == ("failed", "MEDIA_UNAVAILABLE", "retrieve_post")
+    assert job["post_json"] is None and job["features_json"] is None
 
 
 @pytest.mark.parametrize("code", ["INVALID_URL", "UNSUPPORTED_PLATFORM"])
@@ -110,12 +112,12 @@ def test_bad_input_urls_return_400(client, store, monkeypatch, code):
 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == code
-    assert store.get_job("job_3") is None
+    assert store.get_job("job_3")["status"] == "failed"
 
 
 def test_transcription_failure_returns_502_and_marks_job_failed(client, store, monkeypatch, upstream):
     def fail(media, options):
-        raise QuantroError("TRANSCRIPTION_FAILED", "extract_media_features", "provider down")
+        raise QuantroError("TRANSCRIPTION_FAILED", "extract_media_features")
 
     monkeypatch.setattr(ingest_module, "extract_media_features", fail)
 
@@ -123,7 +125,7 @@ def test_transcription_failure_returns_502_and_marks_job_failed(client, store, m
 
     assert response.status_code == 502
     assert response.json()["error"] == {"code": "TRANSCRIPTION_FAILED", "stage": "extract_media_features",
-                                        "message": "The audio could not be transcribed.", "retryable": True}
+                                        "message": "The audio could not be transcribed.", "retryable": False}
     job = store.get_job("job_4")
     assert job["status"] == "failed"
     assert job["error_code"] == "TRANSCRIPTION_FAILED"
@@ -131,16 +133,51 @@ def test_transcription_failure_returns_502_and_marks_job_failed(client, store, m
     assert job["post_json"] is None and job["features_json"] is None
 
 
-def test_tiger_round_trip_returns_exact_json(client, store, upstream):
+@pytest.mark.parametrize("code,retryable,status", [
+    ("PROCESSING_FAILED", False, 500),
+    ("MEDIA_UNAVAILABLE", False, 404),
+    ("TRANSCRIPTION_FAILED", True, 502),
+])
+def test_extraction_preserves_typed_error(client, store, upstream, monkeypatch, code, retryable, status):
+    original = QuantroError(code, "extract_media_features", retryable=retryable)
+
+    def fail(media, options):
+        raise original
+
+    monkeypatch.setattr(ingest_module, "extract_media_features", fail)
+    response = client.post("/ingest/job_typed_error", json={"url": "https://www.youtube.com/watch?v=x"})
+    assert response.status_code == status
+    assert response.json() == {"error": original.to_dict()}
+    job = store.get_job("job_typed_error")
+    assert (job["status"], job["error_code"], job["error_stage"]) == ("failed", code, "extract_media_features")
+
+
+@pytest.mark.parametrize("failure,retryable", [(ValueError("private provider detail"), False), (TimeoutError(), True)])
+def test_untyped_extraction_error_uses_safe_message_and_correct_retryability(client, upstream, monkeypatch, failure, retryable):
+    def fail(media, options):
+        raise failure
+
+    monkeypatch.setattr(ingest_module, "extract_media_features", fail)
+    response = client.post("/ingest/job_untyped_error", json={"url": "https://www.youtube.com/watch?v=x"})
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "TRANSCRIPTION_FAILED"
+    assert response.json()["error"]["retryable"] is retryable
+    assert "private" not in response.text
+
+
+def test_tiger_round_trip_keeps_internal_paths_private(client, store, upstream):
     client.post("/ingest/job_5", json={"url": "https://www.youtube.com/watch?v=x"})
 
     response = client.get("/ingest/job_5")
 
     assert response.status_code == 200
     job = response.json()
-    assert job["post_json"] == _post()
-    assert job["features_json"] == _features()
-    assert job["post_json"]["media"]["local_path"] == "/tmp/quantro-post-1/media.mp4"
+    stored = store.get_job("job_5")
+    assert stored["post_json"] == _post()
+    assert stored["features_json"] == _features()
+    assert "local_path" not in job["post_json"]["media"]
+    assert "image_path" not in job["features_json"]["frames"][0]
+    assert "/tmp/" not in response.text
     assert job["created_at"].endswith("Z") and job["updated_at"].endswith("Z")
 
 
@@ -154,10 +191,11 @@ def test_invalid_job_id_is_rejected(client):
 
 def test_missing_tiger_database_url_fails_fast_at_startup(monkeypatch):
     monkeypatch.delenv("TIGER_DATABASE_URL", raising=False)
+    monkeypatch.delenv("TIGERDATA_DSN", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
 
-    with pytest.raises(TigerConfigError, match="TIGER_DATABASE_URL is not set"):
-        with TestClient(app):
-            pass
+    with pytest.raises(TigerConfigError, match="TIGER_DATABASE_URL is not set"), TestClient(app):
+        pass
 
 
 @pytest.mark.parametrize(

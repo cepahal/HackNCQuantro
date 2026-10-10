@@ -137,6 +137,11 @@ def test_counts_reject_booleans_and_negatives():
             t.Author.model_validate({"followers_count": bad})
 
 
+def test_unassessed_edit_counts_can_all_be_null():
+    counts = t.EditCounts.model_validate({name: None for name in EXPECTED_FIELDS[t.EditCounts]})
+    assert all(value is None for value in counts.model_dump().values())
+
+
 @pytest.mark.parametrize("value", ["2024-05-01T12:00:00+02:00", "2024-05-01T12:00:00", "May 1 2024"])
 def test_timestamps_must_be_iso_8601_utc(value):
     with pytest.raises(ValidationError):

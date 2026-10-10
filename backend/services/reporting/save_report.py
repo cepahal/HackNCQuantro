@@ -11,16 +11,17 @@ duplicate. The Tiger Data store keeps the first saved report for a report_id.
 """
 
 import os
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from functools import cache
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import quote
 
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from .errors import ErrorCode, QuantroError, Stage, normalize_exception
-from .types import JobCompletionResult
+from .types import JobCompletionResult, ReportV2, parse_stage_output
 
-_DEFAULT_REPORT_BASE_URL = "https://app.example"
+_DEFAULT_REPORT_BASE_URL = "http://localhost:3000"
 
 
 class _Report(Protocol):
@@ -42,18 +43,10 @@ class InMemoryReportStore:
         self._reports: dict[str, str] = {}
 
     def put(self, report_id: str, report_json: str) -> None:
-        self._reports[report_id] = report_json
+        self._reports.setdefault(report_id, report_json)
 
     def get(self, report_id: str) -> str | None:
         return self._reports.get(report_id)
-
-
-class SnowflakeReportStore:
-    def put(self, report_id: str, report_json: str) -> None:
-        raise NotImplementedError("TODO: persist reports via the Snowflake track integration")
-
-    def get(self, report_id: str) -> str | None:
-        raise NotImplementedError("TODO: read reports via the Snowflake track integration")
 
 
 class JobStore(Protocol):
@@ -88,8 +81,8 @@ def _shared_tiger_store() -> TigerStore:
 
 def _store_backend() -> str:
     backend = os.getenv("REPORT_STORE", "tiger").strip().lower() or "tiger"
-    if backend not in {"tiger", "memory", "snowflake"}:
-        raise ValueError(f"REPORT_STORE must be 'tiger', 'memory' or 'snowflake', got {backend!r}")
+    if backend not in {"tiger", "memory"}:
+        raise ValueError("REPORT_STORE must be 'tiger' or 'memory'.")
     return backend
 
 
@@ -97,9 +90,7 @@ def get_report_store() -> ReportStore:
     backend = _store_backend()
     if backend == "tiger":
         return TigerReportStore(_shared_tiger_store())
-    if backend == "memory":
-        return _memory_report_store
-    return SnowflakeReportStore()
+    return _memory_report_store
 
 
 def get_job_store() -> JobStore:
@@ -119,11 +110,13 @@ def _report_url(report_id: str) -> str:
 
 def save_report_and_complete_job(
     job_id: str,
-    report: _Report,
+    report: _Report | Mapping[str, Any],
     *,
     report_store: ReportStore | None = None,
     job_store: JobStore | None = None,
 ) -> JobCompletionResult:
+    if isinstance(report, Mapping):
+        report = parse_stage_output(ReportV2, report, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
     if report.job_id != job_id:
         raise QuantroError(
             code=ErrorCode.PROCESSING_FAILED,
@@ -131,8 +124,11 @@ def save_report_and_complete_job(
             message="job_id mismatch",
         )
 
-    report_store = report_store if report_store is not None else get_report_store()
-    job_store = job_store if job_store is not None else get_job_store()
+    try:
+        report_store = report_store if report_store is not None else get_report_store()
+        job_store = job_store if job_store is not None else get_job_store()
+    except Exception as exc:
+        raise normalize_exception(Stage.SAVE_REPORT_AND_COMPLETE_JOB, exc) from exc
     report_id = report_id_for_job(job_id)
 
     try:

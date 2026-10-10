@@ -183,8 +183,8 @@ def test_matched_end_to_end(client, store, upstream):
     assert store.get_job("job_match")["status"] == "completed"
     assert upstream["compare_calls"] == ["The bridge is closed forever."]
     assert upstream["provider"].sent == [
-        ("conv_1", "The clip omits that the closure is temporary. "
-                   "View the evidence: https://quantro.test/reports/report_job_match")
+        ("conv_1", ("The clip omits that the closure is temporary. "
+                   "View the evidence: https://quantro.test/reports/report_job_match"))
     ]
 
 
@@ -321,3 +321,103 @@ def test_display_report_rejects_non_report_input():
 
 def test_unknown_report_returns_404(client):
     assert client.get("/reports/report_missing").status_code == 404
+
+
+def test_submitted_post_is_never_its_own_source(client, store, upstream):
+    upstream["candidates"] = [{**_candidate(1), "url": CLIP_URL + "#same-post"}]
+    response = _run(client, "job_self", conversation_id=None)
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "no_verified_match"
+    assert "excluded from its own" in response.json()["warnings"][0]
+    report = client.get("/reports/report_job_self").json()
+    assert report["source"] is None
+    assert upstream["compare_calls"] == []
+
+
+def test_nested_confidence_limitations_reach_report(client, upstream, monkeypatch):
+    original = analysis_module.compare_context_and_caption
+
+    def compare(*args):
+        result = original(*args)
+        result["assessment_confidence"]["limitations"].append("Unique confidence limitation.")
+        return result
+
+    monkeypatch.setattr(analysis_module, "compare_context_and_caption", compare)
+    assert _run(client, "job_confidence_limits").status_code == 200
+    report = client.get("/reports/report_job_confidence_limits").json()
+    assert report["limitations"].count("Unique confidence limitation.") == 1
+
+
+def test_report_build_and_save_accept_contract_dictionaries(store):
+    from backend.services.reporting.build_report import build_report
+    from backend.services.reporting.save_report import save_report_and_complete_job
+    from backend.services.storage.tiger import TigerJobStore, TigerReportStore
+
+    report = build_report("job_dicts", _post("clip_media", CLIP_URL), CLIP_FEATURES, None, None, None, None, None)
+    store.upsert_job("job_dicts", CLIP_URL, "running")
+    result = save_report_and_complete_job(
+        "job_dicts", report.model_dump(mode="json"),
+        report_store=TigerReportStore(store), job_store=TigerJobStore(store),
+    )
+    assert result.status == "completed"
+    assert store.get_report(result.report_id) == report.model_dump(mode="json")
+
+
+def test_completed_job_reuses_saved_report_without_new_analysis(client, store, upstream):
+    first = _run(client, "job_repeat").json()
+    upstream["search_error"] = RuntimeError("Search must not run on a completed job.")
+    second = _run(client, "job_repeat")
+    assert second.status_code == 200
+    assert second.json() == first
+    assert len(upstream["compare_calls"]) == 1
+    assert len(upstream["provider"].sent) == 1
+    assert len(store.get_job_reports("job_repeat")) == 1
+
+
+def test_completed_job_cannot_be_reused_for_a_different_url(client, store, upstream):
+    assert _run(client, "job_url_identity").status_code == 200
+    response = client.post("/analyze/job_url_identity/run", json={"url": "https://example.com/another.mp4"})
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "PROCESSING_FAILED"
+    assert store.get_job("job_url_identity")["status"] == "completed"
+
+
+def test_report_get_storage_failure_has_safe_error_envelope(client, store, monkeypatch):
+    def fail(report_id):
+        raise RuntimeError("private connection detail")
+
+    monkeypatch.setattr(store, "get_report", fail)
+    response = client.get("/reports/report_job_broken")
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "STORAGE_FAILED"
+    assert "private" not in response.text
+
+
+@pytest.mark.parametrize("retryable", [False, True])
+def test_search_preserves_typed_error_retryability(client, store, upstream, retryable):
+    original = QuantroError("SEARCH_FAILED", "search_candidates", retryable=retryable)
+    upstream["search_error"] = original
+    response = _run(client, "job_typed_search")
+    assert response.status_code == 500
+    assert response.json() == {"error": original.to_dict()}
+    assert store.get_job("job_typed_search")["status"] == "failed"
+    assert store.get_report("report_job_typed_search") is None
+
+
+def test_first_saved_report_controls_delivery_and_result(client, store, upstream):
+    from backend.services.reporting.build_report import build_report
+
+    assert _run(client, "job_first_save", conversation_id=None).status_code == 200
+    canonical = store.get_report("report_job_first_save")
+    losing_report = build_report("job_first_save", _post("clip_media", CLIP_URL), CLIP_FEATURES, None, None, None, None, None)
+    provider = FakeProvider()
+    result = analysis_module._complete_and_deliver(
+        "job_first_save", losing_report, "conv_concurrent", store,
+        provider, InMemoryDeliveryTracker(), [],
+    )
+    assert result.outcome.value == canonical["outcome"] == "matched"
+    assert provider.sent == [(
+        "conv_concurrent",
+        f"{canonical['summary']} View the evidence: {result.report_url}",
+    )]
+    assert store.get_report("report_job_first_save") == canonical
