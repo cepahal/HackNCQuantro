@@ -37,7 +37,8 @@ Install FFmpeg including `ffprobe` before starting the backend. Both executables
 must be visible to the backend process. If an existing Windows terminal has a
 stale PATH after installation, put the absolute directory containing both tools
 in the ignored environment as `MEDIA_TOOLS_DIR`. Startup validates the configured
-directory and both tools before connecting to Tiger Data or accepting requests.
+directory and both tools before connecting to Tiger Data or accepting requests. Each
+resolved executable must return its expected version banner within five seconds.
 Restart the backend after changing this setting.
 
 Retrieval and search also need `TIGERDATA_DSN` (the same Tiger URL) and
@@ -58,11 +59,11 @@ python -m services.storage.tiger list     # recent jobs as JSON ([] on a fresh d
 ```
 
 The API creates `quantro_jobs`, `quantro_posts` and `quantro_reports` on first boot.
-`REPORT_STORE` supports `tiger` and `memory` only. Snowflake report persistence is
+Production `REPORT_STORE` supports `tiger` only; tests can inject an in-memory store. Snowflake report persistence is
 unsupported; use Tiger Data for the MVP. The separate optional Snowflake media
 adapter does not provide a report store.
 
-### Frontend (Node 20+)
+### Frontend and Photon (Node 24+)
 
 ```bash
 cd frontend
@@ -78,9 +79,10 @@ a production demo, run `npm run build` followed by `npm start`. Its API origin i
 ## 2. Smoke test
 
 `tests/test_smoke_e2e.py` drives `/ingest`, `/analyze/{job_id}/run` and `/reports/{id}`
-through the real ASGI app against a real Postgres. It replaces the eight upstream
-functions with contract-shaped fixtures and deletes the rows it writes. It is skipped
-when `TIGER_DATABASE_URL` is unset.
+through the real ASGI app against the explicitly configured database. It replaces
+the upstream functions with contract-shaped fixtures and deletes the rows it writes.
+It is skipped when `TIGER_DATABASE_URL` is unset. Offline CI uses temporary SQLite;
+that checks wiring and serialization, not Postgres/Tiger-specific behavior.
 
 Against a local Postgres (no TLS needed on localhost), from the repo root:
 
@@ -194,3 +196,47 @@ grep -rn --include='*.py' "/tmp/\|local_path\|api_key\|secret" backend/services/
 - [ ] One full curl run of the demo URL returns `outcome: "matched"`, and the report page opens
 - [ ] `git status` shows no `.env` files staged
 - [ ] Screenshot the report page and save the curl output as a fallback
+
+## 6. Failure recovery and regression gate
+
+Start the healthy backend first, then managed Photon. On every managed startup,
+Photon reconciles existing pending/uncertain/failed markers through GET requests.
+This runs in the background, so incoming acknowledgments do not wait for recovery.
+A valid saved report confirms completion even if the analysis HTTP response failed.
+A failed backend job supplies its safe error code/stage. Unknown or running work is
+never reported as completed or automatically replayed. Recovery never resends a
+report or failure notice for an existing marker.
+
+Default startup does not process old marker-free inbox records. After reviewing
+saved intake and obtaining approval for any external processing/delivery, an
+operator can explicitly resume only provably never-started URL requests:
+
+```bash
+npm --prefix backend/services/photon run start:imessage -- --resume-saved
+```
+
+Use one listener instance. Recovery validates native intake/event hashes, requires
+both job and report lookups to return the expected absence responses, resolves the
+original conversation, and writes an exclusive durable marker before queuing a POST.
+It scans at most 256 directory entries / 32 jobs with a 60-second lookup budget.
+Inspect unresolved/limited recovery manually; do not delete existing markers or
+delivery ledgers to force a replay. Leave the flag off for ordinary restarts.
+
+Same-post sources are rejected at selection, report construction, cached reuse,
+serving, display, and final delivery. A legacy invalid report returns structured
+PROCESSING_FAILED; evidence in Tiger is preserved. Use a fresh job for a corrected
+analysis. Definitive caption assessments require a separate transcript-grounding
+check with valid source citations. Missing evidence, disagreement, or an unavailable
+secondary check yields Not assessed. Two model interpretations can still share
+reasoning errors; citations establish provenance, not universal logical correctness.
+
+`.github/workflows/reliability.yml` checks every push and pull request with isolated
+offline backend tests, dependency/startup checks, both Node suites/typechecks, and
+a frontend production build. It supplies no provider credentials and removes
+NETWORK. Live platform access, real Tiger semantics, message receipt, and mobile
+report rendering remain separate acceptance tests.
+
+Recovery limits apply across both marker and inbox scans. A large marker history
+can exhaust the scan before the inbox is reached. Startup logs `limited=true`
+and a manual-review instruction in that case; do not treat a truncated scan as
+a fully drained queue. Automated pagination of large backlogs is not implemented.

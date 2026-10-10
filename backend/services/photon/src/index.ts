@@ -30,17 +30,18 @@ async function main(): Promise<void> {
     conversations.set(space.id, space);
     analysis.enqueue(record, eventKey, space);
   } });
+  const resolveConversation = async (id: string): Promise<Space> => {
+    const live = conversations.get(id);
+    if (live) return live;
+    if (cloudApp && await hasConversation(directory, id)) {
+      return imessage(cloudApp).space.get(id);
+    }
+    throw new BridgeError(409, "CONVERSATION_UNAVAILABLE", "Receive a submission in this conversation before sending its report.", false);
+  };
   const sendSummary = createSummarySender({
     deliveryDirectory: join(config.directory, "deliveries"),
     prepareReport,
-    resolveConversation: async (id) => {
-      const live = conversations.get(id);
-      if (live) return live;
-      if (cloudApp && await hasConversation(directory, id)) {
-        return imessage(cloudApp).space.get(id);
-      }
-      throw new BridgeError(409, "CONVERSATION_UNAVAILABLE", "Receive a submission in this conversation before sending its report.", false);
-    },
+    resolveConversation,
   });
   const server = createBridgeServer({ token: config.token, sendSummary });
   let stopping = false;
@@ -64,6 +65,19 @@ async function main(): Promise<void> {
       console.error("The private Photon bridge stopped accepting requests.");
       stop();
     });
+    if (cloudApp) {
+      // Recovery never delays inbound acknowledgments. Existing markers are GET-only.
+      void analysis.recover({
+        inboxDirectory: directory,
+        resumeUnstarted: config.resumeSaved,
+        resolveConversation: (record) => resolveConversation(record.conversation_id),
+      }).then((result) => {
+        console.log(`Saved-request recovery: ${result.scanned} scanned, ${result.reconciled} reconciled, ${result.resumed} resumed, ${result.unresolved} unresolved, ${result.skipped} skipped; limited=${result.limited}.`);
+        if (result.limited) console.error("Saved-request recovery reached its limit. Review remaining saved requests manually; existing markers will not be replayed.");
+      }).catch(() => {
+        console.error("Saved-request recovery could not finish. Processing markers were preserved.");
+      });
+    }
     console.log(`Quantro Photon (${config.cloud ? "iMessage" : "terminal"}) ready at http://127.0.0.1:${config.port}.`);
     for await (const [space, message] of app.messages) {
       if (message.direction !== "inbound") continue;

@@ -10,6 +10,7 @@ from backend.services.reporting.build_report import sanitize_report
 from backend.services.reporting.display_report import display_report
 from backend.services.reporting.run_analysis import run_analysis
 from backend.services.shared.errors import ErrorCode, QuantroError, Stage
+from backend.services.shared.post_identity import ensure_distinct_source
 from backend.services.shared.types import ReportV2, parse_stage_output
 from backend.services.storage.tiger import TigerReportStore, TigerStore
 
@@ -43,12 +44,13 @@ def get_report(report_id: ReportId, store: TigerDependency) -> JSONResponse:
     if raw is None:
         return not_found("Report not found")
     try:
-        report = parse_stage_output(ReportV2, sanitize_report(json.loads(raw)), Stage.DISPLAY_REPORT).model_dump(mode="json")
+        report = parse_stage_output(ReportV2, sanitize_report(json.loads(raw)), Stage.DISPLAY_REPORT)
+        ensure_distinct_source(report.submitted.post, report.source.post if report.source else None, Stage.DISPLAY_REPORT)
     except QuantroError as error:
         return quantro_error_response(error)
     except (TypeError, ValueError):
         return quantro_error_response(QuantroError(ErrorCode.PROCESSING_FAILED, Stage.DISPLAY_REPORT))
-    return JSONResponse(content=report)
+    return JSONResponse(content=report.model_dump(mode="json"))
 
 
 @router.get("/reports/{report_id}/display")

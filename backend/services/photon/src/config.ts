@@ -4,10 +4,12 @@ import { fileURLToPath } from "node:url";
 const repository = fileURLToPath(new URL("../../../../", import.meta.url));
 
 export function readConfig(env: NodeJS.ProcessEnv, args: string[]) {
-  if (args.some((arg) => arg !== "--imessage")) {
+  if (args.some((arg) => arg !== "--imessage" && arg !== "--resume-saved")) {
     throw new Error("Use npm start for terminal mode or npm run start:imessage for managed iMessage.");
   }
   const cloud = args.includes("--imessage");
+  const resumeSaved = args.includes("--resume-saved");
+  if (resumeSaved && !cloud) throw new Error("--resume-saved requires managed iMessage mode.");
   const token = env.PHOTON_BRIDGE_TOKEN?.trim() ?? "";
   if (!/^[A-Za-z0-9_-]{32,128}$/.test(token)) {
     throw new Error("Set a private PHOTON_BRIDGE_TOKEN of 32-128 letters, numbers, underscores or hyphens.");
@@ -38,7 +40,7 @@ export function readConfig(env: NodeJS.ProcessEnv, args: string[]) {
     if (!env.REPORT_BASE_URL?.trim()) throw new Error("Public report sharing requires REPORT_BASE_URL.");
   }
   return {
-    cloud, token, projectId, projectSecret, port, backendPort,
+    cloud, resumeSaved, token, projectId, projectSecret, port, backendPort,
     directory, publicReportsFile, reportBaseUrl: env.REPORT_BASE_URL?.trim() ?? "",
   };
 }

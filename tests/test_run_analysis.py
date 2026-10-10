@@ -506,6 +506,75 @@ def test_cached_self_match_is_rejected_without_mutating_saved_evidence_or_sendin
     assert len(upstream["compare_calls"]) == 1
 
 
+@pytest.mark.parametrize("submitted_url,source_url,canonical", [
+    ("https://www.instagram.com/reel/DOtmnryAC-R/?psln=tracking", "https://instagram.com/p/DOtmnryAC-R/", None),
+    ("https://www.youtube.com/watch?v=clip&si=tracking", "https://youtu.be/clip?t=1", None),
+    ("https://vm.tiktok.com/submitted/", "https://vt.tiktok.com/candidate/",
+     "https://www.tiktok.com/@someone/video/1234567890"),
+])
+def test_report_boundaries_reject_self_matches_without_rewriting_saved_evidence(
+    client, store, upstream, submitted_url, source_url, canonical,
+):
+    from backend.services.reporting.build_report import build_report
+    from backend.services.shared.types import ReportV2
+
+    assert _run(client, "job_boundary_seed", conversation_id=None).status_code == 200
+    prior = store.get_report("report_job_boundary_seed")
+    submitted = _post("clip_media", submitted_url)
+    source = _post("src_media_1", source_url, candidate_id="cand_1")
+    if canonical:
+        submitted["retrieval"]["metadata_source_urls"].append(canonical + "?tracking=submitted")
+        source["retrieval"]["metadata_source_urls"].append(canonical + "?tracking=candidate")
+
+    with pytest.raises(QuantroError) as caught:
+        build_report(
+            "job_boundary_build", submitted, CLIP_FEATURES, source, _source_features("src_media_1"),
+            prior["alignment"], prior["context"], prior["comparison"],
+        )
+    assert caught.value.code.value == "PROCESSING_FAILED"
+    assert caught.value.stage.value == "build_report"
+    assert store.get_report("report_job_boundary_build") is None
+
+    prior["job_id"] = "job_boundary_legacy"
+    for panel, post in (("submitted", submitted), ("source", source)):
+        prior[panel]["post"]["post_url"] = post["post_url"]
+        prior[panel]["post"]["retrieval"] = post["retrieval"]
+    store.upsert_job("job_boundary_legacy", submitted_url, "completed")
+    store.save_report("report_job_boundary_legacy", "job_boundary_legacy", prior)
+
+    for endpoint in ("/reports/report_job_boundary_legacy", "/reports/report_job_boundary_legacy/display"):
+        response = client.get(endpoint)
+        assert response.status_code == 500
+        assert response.json()["error"]["code"] == "PROCESSING_FAILED"
+        assert response.json()["error"]["stage"] == "display_report"
+        assert "own source" in response.json()["error"]["message"]
+        assert source_url not in response.text
+    for value in (prior, ReportV2.model_validate(prior)):
+        with pytest.raises(QuantroError) as caught:
+            display_report(value)
+        assert caught.value.stage.value == "display_report"
+    assert store.get_report("report_job_boundary_legacy") == prior
+    assert store.get_job("job_boundary_legacy")["status"] == "completed"
+    assert upstream["provider"].sent == []
+
+
+def test_first_saved_self_match_is_not_delivered_after_new_valid_analysis(client, store, upstream):
+    assert _run(client, "job_reread_seed", conversation_id=None).status_code == 200
+    prior = store.get_report("report_job_reread_seed")
+    prior["job_id"] = "job_reread_legacy"
+    prior["source"]["post"]["post_url"] = "https://youtu.be/clip?si=tracking"
+    store.upsert_job("job_reread_legacy", CLIP_URL, "running")
+    store.save_report("report_job_reread_legacy", "job_reread_legacy", prior)
+
+    response = _run(client, "job_reread_legacy")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "PROCESSING_FAILED"
+    assert response.json()["error"]["stage"] == "save_report_and_complete_job"
+    assert store.get_report("report_job_reread_legacy") == prior
+    assert upstream["provider"].sent == []
+
+
 def test_nested_confidence_limitations_reach_report(client, upstream, monkeypatch):
     original = analysis_module.compare_context_and_caption
 

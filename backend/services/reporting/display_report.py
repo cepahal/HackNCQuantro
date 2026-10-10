@@ -14,6 +14,7 @@ from ..shared.contracts import validate_contract_result
 from ..shared.errors import ErrorCode, QuantroError, Stage
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.post_identity import ensure_distinct_source
 from ..shared.types import (
     AssessmentBlock,
     ClipCoverageBlock,
@@ -206,6 +207,7 @@ def display_report(report: ReportV2 | Mapping[str, Any]) -> DisplayModel:
     try:
         if not isinstance(report, ReportV2):
             report = parse_stage_output(ReportV2, report, Stage.DISPLAY_REPORT)
+        ensure_distinct_source(report.submitted.post, report.source.post if report.source else None, Stage.DISPLAY_REPORT)
         data = report.model_dump(mode="json")
         submitted, source = data["submitted"], data["source"]
         alignment, comparison = data["alignment"] or {}, data["comparison"] or {}

@@ -60,8 +60,10 @@ def client_and_model(stage):
     return client, model
 
 
-def generate_json(client, model, contents, schema, stage, code=ErrorCode.PROCESSING_FAILED):
-    for attempt in range(_MAX_ATTEMPTS):
+def generate_json(client, model, contents, schema, stage, code=ErrorCode.PROCESSING_FAILED, *, max_attempts=_MAX_ATTEMPTS):
+    if type(max_attempts) is not int or not 1 <= max_attempts <= _MAX_ATTEMPTS:
+        raise ValueError('Gemini attempts must be an integer from 1 to 3.')
+    for attempt in range(max_attempts):
         try:
             response = client.models.generate_content(
                 model=model, contents=contents,
@@ -72,8 +74,8 @@ def generate_json(client, model, contents, schema, stage, code=ErrorCode.PROCESS
         except Exception as exc:  # noqa: BLE001 - Provider diagnostics may contain credentials or evidence.
             retryable = _retryable(exc)
             message = _safe_failure(exc)
-            logger.warning('%s Attempt %d/%d.', message, attempt + 1, _MAX_ATTEMPTS)
-            if retryable and attempt + 1 < _MAX_ATTEMPTS:
+            logger.warning('%s Attempt %d/%d.', message, attempt + 1, max_attempts)
+            if retryable and attempt + 1 < max_attempts:
                 time.sleep(2 ** (attempt + 1))
                 continue
             raise QuantroError(code, stage, message, retryable=retryable) from None

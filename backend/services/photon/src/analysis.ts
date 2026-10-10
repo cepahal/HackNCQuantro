@@ -1,12 +1,29 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, open, rename, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { Space } from "spectrum-ts";
 import type { IntakeRecord } from "./receive.ts";
+import { privatePathExists, readPrivateJson, RECOVERY_LIMITS, recoveryEntries, savedUrlIntake, withinRecoveryDeadline } from "./recovery.ts";
 
 interface Options {
   directory: string;
   backendPort: number;
   request?: typeof fetch;
+}
+
+export interface RecoveryOptions {
+  inboxDirectory: string;
+  /** Explicit operator opt-in; the default performs GET-only reconciliation. */
+  resumeUnstarted?: boolean;
+  resolveConversation?: (record: IntakeRecord) => Promise<Space>;
+}
+export interface RecoverySummary {
+  scanned: number;
+  reconciled: number;
+  resumed: number;
+  unresolved: number;
+  skipped: number;
+  limited: boolean;
 }
 
 const FAILURE_MESSAGES = {
@@ -89,6 +106,24 @@ async function notify(space: Space, text: string): Promise<void> {
   finally { if (timer) clearTimeout(timer); }
 }
 
+function newMarker(jobId: string): Marker {
+  const now = new Date().toISOString();
+  return { job_id: jobId, state: "pending", started_at: now, updated_at: now,
+    http_status: null, error_code: null, error_stage: null, retryable: null,
+    report_id: null, reconciled: false, backend_status: null };
+}
+
+async function persistMarker(path: string, marker: Marker): Promise<void> {
+  marker.updated_at = new Date().toISOString();
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    const file = await open(temporary, "wx", 0o600);
+    try { await file.writeFile(JSON.stringify(marker)); await file.sync(); }
+    finally { await file.close(); }
+    await rename(temporary, path);
+  } finally { await unlink(temporary).catch(() => undefined); }
+}
+
 /** Serialize URL investigations; durable markers prohibit accidental automatic replay. */
 export function createAnalysisDispatcher(options: Options) {
   if (!Number.isInteger(options.backendPort) || options.backendPort < 1024 || options.backendPort > 65535) {
@@ -98,33 +133,53 @@ export function createAnalysisDispatcher(options: Options) {
   const request = options.request ?? fetch;
   let pending = Promise.resolve();
   let queued = 0;
+  const scheduled = new Set<string>();
+  let recovery: Promise<RecoverySummary> | undefined;
 
-  async function readStatus(path: string): Promise<Record<string, unknown> | undefined> {
+  async function inspectStatus(path: string, deadline = Date.now() + 5_000): Promise<{ status: number; body?: Record<string, unknown> } | undefined> {
+    const probeDeadline = Math.min(deadline, Date.now() + 5_000);
     try {
-      const response = await request(`http://127.0.0.1:${options.backendPort}${path}`, {
-        method: "GET", signal: AbortSignal.timeout(5_000), redirect: "error",
-      });
-      if (!response.ok) { await response.body?.cancel(); return undefined; }
-      return object(await response.json());
+      return await withinRecoveryDeadline(async () => {
+        const response = await request(`http://127.0.0.1:${options.backendPort}${path}`, {
+          method: "GET", signal: AbortSignal.timeout(Math.max(1, probeDeadline - Date.now())), redirect: "error",
+        });
+        // Status probes must not allocate an unbounded report or wait forever on a partial body.
+        const reader = response.body?.getReader();
+        if (!reader) return { status: response.status };
+        try {
+          const chunks: Uint8Array[] = []; let length = 0;
+          while (true) {
+            const chunk = await withinRecoveryDeadline(() => reader.read(), probeDeadline);
+            if (chunk.done) break;
+            length += chunk.value.byteLength;
+            if (length > 2 * 1024 * 1024) return { status: response.status };
+            chunks.push(chunk.value);
+          }
+          return { status: response.status, body: object(JSON.parse(Buffer.concat(chunks).toString("utf8"))) };
+        } finally { void reader.cancel().catch(() => undefined); reader.releaseLock(); }
+      }, probeDeadline);
     } catch { return undefined; }
   }
 
-  async function reconcile(marker: Marker): Promise<string> {
+  function completedReport(marker: Marker, saved: Record<string, unknown> | undefined): boolean {
     const reportId = `report_${marker.job_id}`;
-    const saved = await readStatus(`/reports/${reportId}`);
     if (saved?.schema_version === "2.1" && saved.job_id === marker.job_id
         && (saved.outcome === "matched" || saved.outcome === "no_verified_match") && object(saved.submitted)) {
       marker.state = "completed";
       marker.report_id = reportId;
       marker.reconciled = true;
       marker.backend_status = "completed";
-      return COMPLETED_WITH_UNCONFIRMED_REPLY;
+      marker.error_code = null; marker.error_stage = null; marker.retryable = null;
+      return true;
     }
-    const status = await readStatus(`/ingest/${marker.job_id}`);
+    return false;
+  }
+
+  function reconcileJob(marker: Marker, status: Record<string, unknown> | undefined): string {
     const job = object(status?.job);
     if (job?.id !== marker.job_id) return UNCERTAIN;
-    marker.reconciled = true;
     if (typeof job.status === "string" && ["running", "ingested", "failed", "completed"].includes(job.status)) {
+      marker.reconciled = true;
       marker.backend_status = job.status;
     }
     if (job.status === "failed") {
@@ -137,16 +192,29 @@ export function createAnalysisDispatcher(options: Options) {
     return UNCERTAIN;
   }
 
+  async function reconcile(marker: Marker, deadline = Date.now() + 10_000): Promise<string> {
+    const saved = await inspectStatus(`/reports/report_${marker.job_id}`, deadline);
+    if (saved?.status === 200 && completedReport(marker, saved.body)) return COMPLETED_WITH_UNCONFIRMED_REPLY;
+    const status = await inspectStatus(`/ingest/${marker.job_id}`, deadline);
+    const notification = reconcileJob(marker, status?.status === 200 ? status.body : undefined);
+    const error = object(saved?.body?.error);
+    // A rejected stored report is a confirmed report failure, even if its database job says completed.
+    // Storage/network failures still leave report validity unknown and must not become terminal failures.
+    if (saved?.status === 500 && error?.code === "PROCESSING_FAILED"
+        && error.stage === "display_report" && error.retryable === false) {
+      marker.reconciled = true;
+      marker.http_status = 500;
+      markFailed(marker, { code: "PROCESSING_FAILED", stage: "display_report", retryable: false });
+      return "The saved report did not pass validation. Ask the team to check the report before another analysis attempt.";
+    }
+    return notification;
+  }
+
   async function run(record: IntakeRecord, eventKey: string, space: Space): Promise<void> {
     if (record.input_type !== "url" || !record.input_url || !/^[a-f0-9]{64}$/.test(eventKey)) return;
     const jobId = `photon_${eventKey}`;
     const path = join(directory, `${eventKey}.json`);
-    const now = new Date().toISOString();
-    const processing: Marker = {
-      job_id: jobId, state: "pending", started_at: now, updated_at: now,
-      http_status: null, error_code: null, error_stage: null, retryable: null,
-      report_id: null, reconciled: false, backend_status: null,
-    };
+    const processing = newMarker(jobId);
     try {
       await mkdir(directory, { recursive: true, mode: 0o700 });
       const marker = await open(path, "wx", 0o600);
@@ -171,9 +239,13 @@ export function createAnalysisDispatcher(options: Options) {
         const error = object(result?.error);
         const confirmed = error && typeof error.retryable === "boolean" && failure(error.code, error.stage, error.retryable);
         if (!confirmed) throw new Error("Analysis response was not a recognized failure");
-        notification = markFailed(processing, confirmed);
+        // A late completion/delivery error can follow a committed report. Saved evidence wins.
+        const saved = await inspectStatus(`/reports/report_${jobId}`);
+        notification = saved?.status === 200 && completedReport(processing, saved.body)
+          ? COMPLETED_WITH_UNCONFIRMED_REPLY : markFailed(processing, confirmed);
       } else {
         if (result?.job_id !== jobId || result.report_id !== `report_${jobId}`
+            || !["matched", "no_verified_match"].includes(typeof result.outcome === "string" ? result.outcome : "")
             || typeof result.delivery_status !== "string"
             || !["accepted", "failed", "skipped"].includes(result.delivery_status)) {
           throw new Error("Analysis response did not confirm this job");
@@ -185,27 +257,98 @@ export function createAnalysisDispatcher(options: Options) {
     } catch {
       notification = await reconcile(processing);
     } finally {
-      processing.updated_at = new Date().toISOString();
-      const temporary = `${path}.tmp`;
-      try {
-        const marker = await open(temporary, "wx", 0o600);
-        try { await marker.writeFile(JSON.stringify(processing)); await marker.sync(); }
-        finally { await marker.close(); }
-        await rename(temporary, path);
-      } catch { /* Retaining the pending marker prevents an uncertain automatic replay. */ }
-      finally { await unlink(temporary).catch(() => undefined); }
+      try { await persistMarker(path, processing); }
+      catch { /* Retaining the pending marker prevents an uncertain automatic replay. */ }
     }
     if (notification) await notify(space, notification);
   }
 
-  return {
-    enqueue(record: IntakeRecord, eventKey: string, space: Space): void {
-      if (queued >= 32) {
-        void notify(space, "Your request is saved, but the analysis queue is full. Please wait and ask the team to process this saved request.");
-        return;
+  function enqueue(record: IntakeRecord, eventKey: string, space: Space): boolean {
+    if (scheduled.has(eventKey)) return false;
+    if (queued >= 32) {
+      void notify(space, "Your request is saved, but the analysis queue is full. Please wait and ask the team to process this saved request.");
+      return false;
+    }
+    queued += 1;
+    scheduled.add(eventKey);
+    pending = pending.then(() => run(record, eventKey, space)).catch(() => undefined).finally(() => {
+      queued -= 1; scheduled.delete(eventKey);
+    });
+    return true;
+  }
+
+  async function recoverSaved(settings: RecoveryOptions): Promise<RecoverySummary> {
+    const result: RecoverySummary = { scanned: 0, reconciled: 0, resumed: 0, unresolved: 0, skipped: 0, limited: false };
+    const deadline = Date.now() + RECOVERY_LIMITS.milliseconds;
+    let jobs = 0;
+    const room = (): boolean => {
+      if (result.scanned >= RECOVERY_LIMITS.entries || jobs >= RECOVERY_LIMITS.jobs || Date.now() >= deadline) {
+        result.limited = true; return false;
       }
-      queued += 1;
-      pending = pending.then(() => run(record, eventKey, space)).catch(() => undefined).finally(() => { queued -= 1; });
+      return true;
+    };
+    // Any existing marker prohibits automatic replay, including a legacy or malformed marker.
+    for await (const entry of recoveryEntries(directory)) {
+      if (!room()) break;
+      result.scanned++;
+      if (!entry.file || !/^[a-f0-9]{64}\.json$/.test(entry.name)) { result.skipped++; continue; }
+      const eventKey = entry.name.slice(0, -5);
+      if (scheduled.has(eventKey)) { result.skipped++; continue; }
+      const path = join(directory, entry.name);
+      try {
+        const saved = object(await readPrivateJson(path, 8 * 1024));
+        if (saved?.job_id !== `photon_${eventKey}` || typeof saved.state !== "string" || !["pending", "uncertain", "failed"].includes(saved.state)) {
+          result.skipped++; continue;
+        }
+        jobs++;
+        const marker = newMarker(`photon_${eventKey}`);
+        marker.state = "uncertain";
+        if (typeof saved.started_at === "string" && saved.started_at.endsWith("Z") && Number.isFinite(Date.parse(saved.started_at))) marker.started_at = saved.started_at;
+        if (saved.state === "failed") {
+          const error = failure(saved.error_code, saved.error_stage, saved.retryable);
+          if (error) markFailed(marker, error);
+        }
+        if (Number.isInteger(saved.http_status) && Number(saved.http_status) >= 100 && Number(saved.http_status) <= 599) marker.http_status = Number(saved.http_status);
+        await reconcile(marker, deadline);
+        if (scheduled.has(eventKey)) { result.skipped++; continue; }
+        await persistMarker(path, marker);
+        if (marker.reconciled && ["completed", "failed"].includes(marker.state)) result.reconciled++;
+        else result.unresolved++;
+      } catch { result.unresolved++; }
+    }
+    for await (const entry of recoveryEntries(resolve(settings.inboxDirectory))) {
+      if (!room()) break;
+      result.scanned++;
+      if (!entry.directory || !/^[a-f0-9]{64}$/.test(entry.name) || scheduled.has(entry.name)) { result.skipped++; continue; }
+      const path = join(directory, `${entry.name}.json`);
+      if (await privatePathExists(path)) { result.skipped++; continue; }
+      try {
+        const record = savedUrlIntake(await readPrivateJson(join(resolve(settings.inboxDirectory), entry.name, "request.json"), 64 * 1024), entry.name);
+        if (!record) { result.skipped++; continue; }
+        jobs++;
+        const marker = newMarker(`photon_${entry.name}`);
+        const report = await inspectStatus(`/reports/report_${marker.job_id}`, deadline);
+        const status = await inspectStatus(`/ingest/${marker.job_id}`, deadline);
+        // Both independent lookups must explicitly confirm absence before any new POST.
+        const reportError = object(report?.body?.error);
+        const jobError = object(status?.body?.error);
+        const absent = report?.status === 404 && reportError?.message === "Report not found"
+          && status?.status === 404 && jobError?.code === "MEDIA_UNAVAILABLE"
+          && jobError.stage === "retrieve_post" && jobError.retryable === false && jobError.message === "Job not found";
+        if (!absent || settings.resumeUnstarted !== true || !settings.resolveConversation) { result.unresolved++; continue; }
+        const space = await withinRecoveryDeadline(() => settings.resolveConversation!(record), deadline);
+        if (space.id !== record.conversation_id || scheduled.has(entry.name) || await privatePathExists(path) || queued >= 32) { result.skipped++; continue; }
+        if (enqueue(record, entry.name, space)) result.resumed++; else result.skipped++;
+      } catch { result.unresolved++; }
+    }
+    return result;
+  }
+
+  return {
+    enqueue,
+    recover(settings: RecoveryOptions): Promise<RecoverySummary> {
+      recovery ??= recoverSaved(settings);
+      return recovery;
     },
     idle(): Promise<void> { return pending; },
   };

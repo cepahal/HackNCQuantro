@@ -1,12 +1,24 @@
 """Media-tool startup checks need no downloads, database, or provider calls."""
 
 import os
+from pathlib import Path
 from unittest.mock import Mock, call
 
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.services.shared import runtime
+
+
+@pytest.fixture(autouse=True)
+def working_executables(monkeypatch):
+    def version(command, **kwargs):
+        name = Path(command[0]).stem
+        return runtime.subprocess.CompletedProcess(command, 0, f"{name} version test\n".encode())
+
+    run = Mock(side_effect=version)
+    monkeypatch.setattr(runtime.subprocess, "run", run)
+    return run
 
 
 @pytest.fixture(autouse=True)
@@ -104,4 +116,45 @@ def test_media_preflight_fails_before_tiger_connection(monkeypatch):
         pass
 
     preflight.assert_called_once()
+    connect.assert_not_called()
+
+
+@pytest.mark.parametrize("tool", ["ffmpeg", "ffprobe"])
+@pytest.mark.parametrize("failure", ["os_error", "timeout", "nonzero", "wrong_program"])
+def test_present_but_unusable_tool_fails_before_accepting_work(monkeypatch, tool, failure):
+    monkeypatch.setattr(runtime.shutil, "which", lambda name: f"/tools/{name}")
+
+    def version(command, **kwargs):
+        name = Path(command[0]).stem
+        assert command[1:] == ["-version"]
+        assert kwargs["timeout"] == 5
+        assert kwargs["stdin"] == runtime.subprocess.DEVNULL
+        assert kwargs["stderr"] == runtime.subprocess.DEVNULL
+        if name == tool:
+            if failure == "os_error":
+                raise OSError("private directory and credential details")
+            if failure == "timeout":
+                raise runtime.subprocess.TimeoutExpired(command, 5)
+            if failure == "nonzero":
+                return runtime.subprocess.CompletedProcess(command, 1, b"private details")
+            return runtime.subprocess.CompletedProcess(command, 0, b"another program version 1")
+        return runtime.subprocess.CompletedProcess(command, 0, f"{name} version test\n".encode())
+
+    monkeypatch.setattr(runtime.subprocess, "run", version)
+    with pytest.raises(RuntimeError) as caught:
+        runtime.configure_media_tools()
+    assert tool in str(caught.value)
+    assert "restart" in str(caught.value)
+    assert "private" not in str(caught.value)
+
+
+def test_media_preflight_checks_executability_before_tiger_connection(monkeypatch):
+    from backend import main
+
+    monkeypatch.setattr(runtime.shutil, "which", lambda name: f"/tools/{name}")
+    monkeypatch.setattr(runtime.subprocess, "run", Mock(side_effect=OSError("private OS detail")))
+    connect = Mock(side_effect=AssertionError("Database must not be contacted"))
+    monkeypatch.setattr(main.TigerStore, "from_env", connect)
+    with pytest.raises(RuntimeError, match="ffmpeg"), TestClient(main.app):
+        pass
     connect.assert_not_called()

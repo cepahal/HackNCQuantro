@@ -42,3 +42,11 @@ test("public sharing is optional and requires its file to remain inside the data
   assert.equal(basename(config.publicReportsFile!), "public-reports.json");
   assert.equal(config.reportBaseUrl, "https://quantro.example");
 });
+
+test("restart reconciliation is read-only unless the operator explicitly resumes saved iMessage requests", () => {
+  const cloudEnv = { ...env, SPECTRUM_PROJECT_ID: "test-id", SPECTRUM_PROJECT_SECRET: "test-secret" };
+  assert.equal(readConfig(env, []).resumeSaved, false);
+  assert.equal(readConfig(cloudEnv, ["--imessage"]).resumeSaved, false);
+  assert.equal(readConfig(cloudEnv, ["--imessage", "--resume-saved"]).resumeSaved, true);
+  assert.throws(() => readConfig(env, ["--resume-saved"]));
+});

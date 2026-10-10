@@ -12,11 +12,9 @@ and a messaging failure becomes a delivery warning rather than undoing the save.
 """
 
 import logging
-import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, TypeVar
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ..external_apis.build_search_queries import build_search_queries
 from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
@@ -27,6 +25,10 @@ from ..shared.contracts import validate_contract_result
 from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.post_identity import ensure_distinct_source
+from ..shared.post_identity import normalized_post_url as _normalized_post_url
+from ..shared.post_identity import post_identities as _post_identities
+from ..shared.post_identity import post_identity as _post_identity
 from ..shared.types import (
     Alignment,
     AnalysisResult,
@@ -37,7 +39,6 @@ from ..shared.types import (
     JobCompletionResult,
     MediaFeatures,
     Post,
-    PublicPost,
     ReportV2,
     parse_stage_output,
 )
@@ -142,63 +143,6 @@ def _candidate_label(candidate: dict[str, Any], index: int) -> str:
     return candidate_id if isinstance(candidate_id, str) and candidate_id else f"#{index}"
 
 
-def _normalized_post_url(value: str) -> str:
-    try:
-        url = urlsplit(value)
-        host = (url.hostname or "").lower()
-        port = url.port
-        if port is not None and (url.scheme.lower(), port) not in {("http", 80), ("https", 443)}:
-            host = f"{host}:{port}"
-        return urlunsplit((url.scheme.lower(), host, url.path.rstrip("/") or "/", urlencode(sorted(parse_qsl(url.query))), ""))
-    except (TypeError, ValueError):
-        return value
-
-
-def _post_identity(value: str) -> str:
-    """Identify known platform posts independently of share links and tracking."""
-    normalized = _normalized_post_url(value)
-    try:
-        url = urlsplit(value)
-        host = (url.hostname or "").lower().rstrip(".")
-        if (url.scheme not in {"http", "https"} or url.username is not None or url.password is not None
-                or (url.port is not None and (url.scheme, url.port) not in {("http", 80), ("https", 443)})):
-            return normalized
-        if host in {"instagram.com", "www.instagram.com", "m.instagram.com"}:
-            match = re.fullmatch(r"/(?:reel|reels|p|tv)/([A-Za-z0-9_-]+)/?", url.path)
-            if match:
-                return f"instagram:{match[1]}"
-        if host in {"youtu.be", "www.youtu.be"}:
-            match = re.fullmatch(r"/([A-Za-z0-9_-]+)/?", url.path)
-            if match:
-                return f"youtube:{match[1]}"
-        if host in {"tiktok.com", "www.tiktok.com", "m.tiktok.com"}:
-            match = re.fullmatch(r"/@[^/]+/video/(\d+)/?", url.path)
-            if match:
-                return f"tiktok:{match[1]}"
-        if host in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}:
-            if url.path.rstrip("/") == "/watch":
-                videos = [item for key, item in parse_qsl(url.query) if key == "v"]
-                if len(videos) == 1 and re.fullmatch(r"[A-Za-z0-9_-]+", videos[0]):
-                    return f"youtube:{videos[0]}"
-            match = re.fullmatch(r"/(?:shorts|embed|live)/([A-Za-z0-9_-]+)/?", url.path)
-            if match:
-                return f"youtube:{match[1]}"
-    except (TypeError, ValueError):
-        pass
-    return normalized
-
-
-def _post_identities(post: PublicPost) -> set[str]:
-    identities = {_post_identity(post.post_url)}
-    # Retrieval retains the original share URL in post_url; its provider-resolved
-    # webpage URL is provenance. Only concrete platform post IDs count here.
-    for source in post.retrieval.metadata_source_urls:
-        identity = _post_identity(source)
-        if identity.startswith(("instagram:", "youtube:", "tiktok:")) and source.lower().startswith(("http://", "https://")):
-            identities.add(identity)
-    return identities
-
-
 def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures, submitted_identities: set[str]) -> _AssessedSource:
     raw_post = _call(Stage.RETRIEVE_CANDIDATE_MEDIA, retrieve_candidate_media, candidate)
     post = parse_stage_output(Post, raw_post, Stage.RETRIEVE_CANDIDATE_MEDIA)
@@ -270,11 +214,7 @@ def run_analysis(
             if existing_report is None:
                 raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
             report = parse_stage_output(ReportV2, existing_report, Stage.BUILD_REPORT)
-            if report.source is not None and _post_identities(report.submitted.post) & _post_identities(report.source.post):
-                raise QuantroError(
-                    ErrorCode.PROCESSING_FAILED, Stage.BUILD_REPORT,
-                    "The saved report identifies the submitted post as its own source. Run a new analysis job.",
-                )
+            ensure_distinct_source(report.submitted.post, report.source.post if report.source else None, Stage.BUILD_REPORT)
             return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, []), _ContractStage.RUN_ANALYSIS, json_native=False)
 
         _call(Stage.RETRIEVE_POST, run_ingest, job_id, url, store=store)
@@ -428,6 +368,7 @@ def _complete_and_deliver(
     report = parse_stage_output(ReportV2, saved_report, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
     if report.job_id != job_id:
         raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
+    ensure_distinct_source(report.submitted.post, report.source.post if report.source else None, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
 
     delivery, delivery_warning = deliver_summary_after_save(
         job_id,

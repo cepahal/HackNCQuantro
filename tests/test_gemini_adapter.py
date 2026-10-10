@@ -66,6 +66,28 @@ def test_transient_failure_recovers_before_returning(sleep):
     sleep.assert_called_once_with(2)
 
 
+def test_single_attempt_override_never_retries_transient_failure(sleep):
+    client = Mock()
+    client.models.generate_content.side_effect = ProviderFailure(503)
+
+    with pytest.raises(QuantroError, match="HTTP 503"):
+        gemini.generate_json(client, "test-model", "evidence", {}, STAGE, max_attempts=1)
+
+    client.models.generate_content.assert_called_once()
+    sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("attempts", [0, 4, True, 1.5, "1"])
+def test_attempt_override_cannot_disable_or_expand_bound(sleep, attempts):
+    client = Mock()
+
+    with pytest.raises(ValueError, match="integer from 1 to 3"):
+        gemini.generate_json(client, "test-model", "evidence", {}, STAGE, max_attempts=attempts)
+
+    client.models.generate_content.assert_not_called()
+    sleep.assert_not_called()
+
+
 @pytest.mark.parametrize("failure,diagnostic", [
     (ProviderFailure(429), "HTTP 429"),
     (ProviderFailure(500), "HTTP 500"),

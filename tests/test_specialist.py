@@ -175,7 +175,11 @@ def test_empty_context_does_not_call_provider(clip, monkeypatch):
 def test_comparison_provider_boundary(clip, context, comparison, monkeypatch):
     client = Mock()
     monkeypatch.setattr(c, 'client_and_model', lambda stage: (client, 'test-model'))
-    monkeypatch.setattr(c, 'generate_json', lambda *args: {**comparison, 'caption_evidence_basis': 'direct_transcript'})
+    generate = Mock(side_effect=[
+        {**comparison, 'caption_evidence_basis': 'direct_transcript'},
+        {'relation': 'contradicts', 'evidence': comparison['findings'][0]['evidence']},
+    ])
+    monkeypatch.setattr(c, 'generate_json', generate)
     result = c.compare_context_and_caption(clip, context, 'Cancel it')
     assert result['context_assessment'] == 'material_context_missing'
     client.close.assert_called_once()

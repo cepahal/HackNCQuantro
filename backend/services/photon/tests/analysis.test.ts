@@ -30,7 +30,7 @@ test("URL intake calls the real analysis route after a durable marker and preser
     const marker = JSON.parse(await readFile(join(path, `${event}.json`), "utf8"));
     assert.equal(marker.state, "pending");
     calls.push({ url: String(url), body: JSON.parse(String(options?.body)) });
-    return Response.json({ job_id: `photon_${event}`, report_id: `report_photon_${event}`, delivery_status: "accepted" });
+    return Response.json({ job_id: `photon_${event}`, report_id: `report_photon_${event}`, outcome: "matched", delivery_status: "accepted" });
   }) as typeof fetch });
   dispatcher.enqueue(record, event, channel.space);
   await dispatcher.idle();
@@ -59,7 +59,7 @@ test("analysis errors are acknowledged safely and never automatically retried", 
 test("successful analysis with failed delivery preserves completion", async (t) => {
   const path = await directory(t); const channel = chat();
   const dispatcher = createAnalysisDispatcher({ directory: path, backendPort: 8000, request: (async () => Response.json({
-    job_id: `photon_${event}`, report_id: `report_photon_${event}`, delivery_status: "failed",
+    job_id: `photon_${event}`, report_id: `report_photon_${event}`, outcome: "matched", delivery_status: "failed",
   })) as typeof fetch });
   dispatcher.enqueue(record, event, channel.space); await dispatcher.idle();
   assert.match(channel.sent[0] ?? "", /report remains saved/);
@@ -85,6 +85,7 @@ for (const [httpStatus, code, stage] of [
   test(`structured HTTP ${httpStatus} failure is persisted and never retried or mislabeled uncertain`, async (t) => {
     const path = await directory(t); const channel = chat(); let posts = 0;
     const dispatcher = createAnalysisDispatcher({ directory: path, backendPort: 8000, request: (async (_url, options) => {
+      if (options?.method === "GET") return Response.json({}, { status: 404 });
       assert.equal(options?.method, "POST");
       posts++;
       return Response.json({ error: { code, stage, retryable: false,
@@ -153,7 +154,7 @@ test("a dropped response reconciles a failed Tiger job and retains safe failure 
   assert.equal(calls.filter((call) => call.startsWith("GET ")).length, 2);
 });
 
-for (const kind of ["unknown-error", "invalid-json", "wrong-job", "wrong-report", "null-retryable", "array-delivery-status"] as const) {
+for (const kind of ["unknown-error", "invalid-json", "wrong-job", "wrong-report", "null-retryable", "array-delivery-status", "missing-outcome", "wrong-outcome"] as const) {
   test(`${kind} remains uncertain when read-only reconciliation cannot confirm a result`, async (t) => {
     const path = await directory(t); const channel = chat(); let posts = 0; let reads = 0;
     const dispatcher = createAnalysisDispatcher({ directory: path, backendPort: 8000, request: (async (_url, options) => {
@@ -164,6 +165,7 @@ for (const kind of ["unknown-error", "invalid-json", "wrong-job", "wrong-report"
       if (kind === "null-retryable") return Response.json({ error: { code: "PROCESSING_FAILED", stage: "retrieve_post", retryable: null } }, { status: 500 });
       return Response.json({ job_id: kind === "wrong-job" ? "other" : `photon_${event}`,
         report_id: kind === "wrong-report" ? "report_other" : `report_photon_${event}`,
+        outcome: kind === "missing-outcome" ? undefined : kind === "wrong-outcome" ? "complete" : "matched",
         delivery_status: kind === "array-delivery-status" ? ["accepted"] : "accepted" });
     }) as typeof fetch });
     dispatcher.enqueue(record, event, channel.space); await dispatcher.idle();
