@@ -1,4 +1,5 @@
 """Bounded Exa web discovery; results remain unverified candidate pages."""
+import logging
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
@@ -7,12 +8,15 @@ import httpx
 from ..shared.errors import QuantroError, Stage
 from .retrieve_post import _validate_url
 
+logger = logging.getLogger(__name__)
+
 
 class ExaSearch:
     def __init__(self, api_key: str, *, client=None):
         if not api_key.strip():
+            logger.error('EXA_API_KEY is required when SEARCH_PROVIDER=exa.')
             raise QuantroError('SEARCH_FAILED', Stage.SEARCH_CANDIDATES,
-                               'EXA_API_KEY is required when SEARCH_PROVIDER=exa.')
+                               'The source search is not configured on the server.')
         self._key = api_key
         self._client = client or httpx.Client(timeout=20, follow_redirects=False)
         self.warnings = []
@@ -96,7 +100,8 @@ class ExaSearch:
         def recording_priority(url):
             try:
                 _, platform = _validate_url(url)
-                return 0 if platform != "direct_image" and not urlsplit(url).path.lower().endswith((".jpg", ".jpeg")) else 1
+                is_image = platform == "direct" and urlsplit(url).path.lower().endswith((".jpg", ".jpeg"))
+                return 1 if is_image else 0
             except QuantroError:
                 return 1
         order.sort(key=recording_priority)

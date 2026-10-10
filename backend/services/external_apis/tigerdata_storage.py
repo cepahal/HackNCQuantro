@@ -14,15 +14,25 @@ import logging
 import os
 import re
 import stat
+import threading
 from pathlib import Path
 from typing import Protocol, cast
 
+from ..shared.settings import load_environment
 from ..shared.types import Post
 
-ROOT = Path(__file__).resolve().parents[3]
 MAX_MEDIA_BYTES = 100_000_000
 logger = logging.getLogger(__name__)
 _MEDIA_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
+_SHA256 = re.compile(r"[a-f0-9]{64}")
+_MEDIA_INFO = (
+    "SELECT mime_type, octet_length(media_bytes), sha256 "
+    "FROM quantro_retrieval.posts WHERE media_id = %s"
+)
+_MEDIA_SLICE = (
+    "SELECT substring(media_bytes FROM %s::integer FOR %s::integer) "
+    "FROM quantro_retrieval.posts WHERE media_id = %s AND sha256 = %s"
+)
 _HOST = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?\.?\Z")
 _INSERT = (
     "INSERT INTO quantro_retrieval.posts "
@@ -88,21 +98,12 @@ class SearchCursor(Cursor, Protocol):
 
 
 def _environment() -> dict[str, str]:
-    """Read local settings without changing the process's environment or other keys."""
+    """Process settings; local env files fill only unset keys, once per process."""
     try:
-        dotenv = importlib.import_module("dotenv")
-        values: dict[str, str] = {}
-        for filename in ("backend/.env", ".env", ".env.local"):
-            parsed = dotenv.dotenv_values(ROOT / filename, interpolate=False)
-            values.update(
-                (key, value)
-                for key, value in parsed.items()
-                if isinstance(key, str) and isinstance(value, str)
-            )
-        values.update(os.environ)
-        return values
+        load_environment()
     except (ImportError, OSError):
         raise StorageError("Could not read Tiger Data environment settings.") from None
+    return dict(os.environ)
 
 
 def _validate_dsn(parameters: dict[str, str], values: dict[str, str]) -> None:
@@ -139,6 +140,7 @@ class TigerDataPostStore:
             raise StorageError("Tiger Data storage requires autocommit disabled.")
         self._connection: Connection | None = connection
         self._owns_connection = owned_connection
+        self._read_lock = threading.Lock()
 
     @classmethod
     def from_env(cls) -> TigerDataPostStore:
@@ -317,47 +319,68 @@ class TigerDataPostStore:
                         type(error).__name__,
                     )
 
-    def read_media(self, media_id: str) -> tuple[str, bytes, str] | None:
-        """Read stored media by its opaque ID, never by a filesystem path."""
+    def read_media_info(self, media_id: str) -> tuple[str, int, str] | None:
+        """(mime_type, size, sha256) of stored media by opaque ID; never reads the bytes."""
+        row = self._read_media_row(media_id, _MEDIA_INFO, (media_id,))
+        if row is None:
+            return None
+        mime, size, digest = row
+        if (
+            mime not in ("image/jpeg", "video/mp4")
+            or not isinstance(size, int)
+            or isinstance(size, bool)
+            or not 0 < size <= MAX_MEDIA_BYTES
+            or not isinstance(digest, str)
+            or _SHA256.fullmatch(digest) is None
+        ):
+            raise StorageError("The stored media is invalid.")
+        return cast(str, mime), size, digest
+
+    def read_media_slice(self, media_id: str, digest: str, start: int, length: int) -> bytes:
+        """Bytes [start, start + length) of the media whose content hash is still digest."""
+        if (
+            not isinstance(digest, str)
+            or _SHA256.fullmatch(digest) is None
+            or not 0 <= start < MAX_MEDIA_BYTES
+            or not 0 < length <= MAX_MEDIA_BYTES
+        ):
+            raise StorageError("The media range is invalid.")
+        row = self._read_media_row(media_id, _MEDIA_SLICE, (start + 1, length, media_id, digest))
+        data = row[0] if row is not None else None
+        if not isinstance(data, (bytes, memoryview)) or len(data) != length:
+            raise StorageError("The stored media changed while it was read.")
+        return bytes(data)
+
+    def _read_media_row(
+        self, media_id: str, query: str, parameters: tuple[object, ...]
+    ) -> tuple[object, ...] | None:
+        """One read-only row; the lock keeps execute, fetch and rollback together
+        when request threads share this store's connection."""
         if not isinstance(media_id, str) or not _MEDIA_ID.fullmatch(media_id):
             raise StorageError("The media identifier is invalid.")
         connection = self._connection
         if connection is None:
             raise StorageError("The Tiger Data connection is closed.")
         cursor: Cursor | None = None
-        try:
-            cursor = connection.cursor()
-            cursor.execute(
-                "SELECT mime_type, media_bytes, sha256 FROM quantro_retrieval.posts "
-                "WHERE media_id = %s",
-                (media_id,),
-            )
-            row = cursor.fetchone()
-            connection.rollback()
-            if row is None:
-                return None
-            mime, data, digest = row
-            if (
-                mime not in ("image/jpeg", "video/mp4")
-                or not isinstance(data, (bytes, memoryview))
-                or not 0 < len(data) <= MAX_MEDIA_BYTES
-                or not isinstance(digest, str)
-                or re.fullmatch(r"[a-f0-9]{64}", digest) is None
-            ):
-                raise StorageError("The stored media is invalid.")
-            return cast(str, mime), bytes(data), digest
-        except Exception:  # noqa: BLE001 - redact database diagnostics
+        with self._read_lock:
             try:
+                cursor = connection.cursor()
+                cursor.execute(query, parameters)
+                row = cursor.fetchone()
                 connection.rollback()
-            except Exception as error:  # noqa: BLE001 - preserve the safe read failure
-                logger.warning("Media read rollback failed (%s)", type(error).__name__)
-            raise StorageError("Tiger Data could not read the stored media.") from None
-        finally:
-            if cursor is not None:
+                return row
+            except Exception:  # noqa: BLE001 - redact database diagnostics
                 try:
-                    cursor.close()
-                except Exception as error:  # noqa: BLE001 - preserve the safe read result
-                    logger.warning("Media cursor close failed (%s)", type(error).__name__)
+                    connection.rollback()
+                except Exception as error:  # noqa: BLE001 - preserve the safe read failure
+                    logger.warning("Media read rollback failed (%s)", type(error).__name__)
+                raise StorageError("Tiger Data could not read the stored media.") from None
+            finally:
+                if cursor is not None:
+                    try:
+                        cursor.close()
+                    except Exception as error:  # noqa: BLE001 - preserve the safe read result
+                        logger.warning("Media cursor close failed (%s)", type(error).__name__)
 
     def close(self) -> None:
         """Release only a connection opened or explicitly owned by this store."""

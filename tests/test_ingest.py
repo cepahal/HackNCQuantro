@@ -101,18 +101,51 @@ def test_media_unavailable_returns_404_and_marks_job_failed(client, store, monke
     assert job["post_json"] is None and job["features_json"] is None
 
 
-@pytest.mark.parametrize("code", ["INVALID_URL", "UNSUPPORTED_PLATFORM"])
-def test_bad_input_urls_return_400(client, store, monkeypatch, code):
-    def fail(url):
-        raise RetrievalError(code, "Provide a valid public post URL.", status_code=400)
+@pytest.mark.parametrize("url,code", [
+    ("ftp://nope", "INVALID_URL"),
+    ("https://127.0.0.1/video.mp4", "INVALID_URL"),
+    ("https://example.com/article", "UNSUPPORTED_PLATFORM"),
+])
+def test_bad_input_urls_return_400_before_any_job_row(client, store, monkeypatch, url, code):
+    monkeypatch.setattr(ingest_module, "retrieve_post", lambda url: pytest.fail("retrieval must not run"))
+    monkeypatch.setattr(store, "upsert_job", lambda *args, **kwargs: pytest.fail("no job row for a rejected URL"))
 
-    monkeypatch.setattr(ingest_module, "retrieve_post", fail)
-
-    response = client.post("/ingest/job_3", json={"url": "ftp://nope"})
+    response = client.post("/ingest/job_3", json={"url": url})
 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == code
-    assert store.get_job("job_3")["status"] == "failed"
+    assert store.get_job("job_3") is None
+
+
+def test_ingest_never_overwrites_a_completed_job(client, store, monkeypatch):
+    store.upsert_job("job_done", "https://www.youtube.com/watch?v=original", "completed")
+    monkeypatch.setattr(ingest_module, "retrieve_post", lambda url: pytest.fail("retrieval must not run"))
+
+    other = client.post("/ingest/job_done", json={"url": "https://www.youtube.com/watch?v=other"})
+    same = client.post("/ingest/job_done", json={"url": "https://www.youtube.com/watch?v=original"})
+
+    assert other.status_code == same.status_code == 409
+    assert other.json()["error"]["code"] == "PROCESSING_FAILED"
+    assert set(same.json()["error"]) == {"code", "stage", "message", "retryable"}
+    job = store.get_job("job_done")
+    assert (job["url"], job["status"]) == ("https://www.youtube.com/watch?v=original", "completed")
+
+
+def test_ingest_rejects_a_job_id_already_used_for_another_url(client, store, monkeypatch):
+    store.upsert_job("job_failed", "https://www.youtube.com/watch?v=first", "failed", "MEDIA_UNAVAILABLE", "retrieve_post")
+    monkeypatch.setattr(ingest_module, "retrieve_post", lambda url: pytest.fail("retrieval must not run"))
+
+    response = client.post("/ingest/job_failed", json={"url": "https://www.youtube.com/watch?v=second"})
+
+    assert response.status_code == 409
+    assert store.get_job("job_failed")["url"] == "https://www.youtube.com/watch?v=first"
+
+
+def test_ingest_rejects_unknown_fields(client, store, upstream):
+    response = client.post("/ingest/job_x", json={"url": "https://www.youtube.com/watch?v=x", "extra": 1})
+    assert response.status_code == 422
+    assert set(response.json()["error"]) == {"code", "stage", "message", "retryable"}
+    assert "url" not in upstream
 
 
 def test_transcription_failure_returns_502_and_marks_job_failed(client, store, monkeypatch, upstream):

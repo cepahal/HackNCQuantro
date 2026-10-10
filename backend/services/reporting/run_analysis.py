@@ -17,12 +17,11 @@ from collections.abc import Callable, Sequence
 from ..pipeline.artifacts import artifact_scope
 from dataclasses import dataclass
 from typing import Any, TypeVar
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ..external_apis.build_search_queries import build_search_queries
 from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
-from ..external_apis.search_candidates import search_candidates
-from ..pipeline.run_ingest import EXTRACTION_OPTIONS, ingest_post_and_features
+from ..external_apis.search_candidates import check_search_settings, search_candidates
+from ..pipeline.run_ingest import EXTRACTION_OPTIONS, _normalized_post_url, check_job_identity, ingest_post_and_features
 from ..processing.preprocessing import extract_media_features
 from ..shared.contracts import validate_contract_result
 from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
@@ -144,18 +143,6 @@ def _candidate_label(candidate: dict[str, Any], index: int) -> str:
     return candidate_id if isinstance(candidate_id, str) and candidate_id else f"#{index}"
 
 
-def _normalized_post_url(value: str) -> str:
-    try:
-        url = urlsplit(value)
-        host = (url.hostname or "").lower()
-        port = url.port
-        if port is not None and (url.scheme.lower(), port) not in {("http", 80), ("https", 443)}:
-            host = f"{host}:{port}"
-        return urlunsplit((url.scheme.lower(), host, url.path.rstrip("/") or "/", urlencode(sorted(parse_qsl(url.query))), ""))
-    except (TypeError, ValueError):
-        return value
-
-
 def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures) -> _AssessedSource:
     raw_post = _call(Stage.RETRIEVE_CANDIDATE_MEDIA, retrieve_candidate_media, candidate)
     post = parse_stage_output(Post, raw_post, Stage.RETRIEVE_CANDIDATE_MEDIA)
@@ -218,22 +205,25 @@ def run_analysis(
             existing_report = store.get_report(report_id_for_job(job_id)) if existing_job and existing_job["status"] == "completed" else None
         except Exception as exc:
             raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
+        check_job_identity(existing_job, url)
         if existing_job and existing_job["status"] == "completed":
-            if _normalized_post_url(existing_job["url"]) != _normalized_post_url(url):
-                raise QuantroError(ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_POST, "This job ID already belongs to a different submitted URL.")
             if existing_report is None:
                 raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
             report = parse_stage_output(ReportV2, existing_report, Stage.BUILD_REPORT)
             return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, []), _ContractStage.RUN_ANALYSIS, json_native=False)
 
+        # Configuration errors must surface before the download and transcription.
+        check_search_settings()
         ingested = ingest_post_and_features(job_id, url, store=store)
         try:
             return validate_contract_result(_ReturnModel, _analyze(job_id, ingested.post, ingested.features, conversation_id, store, provider, tracker), _ContractStage.RUN_ANALYSIS, json_native=False)
         except QuantroError as error:
             _mark_failed(store, job_id, error)
             raise
+    except QuantroError:
+        raise
     except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
-        raise _normalize_contract_exception(_ContractStage.RUN_ANALYSIS, exc) from None
+        raise _normalize_contract_exception(_ContractStage.RUN_ANALYSIS, exc) from exc
 
 
 def _analyze(

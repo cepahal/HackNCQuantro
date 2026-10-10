@@ -21,25 +21,47 @@ DSN = "postgresql://example_user:private_password@db.example.com:5432/quantro"
 MODULE = "backend.services.external_apis.tigerdata_storage"
 
 
-def test_read_media_uses_bound_id_and_ends_transaction() -> None:
+def test_read_media_info_never_selects_bytes_and_ends_transaction() -> None:
     connection = FakeConnection()
     digest = hashlib.sha256(JPEG).hexdigest()
-    connection.returned = ("image/jpeg", memoryview(JPEG), digest)
-    result = TigerDataPostStore(connection).read_media("media_123")
-    assert result == ("image/jpeg", JPEG, digest)
-    assert connection.calls[0][1] == ("media_123",)
+    connection.returned = ("image/jpeg", len(JPEG), digest)
+    result = TigerDataPostStore(connection).read_media_info("media_123")
+    assert result == ("image/jpeg", len(JPEG), digest)
+    query, parameters = connection.calls[0]
+    assert parameters == ("media_123",)
+    assert "octet_length(media_bytes)" in query and "SELECT mime_type, media_bytes" not in query
     assert connection.rollbacks == 1 and connection.commits == 0
     assert connection.cursors[0].closed
+
+
+def test_read_media_slice_binds_one_based_offset_and_digest() -> None:
+    connection = FakeConnection()
+    digest = hashlib.sha256(JPEG).hexdigest()
+    connection.returned = (memoryview(JPEG[2:6]),)
+    store = TigerDataPostStore(connection)
+    assert store.read_media_slice("media_123", digest, 2, 4) == JPEG[2:6]
+    query, parameters = connection.calls[0]
+    assert "substring(media_bytes" in query
+    assert parameters == (3, 4, "media_123", digest)
+    assert connection.rollbacks == 1
+    connection.returned = (JPEG[2:5],)
+    with pytest.raises(StorageError, match="changed"):
+        store.read_media_slice("media_123", digest, 2, 4)
+    with pytest.raises(StorageError, match="invalid"):
+        store.read_media_slice("media_123", "not-a-digest", 0, 4)
 
 
 def test_read_media_missing_and_failure_are_safe() -> None:
     connection = FakeConnection()
     connection.returned = None
     store = TigerDataPostStore(connection)
-    assert store.read_media("missing") is None
+    assert store.read_media_info("missing") is None
+    connection.returned = ("text/html", 10, hashlib.sha256(JPEG).hexdigest())
+    with pytest.raises(StorageError, match="invalid"):
+        store.read_media_info("media_123")
     connection.failure.add("execute")
     with pytest.raises(StorageError, match="could not read") as error:
-        store.read_media("media_123")
+        store.read_media_info("media_123")
     assert "private_password" not in str(error.value)
     assert connection.commits == 0
 
@@ -435,24 +457,9 @@ def test_closed_owned_store_cannot_save(tmp_path: Path) -> None:
         store.save_post(post_file(tmp_path))
 
 
-def test_environment_precedence_and_other_keys_are_preserved_without_mutation(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    (tmp_path / ".env").write_text(
-        "TIGERDATA_DSN=file-base\nOTHER_KEY=base\nFILE_ONLY=kept\n", encoding="utf-8"
-    )
-    (tmp_path / ".env.local").write_text(
-        "TIGERDATA_DSN=file-local\nOTHER_KEY=local\nLOCAL_ONLY=kept\n", encoding="utf-8"
-    )
-    monkeypatch.setattr(MODULE + ".ROOT", tmp_path)
+def test_environment_is_the_process_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TIGERDATA_DSN", "process-value")
-    monkeypatch.delenv("OTHER_KEY", raising=False)
-    monkeypatch.delenv("FILE_ONLY", raising=False)
-    monkeypatch.delenv("LOCAL_ONLY", raising=False)
-    before = dict(os.environ)
     module = importlib.import_module(MODULE)
     values = module._environment()
     assert values["TIGERDATA_DSN"] == "process-value"
-    assert values["OTHER_KEY"] == "local"
-    assert values["FILE_ONLY"] == values["LOCAL_ONLY"] == "kept"
-    assert dict(os.environ) == before
+    assert values == dict(os.environ)

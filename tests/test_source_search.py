@@ -444,22 +444,6 @@ def test_candidate_requires_complete_contract(candidate: Candidate, field: str) 
     assert caught.value.to_dict()["stage"] == "retrieve_candidate_media"
 
 
-def test_backend_environment_is_loaded_without_overriding_root(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    (tmp_path / "backend").mkdir()
-    (tmp_path / "backend" / ".env").write_text(
-        "TIGERDATA_DSN=backend\nBACKEND_ONLY=kept\n"
-    )
-    (tmp_path / ".env").write_text("TIGERDATA_DSN=root\n")
-    module = importlib.import_module("backend.services.external_apis.tigerdata_storage")
-    monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.delenv("TIGERDATA_DSN", raising=False)
-    monkeypatch.delenv("BACKEND_ONLY", raising=False)
-    values = module._environment()
-    assert values["TIGERDATA_DSN"] == "root" and values["BACKEND_ONLY"] == "kept"
-
-
 def test_three_stage_handoff_preserves_contract_and_stored_link(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

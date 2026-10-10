@@ -137,10 +137,9 @@ Before the first default call:
 
 The existing root `.env` is tracked. Keep credentials in `.env.local` or the process
 environment; an ignore rule does not remove a file already tracked by Git. Preserve
-teammates' existing settings. Settings load from `backend/.env`, then root `.env`,
-then `.env.local`, then
-the process environment, with later values overriding earlier values. Loading does
-not mutate the process environment or change other settings. `DATABASE_URL` is a
+teammates' existing settings. Settings precedence, highest first: process
+environment, `.secrets/.env`, `.env.local`, root `.env`, `backend/.env`. Files are
+loaded once per process and only fill keys the process does not already set. `DATABASE_URL` is a
 fallback only when `TIGERDATA_DSN` is absent; an explicitly blank primary value fails
 configuration rather than selecting a different database.
 

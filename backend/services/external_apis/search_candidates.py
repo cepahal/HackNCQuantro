@@ -21,6 +21,24 @@ from .exa_search import ExaSearch
 
 logger = logging.getLogger(__name__)
 
+_SEARCH_NOT_CONFIGURED = "The source search is not configured on the server."
+
+
+def _configured_provider(settings: dict[str, str]) -> str:
+    name = (settings.get("SEARCH_PROVIDER") or "tiger").strip().lower()
+    if name not in ("exa", "tiger"):
+        logger.error("SEARCH_PROVIDER must be exa or tiger (got %r).", name[:32])
+        raise QuantroError("SEARCH_FAILED", Stage.SEARCH_CANDIDATES, _SEARCH_NOT_CONFIGURED)
+    if name == "exa" and not settings.get("EXA_API_KEY", "").strip():
+        logger.error("EXA_API_KEY is required when SEARCH_PROVIDER=exa.")
+        raise QuantroError("SEARCH_FAILED", Stage.SEARCH_CANDIDATES, _SEARCH_NOT_CONFIGURED)
+    return name
+
+
+def check_search_settings() -> None:
+    """Raise the same configuration error search_candidates would, without searching."""
+    _configured_provider(_environment())
+
 
 class CandidateSearch(Protocol):
     def find_posts(
@@ -92,13 +110,10 @@ def search_candidates(
         try:
             if provider is None:
                 settings = _environment()
-                name = (settings.get("SEARCH_PROVIDER") or "tiger").strip().lower()
-                if name == "exa":
+                if _configured_provider(settings) == "exa":
                     owned = ExaSearch(settings.get("EXA_API_KEY", ""))
-                elif name == "tiger":
-                    owned = TigerDataPostStore.from_env()
                 else:
-                    raise QuantroError("SEARCH_FAILED", Stage.SEARCH_CANDIDATES, "SEARCH_PROVIDER must be exa or tiger.")
+                    owned = TigerDataPostStore.from_env()
                 provider = owned
             rows = provider.find_posts(normalized, limit)
             if not isinstance(rows, list) or len(rows) > limit:

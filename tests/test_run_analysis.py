@@ -377,7 +377,7 @@ def test_completed_job_reuses_saved_report_without_new_analysis(client, store, u
 def test_completed_job_cannot_be_reused_for_a_different_url(client, store, upstream):
     assert _run(client, "job_url_identity").status_code == 200
     response = client.post("/analyze/job_url_identity/run", json={"url": "https://example.com/another.mp4"})
-    assert response.status_code == 500
+    assert response.status_code == 409
     assert response.json()["error"]["code"] == "PROCESSING_FAILED"
     assert store.get_job("job_url_identity")["status"] == "completed"
 

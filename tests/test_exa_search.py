@@ -108,6 +108,34 @@ def test_recording_links_survive_candidate_limit_without_claiming_verification()
     provider.close()
 
 
+def test_direct_images_rank_after_direct_recordings_and_pages():
+    def handler(request):
+        return httpx.Response(200, json={"results": [
+            {"url": "https://example.org/still.jpg"},
+            {"url": "https://example.org/article"},
+            {"url": "https://example.org/clip.mp4"},
+        ]})
+    provider = ExaSearch("test", client=client(handler))
+    result = search_candidates(["speech"], 3, provider=provider)
+    assert [item["url"] for item in result["candidates"]] == [
+        "https://example.org/clip.mp4", "https://example.org/still.jpg", "https://example.org/article"]
+    provider.close()
+
+
+def test_missing_exa_key_is_logged_not_named_to_clients(monkeypatch, caplog):
+    import importlib
+    import logging
+    module = importlib.import_module('backend.services.external_apis.search_candidates')
+    monkeypatch.setattr(module, '_environment', lambda: {'SEARCH_PROVIDER': 'exa', 'EXA_API_KEY': ' '})
+    with caplog.at_level(logging.ERROR), pytest.raises(QuantroError) as caught:
+        search_candidates(['words'], 5)
+    assert caught.value.code.value == 'SEARCH_FAILED'
+    assert 'EXA_API_KEY' not in caught.value.message and 'EXA_API_KEY' in caplog.text
+    with pytest.raises(QuantroError) as direct:
+        ExaSearch('')
+    assert 'EXA_API_KEY' not in direct.value.message
+
+
 def test_video_host_search_adds_recordings_within_four_call_budget():
     import json
     requests = []

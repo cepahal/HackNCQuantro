@@ -1,20 +1,27 @@
 """End-to-end smoke test over the real HTTP layer and a real Postgres.
 
-Run against a local Postgres or Tiger Data:
-    TIGER_DATABASE_URL=postgresql://localhost:5432/quantro_smoke pytest tests/test_smoke_e2e.py -v
+Opt-in only, because it writes rows to whichever database is configured. Run against
+a local Postgres or Tiger Data:
+    QUANTRO_SMOKE=1 TIGER_DATABASE_URL=postgresql://localhost:5432/quantro_smoke pytest tests/test_smoke_e2e.py -v
 
 All eight upstream functions are replaced with contract-shaped fixtures, so no
 network, model or messaging calls are made. Rows written by the test are deleted
 afterwards.
 """
 
+import os
+
+import pytest
+
+# Decided before importing backend.main, which loads the local settings vault.
+if os.getenv("QUANTRO_SMOKE") != "1":
+    pytest.skip("Set QUANTRO_SMOKE=1 to run the real-database smoke test.", allow_module_level=True)
+
 import copy
 import json
-import os
 import uuid
 
 import httpx
-import pytest
 from sqlalchemy import func, select
 
 import backend.services.pipeline.run_ingest as ingest_module

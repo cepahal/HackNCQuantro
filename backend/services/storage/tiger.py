@@ -16,7 +16,6 @@ import re
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import (
@@ -338,11 +337,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     show_command.add_argument("job_id")
     args = parser.parse_args(argv)
 
-    from dotenv import load_dotenv
+    from ..shared.settings import load_environment
 
-    load_dotenv(Path(__file__).resolve().parents[3] / ".secrets" / ".env")
-    load_dotenv(Path(__file__).resolve().parents[3] / ".env.local")
-    load_dotenv()
+    load_environment()
     try:
         store = TigerStore.from_env()
     except TigerConfigError as error:

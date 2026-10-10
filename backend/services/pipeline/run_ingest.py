@@ -1,17 +1,19 @@
 """First end-to-end slice: URL -> Post -> MediaFeatures -> Tiger Data.
 
 Runs retrieve_post and extract_media_features, validates both outputs against
-the v2 contract, and persists them for the later pipeline stages. Failed submitted
-retrievals retain a failed job row so clients can inspect the failing stage.
+the v2 contract, and persists them for the later pipeline stages. Rejected URLs and
+job ID conflicts fail before any job row is written; failed retrievals of accepted
+URLs retain a failed job row so clients can inspect the failing stage.
 """
 
 from ..pipeline.artifacts import artifact_scope
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from ..external_apis.retrieve_post import RetrievalError, retrieve_post
+from ..external_apis.retrieve_post import RetrievalError, _validate_url, retrieve_post
 from ..processing.preprocessing import extract_media_features
-from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
+from ..shared.errors import ErrorCode, JobConflictError, QuantroError, Stage, normalize_exception
 from ..shared.types import (
     IngestResult,
     MediaFeatures,
@@ -53,6 +55,24 @@ def _storage_error(stage: Stage) -> QuantroError:
     return QuantroError(code=ErrorCode.STORAGE_FAILED, stage=stage, retryable=True)
 
 
+def _normalized_post_url(value: str) -> str:
+    try:
+        url = urlsplit(value)
+        host = (url.hostname or "").lower()
+        port = url.port
+        if port is not None and (url.scheme.lower(), port) not in {("http", 80), ("https", 443)}:
+            host = f"{host}:{port}"
+        return urlunsplit((url.scheme.lower(), host, url.path.rstrip("/") or "/", urlencode(sorted(parse_qsl(url.query))), ""))
+    except (TypeError, ValueError):
+        return value
+
+
+def check_job_identity(existing_job: dict | None, url: str) -> None:
+    """A job ID belongs to the first URL submitted with it."""
+    if existing_job is not None and _normalized_post_url(existing_job["url"]) != _normalized_post_url(url):
+        raise JobConflictError("This job ID already belongs to a different submitted URL.")
+
+
 @dataclass(frozen=True)
 class IngestOutput:
     result: IngestResult
@@ -73,6 +93,17 @@ def run_ingest(job_id: str, url: str, *, store: TigerStore | None = None) -> Ing
 
 def ingest_post_and_features(job_id: str, url: str, *, store: TigerStore) -> IngestOutput:
     """run_ingest, also returning the validated models for the rest of run_analysis."""
+    try:
+        _validate_url(url)
+    except Exception as exc:
+        raise _retrieval_error(exc) from exc
+    try:
+        existing_job = store.get_job(job_id)
+    except Exception as exc:
+        raise _storage_error(Stage.RETRIEVE_POST) from exc
+    check_job_identity(existing_job, url)
+    if existing_job is not None and existing_job["status"] == "completed":
+        raise JobConflictError("This job has already completed; submit the link with a new job ID.")
     try:
         store.upsert_job(job_id, url, "running")
     except Exception as exc:
