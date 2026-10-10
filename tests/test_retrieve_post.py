@@ -1,11 +1,15 @@
 """Post retrieval contract, downloaded-file handoff and failure cleanup (no network)."""
 
 import base64
+import importlib
 import json
+import os
 import struct
 import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -68,14 +72,9 @@ class SaveStore:
         self.closed = True
 
 
-@pytest.fixture(autouse=True)
-def default_store(monkeypatch: pytest.MonkeyPatch) -> SaveStore:
-    store = SaveStore()
-    monkeypatch.setattr(
-        "backend.services.external_apis.retrieve_post.SnowflakePostStore.from_env",
-        lambda: store,
-    )
-    return store
+@pytest.fixture
+def recording_store() -> SaveStore:
+    return SaveStore()
 
 
 class Downloader:
@@ -599,20 +598,20 @@ JPEG = base64.b64decode(
 )
 
 
-def test_success_is_persisted_once_before_return(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
+def test_explicit_storage_is_persisted_once_before_return(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, recording_store: SaveStore
 ) -> None:
     install(monkeypatch)
 
-    post = retrieve_post(POST_URL, output_dir=tmp_path)
+    post = retrieve_post(POST_URL, output_dir=tmp_path, storage=recording_store)
 
-    assert default_store.posts == [post]
-    assert default_store.media_bytes == [MP4]
-    assert default_store.closed
+    assert recording_store.posts == [post]
+    assert recording_store.media_bytes == [MP4]
+    assert not recording_store.closed
 
 
 def test_injected_store_receives_exact_downstream_post(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     install(monkeypatch)
     supplied_store = SaveStore()
@@ -624,7 +623,7 @@ def test_injected_store_receives_exact_downstream_post(
     assert supplied_store.media_bytes == [
         Path(post["media"]["local_path"]).read_bytes()
     ]
-    assert default_store.posts == []
+    assert not supplied_store.closed
 
 
 def test_storage_failure_returns_safe_error_and_removes_media(
@@ -642,18 +641,19 @@ def test_storage_failure_returns_safe_error_and_removes_media(
     assert secret not in str(caught.value)
     assert secret not in json.dumps(caught.value.as_dict())
     assert len(store.posts) == 1
+    assert not store.closed
     assert_clean(tmp_path)
 
 
 def test_invalid_download_never_reaches_storage(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, recording_store: SaveStore
 ) -> None:
     install(monkeypatch, content=b"This is an error page.")
 
     with pytest.raises(RetrievalError):
-        retrieve_post(POST_URL, output_dir=tmp_path)
+        retrieve_post(POST_URL, output_dir=tmp_path, storage=recording_store)
 
-    assert default_store.posts == []
+    assert recording_store.posts == []
     assert_clean(tmp_path)
 
 
@@ -661,13 +661,13 @@ def test_invalid_download_never_reaches_storage(
 def test_direct_jpeg_download_is_persisted_and_ready_for_extraction(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    default_store: SaveStore,
+    recording_store: SaveStore,
     extension: str,
 ) -> None:
     downloader = install(monkeypatch, metadata={}, content=JPEG)
     url = f"https://cdn.example.com/photo.{extension}?v=1"
 
-    post = retrieve_post(url, output_dir=tmp_path)
+    post = retrieve_post(url, output_dir=tmp_path, storage=recording_store)
 
     assert post["post_url"] == url
     assert post["platform"] == "direct"
@@ -678,8 +678,8 @@ def test_direct_jpeg_download_is_persisted_and_ready_for_extraction(
     path = Path(post["media"]["local_path"])
     assert path.suffix == ".jpg"
     assert path.read_bytes() == JPEG
-    assert default_store.posts == [post]
-    assert default_store.media_bytes == [JPEG]
+    assert recording_store.posts == [post]
+    assert recording_store.media_bytes == [JPEG]
     args, options = downloader.calls[0]
     assert args[args.index("--direct-image") + 1] == url
     assert args[args.index("--output-file") + 1] == str(path)
@@ -691,27 +691,31 @@ def test_direct_jpeg_download_is_persisted_and_ready_for_extraction(
 def test_non_jpeg_image_download_fails_before_storage(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    default_store: SaveStore,
+    recording_store: SaveStore,
     content: bytes,
 ) -> None:
     install(monkeypatch, metadata={}, content=content)
 
     with pytest.raises(RetrievalError):
-        retrieve_post("https://cdn.example.com/photo.jpg", output_dir=tmp_path)
+        retrieve_post(
+            "https://cdn.example.com/photo.jpg",
+            output_dir=tmp_path,
+            storage=recording_store,
+        )
 
-    assert default_store.posts == []
+    assert recording_store.posts == []
     assert_clean(tmp_path)
 
 
 def test_nonexistent_post_errors_without_persistence(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, recording_store: SaveStore
 ) -> None:
     install(
         monkeypatch, returncode=1, write_file=False, stderr="HTTP Error 404: Not Found"
     )
 
     with pytest.raises(RetrievalError) as caught:
-        retrieve_post(POST_URL, output_dir=tmp_path)
+        retrieve_post(POST_URL, output_dir=tmp_path, storage=recording_store)
 
     assert caught.value.stage == "retrieve_post"
     assert set(caught.value.as_dict()["error"]) == {
@@ -720,7 +724,7 @@ def test_nonexistent_post_errors_without_persistence(
         "message",
         "retryable",
     }
-    assert default_store.posts == []
+    assert recording_store.posts == []
     assert_clean(tmp_path)
 
 
@@ -753,7 +757,7 @@ def complete_metadata() -> dict[str, object]:
 
 
 def test_enriched_contract_maps_available_provider_metadata(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     metadata = complete_metadata()
     install(monkeypatch, metadata=metadata)
@@ -806,7 +810,6 @@ def test_enriched_contract_maps_available_provider_metadata(
     assert provenance["unavailable_fields"] == []
     assert provenance["warnings"] == []
     assert json.loads(json.dumps(post, allow_nan=False)) == post
-    assert default_store.posts == [post]
 
 
 def test_missing_optional_metadata_has_complete_nullable_objects_and_provenance(
@@ -1028,25 +1031,29 @@ def test_direct_jpeg_reports_http_provider_and_no_audio(
 
 
 def test_trigger_success_returns_persisted_downstream_post(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, recording_store: SaveStore
 ) -> None:
     install(monkeypatch)
 
-    result = retrieval.handle_post_trigger(POST_URL, output_dir=tmp_path)
+    result = retrieval.handle_post_trigger(
+        POST_URL, output_dir=tmp_path, storage=recording_store
+    )
 
     assert "error" not in result
-    assert result == default_store.posts[0]
-    assert Path(default_store.posts[0]["media"]["local_path"]).read_bytes() == MP4
+    assert result == recording_store.posts[0]
+    assert Path(recording_store.posts[0]["media"]["local_path"]).read_bytes() == MP4
 
 
 def test_trigger_failure_returns_shared_error_envelope(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, recording_store: SaveStore
 ) -> None:
     install(
         monkeypatch, returncode=1, write_file=False, stderr="private provider error"
     )
 
-    result = retrieval.handle_post_trigger(POST_URL, output_dir=tmp_path)
+    result = retrieval.handle_post_trigger(
+        POST_URL, output_dir=tmp_path, storage=recording_store
+    )
 
     assert set(result) == {"error"}
     assert result == {
@@ -1058,7 +1065,7 @@ def test_trigger_failure_returns_shared_error_envelope(
         }
     }
     assert "private provider error" not in json.dumps(result)
-    assert default_store.posts == []
+    assert recording_store.posts == []
     assert_clean(tmp_path)
 
 
@@ -1094,16 +1101,16 @@ def test_malformed_optional_text_is_null_and_never_blocks_media(
 def test_malformed_provider_content_type_is_typed_failure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    default_store: SaveStore,
+    recording_store: SaveStore,
     kind: object,
 ) -> None:
     install(monkeypatch, metadata={"id": "abcdefghijk", "_type": kind})
 
     with pytest.raises(RetrievalError) as caught:
-        retrieve_post(POST_URL, output_dir=tmp_path)
+        retrieve_post(POST_URL, output_dir=tmp_path, storage=recording_store)
 
     assert caught.value.code == "MEDIA_UNAVAILABLE"
-    assert default_store.posts == []
+    assert recording_store.posts == []
     assert_clean(tmp_path)
 
 
@@ -1114,7 +1121,7 @@ def test_malformed_provider_content_type_is_typed_failure(
 def test_cleanup_failure_preserves_the_original_safe_retrieval_error(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    default_store: SaveStore,
+    recording_store: SaveStore,
     timeout: bool,
     expected_code: str,
 ) -> None:
@@ -1136,38 +1143,94 @@ def test_cleanup_failure_preserves_the_original_safe_retrieval_error(
     )
 
     with pytest.raises(RetrievalError) as caught:
-        retrieve_post(POST_URL, output_dir=tmp_path)
+        retrieve_post(POST_URL, output_dir=tmp_path, storage=recording_store)
 
     assert caught.value.code == expected_code
     assert caught.value.stage == "retrieve_post"
     assert len(cleanup_attempts) == 1
     assert cleanup_attempts[0].parent == tmp_path
-    assert default_store.posts == []
+    assert recording_store.posts == []
     serialized = json.dumps(caught.value.as_dict())
     assert "private provider details" not in serialized
     assert "private-local-path" not in serialized
 
 
-def test_owned_store_close_failure_preserves_the_committed_success(
+@pytest.mark.parametrize(
+    ("url", "content"),
+    [(POST_URL, MP4), ("https://cdn.example.com/photo.jpg", JPEG)],
+)
+def test_default_download_returns_post_without_snowflake_settings_or_imports(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, url: str, content: bytes
+) -> None:
+    for name in tuple(os.environ):
+        if name.startswith("SNOWFLAKE_"):
+            monkeypatch.delenv(name)
+    original_import_module = importlib.import_module
+
+    def without_storage(name: str, package: str | None = None) -> ModuleType:
+        assert not name.startswith("snowflake")
+        assert name != "backend.services.external_apis.snowflake_storage"
+        assert name != "dotenv"
+        return original_import_module(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", without_storage)
+    install(monkeypatch, content=content)
+
+    post = retrieve_post(url, output_dir=tmp_path)
+
+    assert post["post_url"] == url
+    assert post["post_id"]
+    assert Path(post["media"]["local_path"]).read_bytes() == content
+    assert json.loads(json.dumps(post, allow_nan=False)) == post
+
+
+def test_retrieval_module_import_is_independent_of_snowflake_and_dotenv() -> None:
+    script = """
+import importlib.abc
+import sys
+
+class NoStorage(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if (fullname.startswith('snowflake')
+                or fullname == 'backend.services.external_apis.snowflake_storage'
+                or fullname == 'dotenv'):
+            raise AssertionError('Standalone retrieval imported storage dependencies')
+        return None
+
+sys.meta_path.insert(0, NoStorage())
+from backend.services.external_apis.retrieve_post import retrieve_post
+assert callable(retrieve_post)
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_trigger_with_explicit_storage_failure_returns_safe_error_and_cleans_media(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     install(monkeypatch)
+    secret = "private-storage-connection-details"
+    store = SaveStore(failure=RuntimeError(secret))
 
-    class CloseFailureStore(SaveStore):
-        def close(self) -> None:
-            self.closed = True
-            raise RuntimeError("private-snowflake-cleanup-details")
+    result = retrieval.handle_post_trigger(POST_URL, output_dir=tmp_path, storage=store)
 
-    store = CloseFailureStore()
-    monkeypatch.setattr(
-        "backend.services.external_apis.retrieve_post.SnowflakePostStore.from_env",
-        lambda: store,
-    )
-
-    post = retrieve_post(POST_URL, output_dir=tmp_path)
-
-    assert store.closed
-    assert store.posts == [post]
-    assert store.media_bytes == [MP4]
-    assert Path(post["media"]["local_path"]).read_bytes() == MP4
-    assert "private-snowflake-cleanup-details" not in json.dumps(post)
+    assert result == {
+        "error": {
+            "code": "STORAGE_FAILED",
+            "stage": "retrieve_post",
+            "message": "The retrieved media could not be saved to the supplied storage.",
+            "retryable": False,
+        }
+    }
+    assert secret not in json.dumps(result)
+    assert len(store.posts) == 1
+    assert not store.closed
+    assert_clean(tmp_path)

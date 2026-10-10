@@ -3,10 +3,16 @@
 ## Submitted-post retrieval module
 
 `backend/services/external_apis/retrieve_post.py` accepts a URL trigger, downloads
-one supported JPG/MP4, uploads it through `snowflake_storage.py`, appends metadata,
-and returns the team's Post/MediaAsset contract. Storage succeeds before the next
-pipeline stage receives a Post. `handle_post_trigger(url)` returns the shared error
-envelope on failure. No HTTP routes or other stages are implemented by this module.
+one supported JPG/MP4, and returns the team's complete v2 Post/MediaAsset contract
+for extraction. Default `retrieve_post(url)` runs without Snowflake imports,
+configuration or credentials. `handle_post_trigger(url)` returns the shared error
+envelope on failure.
+
+Persistence is optional: pass `storage=store` explicitly to save the downloaded
+media and metadata before returning success. `snowflake_storage.py` provides that
+helper; its caller creates and closes the connection. A supplied store's failure
+returns `STORAGE_FAILED` and cleans up local media. No HTTP routes or other stages
+are implemented by this module.
 See [retrieve_post handoff](retrieve_post.md) for configuration and exact fields.
 
 ## High-level flow

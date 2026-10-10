@@ -21,7 +21,6 @@ from backend.services.external_apis.post_contract import (
     MediaAsset,
     Post,
 )
-from backend.services.external_apis.snowflake_storage import SnowflakePostStore
 
 logger = logging.getLogger(__name__)
 
@@ -395,7 +394,7 @@ def retrieve_post(
     timeout_seconds: float = 120,
     max_bytes: int = 100_000_000,
 ) -> Post:
-    """Retrieve JPG/MP4, save media and metadata to Snowflake, then return the team Post.
+    """Retrieve JPG/MP4 and return the team Post; optionally persist with a supplied store.
 
     Call from a worker thread in async code. Caller owns successful files until all
     downstream consumers finish. Failure removes this call's isolated workspace.
@@ -485,26 +484,14 @@ def retrieve_post(
                 "MEDIA_UNAVAILABLE", "The submitted video could not be retrieved."
             )
         post = _result(url, platform, workspace, completed.stdout, max_bytes)
-        owned_store: SnowflakePostStore | None = None
-        try:
-            if storage is None:
-                owned_store = SnowflakePostStore.from_env()
-                storage = owned_store
-            storage.save_post(post)
-        except Exception:  # noqa: BLE001 - redact connector diagnostics at the persistence boundary
-            raise RetrievalError(
-                "STORAGE_FAILED", "The retrieved media could not be saved to Snowflake."
-            ) from None
-        finally:
-            if owned_store is not None:
-                try:
-                    owned_store.close()
-                except Exception as close_error:  # noqa: BLE001 - preserve the committed success and redact diagnostics
-                    # A connection cleanup error must not erase a successful upload/commit.
-                    logger.warning(
-                        "Snowflake connection cleanup failed (%s)",
-                        type(close_error).__name__,
-                    )
+        if storage is not None:
+            try:
+                storage.save_post(post)
+            except Exception:  # noqa: BLE001 - redact connector diagnostics at the persistence boundary
+                raise RetrievalError(
+                    "STORAGE_FAILED",
+                    "The retrieved media could not be saved to the supplied storage.",
+                ) from None
 
     except Exception as exc:
         if (

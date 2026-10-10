@@ -1,10 +1,21 @@
 # retrieve_post handoff
 
-This modular stage handles a submitted URL, downloads JPG/MP4, saves the actual media
-and Post metadata to Snowflake, then returns the **version 2 Post from HackNC (4).pdf,
-pages 3-5**. Pass its complete `media` object directly to the extraction stage.
+This modular stage handles a submitted URL, downloads JPG/MP4, then returns the
+**version 2 Post from HackNC (4).pdf, pages 3-5**. Pass its complete `media` object
+directly to the extraction stage. Default retrieval needs an accessible media URL
+and the downloader dependency; it does not load Snowflake or require credentials.
 
 Run from the repository root after `pip install -r backend/requirements.txt`:
+
+```python
+from backend.services.external_apis.retrieve_post import retrieve_post
+
+post = retrieve_post(url)
+features = extract_media_features(post["media"], options)
+```
+
+`url` is the submitted URL string. `extract_media_features` and `options` belong to
+the next pipeline stage. For a trigger that returns the shared error envelope:
 
 ```python
 from backend.services.external_apis.retrieve_post import handle_post_trigger
@@ -102,12 +113,23 @@ with dotted paths. It excludes the intentionally null `candidate_id` and private
 metadata uses `warnings: []`. These fields describe available retrieval evidence,
 not the truth of a caption or the reliability of an account.
 
-## Snowflake setup
+## Optional Snowflake persistence
 
-The checked-in repository initially contained no Snowflake implementation; its
-README describes planned Cortex Search. This module adds the required media save
-helper using the official Python connector. Snowflake's SQL REST API does not support
-file `PUT`; the connector performs the actual stage upload.
+Pass an explicit store only when persistence is wanted. The caller creates and closes
+that store; retrieval never provisions an account, loads cloud settings, or connects
+to Snowflake by default. The optional helper uses the official Python connector to
+upload actual bytes with file `PUT` and save the complete Post as metadata.
+
+```python
+from backend.services.external_apis.retrieve_post import retrieve_post
+from backend.services.external_apis.snowflake_storage import SnowflakePostStore
+
+store = SnowflakePostStore.from_env()
+try:
+    post = retrieve_post(url, storage=store)
+finally:
+    store.close()
+```
 
 Merge Snowflake values from `.env.example` into the existing ignored root `.env`.
 Set `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, and either `SNOWFLAKE_PASSWORD` or
@@ -127,10 +149,10 @@ Run `backend/services/external_apis/snowflake_schema.sql` once in the chosen sch
 Custom stage/table names are supported through the example variables; create those
 objects in the schema explicitly if changing the names. This module runs no DDL.
 
-The helper verifies PUT's uploaded status and byte counts, then inserts metadata
-and commits. A success Post is returned only after this completes. A failed upload
-or metadata insert produces `STORAGE_FAILED`, with no pipeline success. A file that
-uploads before an insert fails can remain orphaned on the stage; no unrelated stage
+When an explicit store is supplied, the helper verifies PUT's uploaded status and
+byte counts, then inserts metadata and commits before retrieval returns success.
+A failed upload or metadata insert produces `STORAGE_FAILED` and local cleanup.
+A file that uploads before an insert fails can remain orphaned on the stage; no unrelated stage
 files are removed. `playback_url` stays null because private staged media is not a
 public player URL. Snowflake rows include the stage path, media ID, byte count and
 SHA-256 digest. The metadata VARIANT preserves the entire v2 Post, including profile
@@ -149,9 +171,10 @@ access policies. The current downloader uses no browser cookie and does not requ
 `RETRIEVAL_PROVIDER_API_KEY`; it uses yt-dlp for video and direct HTTP for JPEG.
 
 The download subprocess deadline defaults to 120 seconds (`timeout_seconds=`).
-Snowflake has separate login/network/query timeouts. The retrieval byte cap defaults
-to 100 MB (`max_bytes=`); persisted media remains capped at 100 MB. Direct JPEG streams
-enforce the byte cap while writing. Video advertised length and final size are checked;
+An explicitly supplied Snowflake store has separate login/network/query timeouts.
+The retrieval byte cap defaults to 100 MB (`max_bytes=`); optional Snowflake storage
+accepts files up to 100 MB. Direct JPEG streams enforce the byte cap while writing.
+Video advertised length and final size are checked;
 unknown-length videos can temporarily exceed the accepted cap, so production workers
 should use disk quotas.
 MP4 validation checks complete container boxes; the next extractor verifies decoding.
@@ -167,8 +190,9 @@ they are for extraction on the shared backend filesystem, not public media URLs.
 `python -m pytest tests/test_retrieve_post.py tests/test_retrieval_worker.py tests/test_snowflake_storage.py`
 
 Tests cover exact v2 Post/error contracts, nullable metadata and provenance,
-downstream handoff, JPEG/MP4, mandatory storage-before-success, preservation of all
-v2 metadata, Snowflake PUT result verification, safe failures, and cleanup.
+downstream handoff, JPEG/MP4, standalone retrieval, explicitly requested persistence,
+preservation of all v2 metadata, Snowflake PUT result verification, safe failures,
+and cleanup.
 No live Snowflake save is claimed until credentials and schema are configured.
 
 ## Change log
@@ -185,3 +209,10 @@ No live Snowflake save is claimed until credentials and schema are configured.
   settings remain intact. Verified 225 tests, Ruff lint/format, strict mypy and
   dependency consistency after the authentication change. Live authentication and
   persistence remain unverified because no credentials have been provided.
+- 2026-10-10: made `retrieve_post(url)` standalone by default: download and return the
+  complete v2 Post directly. Snowflake persistence runs only through an explicitly
+  supplied `storage` object, which the caller owns and closes. Verified 228 tests,
+  Ruff lint/format and strict mypy. Default calls downloaded a real 5,510,872-byte
+  MP4 and a real 6,412-byte JPG (128x128), returned JSON-native Posts and retained
+  usable local files without loading Snowflake. No credentials or Snowflake setup
+  are required for standalone retrieval.
