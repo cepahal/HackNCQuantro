@@ -439,3 +439,19 @@ def test_status_only_returns_safe_job_fields(client, store):
     assert response.json()["error"]["code"] == "SEARCH_FAILED"
     assert "url" not in response.json()
     assert client.get("/analyze/job_missing/status").status_code == 404
+
+
+def test_candidate_analysis_skips_unused_visual_calls(upstream, monkeypatch):
+    original = analysis_module.extract_media_features
+    options_seen = []
+    def extract(media, options):
+        options_seen.append(options)
+        return original(media, options)
+    monkeypatch.setattr(analysis_module, 'extract_media_features', extract)
+    assessed = analysis_module._assess_candidate(_candidate(1), analysis_module.MediaFeatures.model_validate(CLIP_FEATURES))
+    assert assessed.alignment.status == 'verified'
+    assert options_seen[0]['transcript_scope'] == 'full'
+    assert options_seen[0]['extract_frames'] is False
+    assert options_seen[0]['extract_visual_text'] is False
+    assert options_seen[0]['max_frames'] == 0
+    assert ingest_module.EXTRACTION_OPTIONS['extract_visual_text'] is True

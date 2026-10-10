@@ -12,6 +12,7 @@ and a messaging failure becomes a delivery warning rather than undoing the save.
 """
 
 import logging
+import time
 from collections.abc import Callable, Sequence
 from ..pipeline.artifacts import artifact_scope
 from dataclasses import dataclass
@@ -129,10 +130,13 @@ def deliver_summary_after_save(
 
 
 def _call(stage: Stage, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    started = time.monotonic()
     try:
         return function(*args, **kwargs)
     except Exception as exc:
         raise normalize_exception(stage, exc) from exc
+    finally:
+        logger.info("analysis_stage stage=%s seconds=%.3f", stage.value, time.monotonic() - started)
 
 
 def _candidate_label(candidate: dict[str, Any], index: int) -> str:
@@ -159,8 +163,9 @@ def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures) -
         Stage.EXTRACT_MEDIA_FEATURES,
         extract_media_features,
         post.media.model_dump(mode="json"),
-        dict(EXTRACTION_OPTIONS),
+        {**EXTRACTION_OPTIONS, "extract_frames": False, "extract_visual_text": False, "max_frames": 0},
     )
+    raw_features["warnings"].append("Candidate visual extraction was skipped; source verification uses transcript alignment only.")
     features = parse_stage_output(MediaFeatures, raw_features, Stage.EXTRACT_MEDIA_FEATURES)
     raw_alignment = _call(
         Stage.VERIFY_AND_ALIGN,
@@ -252,7 +257,7 @@ def _analyze(
     warnings.extend(queries.warnings)
 
     try:
-        raw_search = search_candidates(queries.queries, limit=SEARCH_LIMIT)
+        raw_search = _call(Stage.SEARCH_CANDIDATES, search_candidates, queries.queries, limit=SEARCH_LIMIT)
     except QuantroError:
         raise
     except Exception as exc:

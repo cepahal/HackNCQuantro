@@ -355,8 +355,8 @@ def _extract_media_features(media, options=None):
                 image_path = folder / f"frame_{index:04d}.jpg"
                 try:
                     _run([
-                        "ffmpeg", "-v", "error", "-y", "-protocol_whitelist", "file,pipe", "-i", str(path),
-                        "-ss", str(timestamp), "-frames:v", "1", "-vf", "scale='min(1280,iw)':-2", str(image_path),
+                        "ffmpeg", "-v", "error", "-y", "-protocol_whitelist", "file,pipe", "-ss", str(timestamp), "-i", str(path),
+                        "-frames:v", "1", "-vf", "scale='min(1280,iw)':-2", str(image_path),
                     ])
                     if not image_path.is_file() or not image_path.stat().st_size:
                         raise ExtractionError("PROCESSING_FAILED", "No frame was decoded.")

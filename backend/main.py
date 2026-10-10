@@ -16,6 +16,17 @@ if not __package__:
     sys.path.insert(0, str(_REPO_ROOT))
 
 import os
+import logging
+
+# Emit only our timing logs; do not enable verbose provider/HTTP logging.
+for _timing_module in ("backend.services.reporting.run_analysis", "backend.services.specialist.transcription"):
+    _timing_logger = logging.getLogger(_timing_module)
+    if not _timing_logger.handlers:
+        _handler = logging.StreamHandler()
+        _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        _timing_logger.addHandler(_handler)
+    _timing_logger.setLevel(logging.INFO)
+    _timing_logger.propagate = False
 from contextlib import asynccontextmanager
 from importlib import import_module
 

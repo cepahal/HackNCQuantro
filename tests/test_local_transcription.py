@@ -20,14 +20,16 @@ def test_provider_defaults_and_rejects_unknown(monkeypatch):
         t.provider()
 
 
-def test_local_provider_preserves_spoken_segments(monkeypatch):
+def test_local_provider_preserves_spoken_segments(monkeypatch, tmp_path):
+    path = tmp_path / "local.wav"
+    path.write_bytes(b"provider test")
     model = Mock()
     model.transcribe.return_value = (iter([
         SimpleNamespace(start=1.2, end=3.4, text=' Do not cancel it. '),
         SimpleNamespace(start=3.4, end=4.0, text=' '),
     ]), SimpleNamespace(language='en'))
     monkeypatch.setattr(t, '_model', lambda name: model)
-    result = t.transcribe('local.wav')
+    result = t.transcribe(path)
     assert result == {'language': 'en', 'sentences': [
         {'start_seconds': 1.2, 'end_seconds': 3.4, 'text': 'Do not cancel it.', 'words': []}]}
     assert model.transcribe.call_args.kwargs['condition_on_previous_text'] is False
@@ -67,14 +69,16 @@ def test_local_failure_does_not_fall_back_to_network(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('word_end, expected_count', [(2.0, 1), (1.2, 0)])
-def test_local_word_timing_preserved_or_discarded(monkeypatch, word_end, expected_count):
+def test_local_word_timing_preserved_or_discarded(monkeypatch, tmp_path, word_end, expected_count):
+    path = tmp_path / "local.wav"
+    path.write_bytes(str(word_end).encode())
     model = Mock()
     model.transcribe.return_value = (iter([SimpleNamespace(
         start=1.2, end=2.0, text=' Hello.',
         words=[SimpleNamespace(start=1.2, end=word_end, word=' Hello.')],
     )]), SimpleNamespace(language='en'))
     monkeypatch.setattr(t, '_model', lambda name: model)
-    words = t.transcribe('local.wav')['sentences'][0]['words']
+    words = t.transcribe(path)['sentences'][0]['words']
     assert len(words) == expected_count
     if words:
         assert words == [{'text': 'Hello.', 'start_seconds': 1.2, 'end_seconds': 2.0}]
@@ -99,3 +103,40 @@ def test_unreliable_optional_words_preserve_sentence_and_disclose_fallback(words
 def test_invalid_sentence_is_still_rejected():
     data={'language':'en','sentences':[{'text':'Keep it.', 'start_seconds':-1, 'end_seconds':2,'words':[]}]}
     with pytest.raises(ValueError):p._sentences(data,0,60,'source',1,warnings=[])
+
+
+def test_transcript_cache_uses_content_and_model_and_isolation(tmp_path, monkeypatch):
+    t._TRANSCRIPTS.clear()
+    calls = []
+    def decode(path, name):
+        calls.append(name)
+        return {'language': 'en', 'sentences': [{'text': 'Original'}]}
+    monkeypatch.setattr(t, '_transcribe_uncached', decode)
+    monkeypatch.setenv('WHISPER_MODEL', 'model-a')
+    a, b = tmp_path / 'a.wav', tmp_path / 'b.wav'
+    a.write_bytes(b'same audio')
+    b.write_bytes(b'same audio')
+    t.transcribe(a)['sentences'][0]['text'] = 'mutated'
+    assert t.transcribe(b)['sentences'][0]['text'] == 'Original'
+    assert calls == ['model-a']
+    b.write_bytes(b'changed audio')
+    t.transcribe(b)
+    monkeypatch.setenv('WHISPER_MODEL', 'model-b')
+    t.transcribe(b)
+    assert calls == ['model-a', 'model-a', 'model-b']
+    monkeypatch.setattr(t, '_CACHE_LIMIT', 2)
+    a.write_bytes(b'another')
+    t.transcribe(a)
+    assert len(t._TRANSCRIPTS) == 2
+    t._TRANSCRIPTS.clear()
+
+
+def test_failed_transcription_is_not_cached(tmp_path, monkeypatch):
+    path = tmp_path / 'failure.wav'
+    path.write_bytes(b'failed audio')
+    decode = Mock(side_effect=RuntimeError('failed'))
+    monkeypatch.setattr(t, '_transcribe_uncached', decode)
+    for _ in range(2):
+        with pytest.raises(RuntimeError):
+            t.transcribe(path)
+    assert decode.call_count == 2
