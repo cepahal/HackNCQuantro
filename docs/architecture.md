@@ -30,6 +30,18 @@ The Snowflake helper remains available for compatibility and is not the default.
 No HTTP routes or other stages are implemented by this module.
 See [retrieve_post handoff](retrieve_post.md) for configuration and exact fields.
 
+## Source discovery modules (v2 functions 3–5)
+
+`build_search_queries.py` derives bounded searches from MediaFeatures and the
+submitted Post. `search_candidates.py` searches the existing Tiger Data Post
+corpus through `TigerDataPostStore.find_posts`; a GIN index supports bound
+full-text queries over title, caption and author clues. Results retain actual
+query provenance and are unverified candidate sources, with normal empty results.
+`retrieve_candidate_media.py` reuses submitted-post downloading and commits the
+candidate relationship alongside its fresh Post and media bytes before success.
+No separate corpus or external web-search service is assumed. See
+[source-search setup and contracts](source_search.md).
+
 ## High-level flow
 
 USER

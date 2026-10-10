@@ -15,13 +15,13 @@ from typing import Any, Protocol
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from backend.services.external_apis.post_contract import (
+from .post_contract import (
     Author,
     Engagement,
     MediaAsset,
     Post,
 )
-from backend.services.external_apis.tigerdata_storage import TigerDataPostStore
+from .tigerdata_storage import TigerDataPostStore
 
 logger = logging.getLogger(__name__)
 

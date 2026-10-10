@@ -13,3 +13,13 @@ CREATE TABLE IF NOT EXISTS quantro_retrieval.posts (
     metadata JSONB NOT NULL CHECK (jsonb_typeof(metadata) = 'object'),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Existing databases: reapply this idempotent migration to add source search.
+-- The expression exactly matches the runtime query; no duplicate corpus is made.
+CREATE INDEX IF NOT EXISTS posts_search_idx ON quantro_retrieval.posts USING GIN (
+    to_tsvector('simple',
+        coalesce(metadata->>'title', '') || ' ' ||
+        coalesce(metadata->>'caption', '') || ' ' ||
+        coalesce(metadata #>> '{author,display_name}', '') || ' ' ||
+        coalesce(metadata #>> '{author,handle}', ''))
+);

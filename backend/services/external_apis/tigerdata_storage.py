@@ -17,7 +17,7 @@ import stat
 from pathlib import Path
 from typing import Protocol, cast
 
-from backend.services.external_apis.post_contract import Post
+from .post_contract import Post
 
 ROOT = Path(__file__).resolve().parents[3]
 MAX_MEDIA_BYTES = 100_000_000
@@ -29,6 +29,32 @@ _INSERT = (
     "(post_id, media_id, mime_type, sha256, size_bytes, media_bytes, metadata) "
     "VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb) RETURNING post_id"
 )
+_VECTOR = """to_tsvector('simple',
+    coalesce(p.metadata->>'title', '') || ' ' ||
+    coalesce(p.metadata->>'caption', '') || ' ' ||
+    coalesce(p.metadata #>> '{author,display_name}', '') || ' ' ||
+    coalesce(p.metadata #>> '{author,handle}', ''))"""
+_SEARCH = f"""
+WITH inputs AS (SELECT unnest(%s::text[]) AS query),
+matched AS MATERIALIZED (
+    SELECT p.post_id, p.metadata, i.query,
+           ts_rank_cd({_VECTOR}, websearch_to_tsquery('simple', i.query)) AS score
+    FROM quantro_retrieval.posts p CROSS JOIN inputs i
+    WHERE {_VECTOR} @@ websearch_to_tsquery('simple', i.query)
+), grouped AS (
+    SELECT metadata->>'post_url' AS url,
+           array_agg(DISTINCT query ORDER BY query) AS discovered,
+           max(score) AS score
+    FROM matched GROUP BY metadata->>'post_url'
+), representative AS (
+    SELECT DISTINCT ON (metadata->>'post_url')
+           metadata->>'post_url' AS url, metadata
+    FROM matched ORDER BY metadata->>'post_url', post_id DESC
+)
+SELECT r.metadata, g.discovered
+FROM grouped g JOIN representative r USING (url)
+ORDER BY g.score DESC, g.url LIMIT %s
+"""
 
 
 class StorageError(Exception):
@@ -57,12 +83,16 @@ class Connection(Protocol):
     def close(self) -> None: ...
 
 
+class SearchCursor(Cursor, Protocol):
+    def fetchall(self) -> list[tuple[object, object]]: ...
+
+
 def _environment() -> dict[str, str]:
     """Read local settings without changing the process's environment or other keys."""
     try:
         dotenv = importlib.import_module("dotenv")
         values: dict[str, str] = {}
-        for filename in (".env", ".env.local"):
+        for filename in ("backend/.env", ".env", ".env.local"):
             parsed = dotenv.dotenv_values(ROOT / filename, interpolate=False)
             values.update(
                 (key, value)
@@ -239,6 +269,52 @@ class TigerDataPostStore:
                     logger.warning(
                         "Tiger Data cursor close failed (%s)",
                         type(close_error).__name__,
+                    )
+
+    def find_posts(self, queries: list[str], limit: int) -> list[tuple[object, object]]:
+        """Search existing Post metadata with bound queries; never reads media bytes.
+
+        Use a dedicated idle connection. Both success and failure end the SELECT
+        transaction by rollback; this method never changes corpus records.
+        """
+        connection = self._connection
+        if connection is None:
+            raise StorageError("The Tiger Data connection is closed.")
+        cursor: SearchCursor | None = None
+        try:
+            if (
+                not isinstance(limit, int)
+                or isinstance(limit, bool)
+                or not 1 <= limit <= 50
+                or not isinstance(queries, list)
+                or not 1 <= len(queries) <= 20
+                or any(
+                    not isinstance(q, str) or not q.strip() or len(q) > 512
+                    for q in queries
+                )
+            ):
+                raise StorageError("Search parameters are invalid.")
+            cursor = cast(SearchCursor, connection.cursor())
+            cursor.execute(_SEARCH, (queries, limit))
+            rows = cursor.fetchall()
+            connection.rollback()
+            return rows
+        except Exception:  # noqa: BLE001 - database diagnostics can expose credentials
+            try:
+                connection.rollback()
+            except Exception as error:  # noqa: BLE001 - preserve the safe failure
+                logger.warning(
+                    "Tiger Data search rollback failed (%s)", type(error).__name__
+                )
+            raise StorageError("Tiger Data source search failed.") from None
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as error:  # noqa: BLE001 - preserve result and redact diagnostics
+                    logger.warning(
+                        "Tiger Data search cursor close failed (%s)",
+                        type(error).__name__,
                     )
 
     def close(self) -> None:
