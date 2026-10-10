@@ -48,7 +48,7 @@ export default function AlgorithmAnimation() {
           }, { duration: 0 }),
           ...fragmentOffsets.map(([x, y], index) =>
             animate(`.stage-fragment-${index}`, {
-              left: `calc(43% - 44px + ${x}px)`, top: `calc(25% + ${sourceOffset + y}px)`,
+              left: `calc(43% - 76px + ${x}px)`, top: `calc(25% + ${sourceOffset + y}px)`,
               scale: 0, opacity: 0,
             }, { duration: 0 }),
           ),
