@@ -4,6 +4,8 @@ Call from the backend. Generated frame files belong to the job and must be
 removed by job cleanup after reporting. No database credentials are needed.
 """
 
+import shutil
+from ..pipeline.artifacts import register_directory
 from ..shared.contracts import contract_input, validate_contract_result
 from ..shared.types import MediaFeatures as _ReturnModel
 from ..shared.errors import Stage as _ContractStage, normalize_exception as _normalize_contract_exception
@@ -272,6 +274,8 @@ def _extract_media_features(media, options=None):
     if needs_gemini:
         client, model = client_and_model(Stage.EXTRACT_MEDIA_FEATURES)
 
+    folder = None
+    completed = False
     try:
         if has_audio:
             languages = set()
@@ -328,6 +332,7 @@ def _extract_media_features(media, options=None):
         if make_frames:
             # Keep files available to function 6; pipeline owns cleanup.
             folder = Path(tempfile.mkdtemp(prefix="quantro_frames_"))
+            register_directory(folder)
             warnings.append("Frame timestamps are requested sample positions and may differ by a frame from decoded timestamps.")
             for index, timestamp in enumerate(_sample_times(frame_ranges, count), start=1):
                 frame_id = f"{media['media_id']}_frame_{index:04d}"
@@ -363,7 +368,10 @@ def _extract_media_features(media, options=None):
                         raise ExtractionError("PROCESSING_FAILED", "Visible-text extraction failed validation.") from None
         elif extract_frames or extract_text:
             warnings.append("No frames were sampled: no video stream or max_frames is zero.")
+        completed = True
         return result
     finally:
+        if folder is not None and (not completed or not result["frames"]):
+            shutil.rmtree(folder, ignore_errors=True)
         if client is not None:
             client.close()

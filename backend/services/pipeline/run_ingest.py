@@ -5,6 +5,7 @@ the v2 contract, and persists them for the later pipeline stages. Failed submitt
 retrievals retain a failed job row so clients can inspect the failing stage.
 """
 
+from ..pipeline.artifacts import artifact_scope
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -59,6 +60,7 @@ class IngestOutput:
     features: MediaFeatures
 
 
+@artifact_scope()
 def run_ingest(job_id: str, url: str, *, store: TigerStore | None = None) -> IngestResult:
     if store is None:
         owned_store = TigerStore.from_env()

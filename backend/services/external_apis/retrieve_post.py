@@ -15,6 +15,7 @@ from typing import Any, Protocol
 from urllib.parse import urlsplit
 from uuid import uuid4
 
+from ..pipeline.artifacts import register_directory
 from ..shared.contracts import contract_input, validate_contract_result
 from ..shared.errors import ErrorCode, QuantroError, Stage
 from ..shared.errors import Stage as _ContractStage
@@ -428,6 +429,7 @@ def retrieve_post(
         try:
             base.mkdir(parents=True, exist_ok=True)
             workspace = Path(tempfile.mkdtemp(prefix="quantro-post-", dir=base)).resolve()
+            register_directory(workspace)
             command = [
                 sys.executable,
                 "-m",

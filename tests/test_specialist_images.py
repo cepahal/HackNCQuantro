@@ -96,6 +96,8 @@ def test_video_ocr_provider_failure_is_an_error(image, monkeypatch, tmp_path):
     assert error.value.stage is Stage.EXTRACT_MEDIA_FEATURES
     client.close.assert_called_once()
 
+    assert not folder.exists()  # Failed OCR must not leak decoded frames.
+
 
 @pytest.mark.parametrize("response", [{}, {"text": 5}])
 def test_jpeg_ocr_invalid_output_is_a_safe_error(image, monkeypatch, response):

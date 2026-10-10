@@ -13,6 +13,7 @@ and a messaging failure becomes a delivery warning rather than undoing the save.
 
 import logging
 from collections.abc import Callable, Sequence
+from ..pipeline.artifacts import artifact_scope
 from dataclasses import dataclass
 from typing import Any, TypeVar
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -178,6 +179,7 @@ def _mark_failed(store: TigerStore, job_id: str, error: QuantroError) -> None:
         logger.warning("Could not record failure for job %s (%s)", job_id, type(exc).__name__)
 
 
+@artifact_scope()
 def run_analysis(
     job_id: str,
     url: str,
