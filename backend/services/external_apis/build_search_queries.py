@@ -3,9 +3,12 @@
 import re
 from typing import Any
 
-from ..reporting.errors import QuantroError, Stage
-from .post_contract import Post
-from .search_contract import Queries
+from ..shared.contracts import contract_input, validate_contract_result
+from ..shared.errors import QuantroError, Stage
+from ..shared.errors import Stage as _ContractStage
+from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.types import Post, Queries
+from ..shared.types import Queries as _ReturnModel
 
 _WORDS = re.compile(r"[^\W_]+(?:['’][^\W_]+)?", re.UNICODE)
 _STOP = {
@@ -62,66 +65,72 @@ def _phrase(text: object, *, minimum: int = 2) -> str | None:
 
 def build_search_queries(features: dict[str, Any], post: Post) -> Queries:
     """Use spoken phrases, OCR and post clues; captions remain unverified clues."""
+    # aligned with shared/types.py on 2026-10-10
+    features = contract_input(features)
+    post = contract_input(post)
     try:
-        if not isinstance(features, dict) or not isinstance(post, dict):
-            raise TypeError
-        if (
-            not isinstance(features["media_id"], str)
-            or not features["media_id"]
-            or features["media_id"] != post["media"]["media_id"]
-        ):
-            raise ValueError("Features must belong to the submitted post.")
-        transcript = features["transcript"]
-        if transcript["status"] not in ("complete", "partial", "unavailable"):
-            raise ValueError
-        sentences = transcript["sentences"]
-        visible = features["visual_text"]
-        if not isinstance(sentences, list) or not isinstance(visible, list):
-            raise TypeError
-        result: Queries = {"queries": [], "warnings": []}
-        seen: set[str] = set()
-
-        def append(phrase: str | None) -> None:
+        try:
+            if not isinstance(features, dict) or not isinstance(post, dict):
+                raise TypeError
             if (
-                phrase
-                and phrase.casefold() not in seen
-                and len(result["queries"]) < MAX_QUERIES
+                not isinstance(features["media_id"], str)
+                or not features["media_id"]
+                or features["media_id"] != post["media"]["media_id"]
             ):
-                result["queries"].append(phrase)
-                seen.add(phrase.casefold())
+                raise ValueError("Features must belong to the submitted post.")
+            transcript = features["transcript"]
+            if transcript["status"] not in ("complete", "partial", "unavailable"):
+                raise ValueError
+            sentences = transcript["sentences"]
+            visible = features["visual_text"]
+            if not isinstance(sentences, list) or not isinstance(visible, list):
+                raise TypeError
+            result: Queries = {"queries": [], "warnings": []}
+            seen: set[str] = set()
 
-        if transcript["status"] != "unavailable":
-            spoken = [_phrase(item["text"], minimum=4) for item in sentences[:500]]
-            for phrase in [p for p in spoken if p is not None][:4]:
-                append(phrase)
-        for item in visible[:3]:
-            append(_phrase(item["text"]))
-        title = post["title"]
-        if title is not None:
-            append(_phrase(title))
-        caption = post["caption"]
-        if caption is not None:
-            caption_phrase = _phrase(caption)
-            if caption_phrase:
-                # Preserve an explicit provenance warning even when the query cap is full.
+            def append(phrase: str | None) -> None:
+                if (
+                    phrase
+                    and phrase.casefold() not in seen
+                    and len(result["queries"]) < MAX_QUERIES
+                ):
+                    result["queries"].append(phrase)
+                    seen.add(phrase.casefold())
+
+            if transcript["status"] != "unavailable":
+                spoken = [_phrase(item["text"], minimum=4) for item in sentences[:500]]
+                for phrase in [p for p in spoken if p is not None][:4]:
+                    append(phrase)
+            for item in visible[:3]:
+                append(_phrase(item["text"]))
+            title = post["title"]
+            if title is not None:
+                append(_phrase(title))
+            caption = post["caption"]
+            if caption is not None:
+                caption_phrase = _phrase(caption)
+                if caption_phrase:
+                    # Preserve an explicit provenance warning even when the query cap is full.
+                    result["warnings"].append(
+                        "The submitted caption is an unverified search clue, not established fact."
+                    )
+                    append(caption_phrase)
+            if transcript["status"] != "complete":
                 result["warnings"].append(
-                    "The submitted caption is an unverified search clue, not established fact."
+                    "Transcript coverage is incomplete; queries use only available evidence."
                 )
-                append(caption_phrase)
-        if transcript["status"] != "complete":
-            result["warnings"].append(
-                "Transcript coverage is incomplete; queries use only available evidence."
-            )
-        if len(sentences) > 500 or len(visible) > 3:
-            result["warnings"].append(
-                "Search clues were bounded; not every sentence or OCR item was used."
-            )
-        if not result["queries"]:
-            result["warnings"].append("No distinctive searchable text was available.")
-        return result
-    except (KeyError, TypeError, ValueError, AttributeError):
-        raise QuantroError(
-            "PROCESSING_FAILED",
-            Stage.BUILD_SEARCH_QUERIES,
-            "Search clues do not match the submitted media contract.",
-        ) from None
+            if len(sentences) > 500 or len(visible) > 3:
+                result["warnings"].append(
+                    "Search clues were bounded; not every sentence or OCR item was used."
+                )
+            if not result["queries"]:
+                result["warnings"].append("No distinctive searchable text was available.")
+            return validate_contract_result(_ReturnModel, result, _ContractStage.BUILD_SEARCH_QUERIES, json_native=True)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise QuantroError(
+                "PROCESSING_FAILED",
+                Stage.BUILD_SEARCH_QUERIES,
+                "Search clues do not match the submitted media contract.",
+            ) from None
+    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+        raise _normalize_contract_exception(_ContractStage.BUILD_SEARCH_QUERIES, exc) from None

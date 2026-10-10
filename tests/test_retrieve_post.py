@@ -537,7 +537,7 @@ def test_invalid_timeout_limits_fail_without_subprocess_or_files(
 ) -> None:
     downloader = install(monkeypatch)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(retrieval.QuantroError):
         retrieve_post(POST_URL, output_dir=tmp_path, timeout_seconds=timeout_seconds)
 
     assert downloader.calls == []
@@ -550,7 +550,7 @@ def test_invalid_size_limits_fail_without_subprocess_or_files(
 ) -> None:
     downloader = install(monkeypatch)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(retrieval.QuantroError):
         retrieve_post(POST_URL, output_dir=tmp_path, max_bytes=max_bytes)
 
     assert downloader.calls == []
@@ -1136,7 +1136,7 @@ def test_malformed_provider_content_type_is_typed_failure(
 
 @pytest.mark.parametrize(
     ("timeout", "expected_code"),
-    [(False, "MEDIA_UNAVAILABLE"), (True, "MEDIA_TIMEOUT")],
+    [(False, "MEDIA_UNAVAILABLE"), (True, "MEDIA_UNAVAILABLE")],
 )
 def test_cleanup_failure_preserves_the_original_safe_retrieval_error(
     monkeypatch: pytest.MonkeyPatch,

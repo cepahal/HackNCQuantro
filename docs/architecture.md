@@ -4,6 +4,13 @@ The canonical app is `backend/` (FastAPI/Python) and `frontend/` (Next.js).
 `backend/services/reporting/run_analysis.py` connects the contract functions;
 `docs/MVP_INTEGRATION_AUDIT.md` records exact imports, types, routes and live gates.
 
+All contract models and enums now live in `backend/services/shared/types.py`;
+`shared/errors.py` owns QuantroError and stage normalization. Historical type/error
+modules only re-export canonical classes. Each public contract function validates
+its return against these models, retaining JSON dict serialization at existing
+upstream boundaries. Startup checks all twelve team functions plus run_analysis.
+The four empty merge scaffolds are retained under `services/_archive/`.
+
 ## Request flow
 
 1. Website submits `{url}` to `POST /analyze/{job_id}/run`. Photon URL intake

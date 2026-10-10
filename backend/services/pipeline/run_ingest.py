@@ -8,12 +8,15 @@ retrievals retain a failed job row so clients can inspect the failing stage.
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from pydantic import BaseModel
-
 from ..external_apis.retrieve_post import RetrievalError, retrieve_post
 from ..processing.preprocessing import extract_media_features
-from ..reporting.errors import ErrorCode, QuantroError, Stage, normalize_exception
-from ..reporting.types import MediaFeatures, Post, TranscriptStatus, parse_stage_output
+from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
+from ..shared.types import (
+    IngestResult,
+    MediaFeatures,
+    Post,
+    parse_stage_output,
+)
 from ..storage.tiger import TigerStore
 
 EXTRACTION_OPTIONS = {
@@ -32,15 +35,6 @@ _PASSTHROUGH_RETRIEVAL_CODES = {
 }
 
 
-class IngestResult(BaseModel):
-    job_id: str
-    url: str
-    post_id: str
-    media_id: str
-    transcript_status: TranscriptStatus
-    sentence_count: int
-    frames_count: int
-    persisted_at: str
 
 
 def _retrieval_error(exc: Exception) -> QuantroError:

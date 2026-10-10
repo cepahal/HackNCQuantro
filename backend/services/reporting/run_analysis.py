@@ -14,36 +14,40 @@ and a messaging failure becomes a delivery warning rather than undoing the save.
 import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, TypeVar
+from typing import Any, TypeVar
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-
-from pydantic import BaseModel
 
 from ..external_apis.build_search_queries import build_search_queries
 from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
 from ..external_apis.search_candidates import search_candidates
 from ..pipeline.run_ingest import EXTRACTION_OPTIONS, ingest_post_and_features
 from ..processing.preprocessing import extract_media_features
-from ..specialist.alignment import verify_and_align
-from ..specialist.comparison import compare_context_and_caption
-from ..specialist.context import select_surrounding_context
-from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
-from .build_report import build_report
-from .errors import ErrorCode, QuantroError, Stage, normalize_exception
-from .save_report import report_id_for_job, save_report_and_complete_job
-from .send_summary import DeliveryTracker, MessagingProvider, send_summary
-from .types import (
+from ..shared.contracts import validate_contract_result
+from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
+from ..shared.errors import Stage as _ContractStage
+from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.types import (
     Alignment,
+    AnalysisResult,
     Comparison,
     ConfidenceLevel,
     Context,
     DeliveryResult,
     MediaFeatures,
-    Outcome,
     Post,
     ReportV2,
     parse_stage_output,
 )
+from ..shared.types import AnalysisResult as _ReturnModel
+from ..shared.types import CandidateList as _CandidateSearch
+from ..shared.types import Queries as _SearchQueries
+from ..specialist.alignment import verify_and_align
+from ..specialist.comparison import compare_context_and_caption
+from ..specialist.context import select_surrounding_context
+from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
+from .build_report import build_report
+from .save_report import report_id_for_job, save_report_and_complete_job
+from .send_summary import DeliveryTracker, MessagingProvider, send_summary
 
 logger = logging.getLogger(__name__)
 
@@ -63,24 +67,10 @@ _LEVEL_RANK: dict[ConfidenceLevel, int] = {
 T = TypeVar("T")
 
 
-class AnalysisResult(BaseModel):
-    job_id: str
-    outcome: Outcome
-    report_id: str
-    report_url: str
-    delivery_status: Literal["accepted", "failed", "skipped"]
-    delivery_warning: str | None = None
-    warnings: list[str]
 
 
-class _SearchQueries(BaseModel):
-    queries: list[Any]
-    warnings: list[str]
 
 
-class _CandidateSearch(BaseModel):
-    candidates: list[dict[str, Any]]
-    warnings: list[str]
 
 
 @dataclass(frozen=True)
@@ -197,42 +187,46 @@ def run_analysis(
     provider: MessagingProvider | None = None,
     tracker: DeliveryTracker | None = None,
 ) -> AnalysisResult:
-    if store is None:
+    # aligned with shared/types.py on 2026-10-10
+    try:
+        if store is None:
+            try:
+                owned_store = TigerStore.from_env()
+            except Exception as exc:
+                raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
+            try:
+                owned_store.ensure_schema()
+                return validate_contract_result(_ReturnModel, run_analysis(
+                    job_id, url, conversation_id, store=owned_store, provider=provider, tracker=tracker
+                ), _ContractStage.RUN_ANALYSIS, json_native=False)
+            except QuantroError:
+                raise
+            except Exception as exc:
+                raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
+            finally:
+                owned_store.close()
+
         try:
-            owned_store = TigerStore.from_env()
+            existing_job = store.get_job(job_id)
+            existing_report = store.get_report(report_id_for_job(job_id)) if existing_job and existing_job["status"] == "completed" else None
         except Exception as exc:
             raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
+        if existing_job and existing_job["status"] == "completed":
+            if _normalized_post_url(existing_job["url"]) != _normalized_post_url(url):
+                raise QuantroError(ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_POST, "This job ID already belongs to a different submitted URL.")
+            if existing_report is None:
+                raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
+            report = parse_stage_output(ReportV2, existing_report, Stage.BUILD_REPORT)
+            return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, []), _ContractStage.RUN_ANALYSIS, json_native=False)
+
+        ingested = ingest_post_and_features(job_id, url, store=store)
         try:
-            owned_store.ensure_schema()
-            return run_analysis(
-                job_id, url, conversation_id, store=owned_store, provider=provider, tracker=tracker
-            )
-        except QuantroError:
+            return validate_contract_result(_ReturnModel, _analyze(job_id, ingested.post, ingested.features, conversation_id, store, provider, tracker), _ContractStage.RUN_ANALYSIS, json_native=False)
+        except QuantroError as error:
+            _mark_failed(store, job_id, error)
             raise
-        except Exception as exc:
-            raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
-        finally:
-            owned_store.close()
-
-    try:
-        existing_job = store.get_job(job_id)
-        existing_report = store.get_report(report_id_for_job(job_id)) if existing_job and existing_job["status"] == "completed" else None
-    except Exception as exc:
-        raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
-    if existing_job and existing_job["status"] == "completed":
-        if _normalized_post_url(existing_job["url"]) != _normalized_post_url(url):
-            raise QuantroError(ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_POST, "This job ID already belongs to a different submitted URL.")
-        if existing_report is None:
-            raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
-        report = parse_stage_output(ReportV2, existing_report, Stage.BUILD_REPORT)
-        return _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, [])
-
-    ingested = ingest_post_and_features(job_id, url, store=store)
-    try:
-        return _analyze(job_id, ingested.post, ingested.features, conversation_id, store, provider, tracker)
-    except QuantroError as error:
-        _mark_failed(store, job_id, error)
-        raise
+    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+        raise _normalize_contract_exception(_ContractStage.RUN_ANALYSIS, exc) from None
 
 
 def _analyze(
@@ -266,12 +260,13 @@ def _analyze(
     search = parse_stage_output(_CandidateSearch, raw_search, Stage.SEARCH_CANDIDATES)
     warnings.extend(search.warnings)
     submitted_url = _normalized_post_url(submitted_post.post_url)
+    candidate_rows = [candidate.model_dump(mode="json") for candidate in search.candidates]
     eligible_candidates = [
-        candidate for candidate in search.candidates
+        candidate for candidate in candidate_rows
         if _normalized_post_url(candidate.get("url", "")) != submitted_url
     ]
     candidates = eligible_candidates[:SEARCH_LIMIT]
-    if len(eligible_candidates) < len(search.candidates):
+    if len(eligible_candidates) < len(candidate_rows):
         warnings.append("The submitted post was excluded from its own source candidates.")
 
     viable: list[_AssessedSource] = []

@@ -15,12 +15,17 @@ from typing import Any, Protocol
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from .post_contract import (
+from ..shared.contracts import contract_input, validate_contract_result
+from ..shared.errors import ErrorCode, QuantroError, Stage
+from ..shared.errors import Stage as _ContractStage
+from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.types import (
     Author,
     Engagement,
     MediaAsset,
     Post,
 )
+from ..shared.types import Post as _ReturnModel
 from .tigerdata_storage import TigerDataPostStore
 
 logger = logging.getLogger(__name__)
@@ -38,7 +43,7 @@ _PLATFORMS = {
 }
 
 
-class RetrievalError(Exception):
+class RetrievalError(QuantroError):
     """Pipeline failure; use as_dict() at the orchestrator boundary."""
 
     def __init__(
@@ -49,11 +54,8 @@ class RetrievalError(Exception):
         retryable: bool = False,
         status_code: int = 502,
     ) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.stage = "retrieve_post"
-        self.retryable = retryable
+        normalized_code = code if code in ErrorCode._value2member_map_ else "MEDIA_UNAVAILABLE"
+        super().__init__(normalized_code, Stage.RETRIEVE_POST, message, retryable)
         self.status_code = status_code
 
     def as_dict(self) -> dict[str, dict[str, str | bool]]:
@@ -380,7 +382,7 @@ def _result(
         post["retrieval"]["warnings"] = [
             "Some optional metadata was unavailable; see unavailable_fields."
         ]
-    return post
+    return Post.model_validate(post).model_dump(mode="json")
 
 
 class PostStorage(Protocol):
@@ -401,139 +403,144 @@ def retrieve_post(
     downstream consumers finish. Failure removes this call's isolated workspace.
     Public single-video posts only; no cookies, API keys, playlists or DRM bypass.
     """
-    url, platform = _validate_url(url)
+    # aligned with shared/types.py on 2026-10-10
+    url = contract_input(url)
     try:
-        timeout = float(timeout_seconds)
-    except (ValueError, TypeError, OverflowError):
-        raise ValueError("timeout_seconds must be a positive finite limit") from None
-    if (
-        isinstance(max_bytes, bool)
-        or not isinstance(max_bytes, int)
-        or max_bytes <= 0
-        or isinstance(timeout_seconds, bool)
-        or not math.isfinite(timeout)
-        or timeout <= 0
-    ):
-        raise ValueError("max_bytes and timeout_seconds must be positive finite limits")
-    workspace: Path | None = None
-    base = Path(output_dir or tempfile.gettempdir()).resolve()
-    try:
-        base.mkdir(parents=True, exist_ok=True)
-        workspace = Path(tempfile.mkdtemp(prefix="quantro-post-", dir=base)).resolve()
-        command = [
-            sys.executable,
-            "-m",
-            "backend.services.external_apis._retrieval_worker",
-            "--ignore-config",
-            "--no-plugin-dirs",
-            "--no-cache-dir",
-            "--no-playlist",
-            "--playlist-items",
-            "1",
-            "--proxy",
-            "",
-            "--no-progress",
-            "--quiet",
-            "--no-warnings",
-            "--socket-timeout",
-            "15",
-            "--retries",
-            "1",
-            "--extractor-retries",
-            "1",
-            "--max-filesize",
-            str(max_bytes),
-            "--compat-options",
-            "prefer-legacy-http-handler,no-certifi",
-            "--format",
-            "b[ext=mp4][protocol=https]/b[ext=mp4][protocol=http]",
-            "--match-filter",
-            "!is_live & !is_upcoming",
-            "--output",
-            str(workspace / "media.%(ext)s"),
-            "--dump-single-json",
-            "--no-simulate",
-            "--",
-            url,
-        ]
-        if urlsplit(url).path.lower().endswith((".jpg", ".jpeg")):
+        url, platform = _validate_url(url)
+        try:
+            timeout = float(timeout_seconds)
+        except (ValueError, TypeError, OverflowError):
+            raise ValueError("timeout_seconds must be a positive finite limit") from None
+        if (
+            isinstance(max_bytes, bool)
+            or not isinstance(max_bytes, int)
+            or max_bytes <= 0
+            or isinstance(timeout_seconds, bool)
+            or not math.isfinite(timeout)
+            or timeout <= 0
+        ):
+            raise ValueError("max_bytes and timeout_seconds must be positive finite limits")
+        workspace: Path | None = None
+        base = Path(output_dir or tempfile.gettempdir()).resolve()
+        try:
+            base.mkdir(parents=True, exist_ok=True)
+            workspace = Path(tempfile.mkdtemp(prefix="quantro-post-", dir=base)).resolve()
             command = [
                 sys.executable,
                 "-m",
                 "backend.services.external_apis._retrieval_worker",
-                "--direct-image",
-                url,
-                "--output-file",
-                str(workspace / "media.jpg"),
-                "--max-bytes",
+                "--ignore-config",
+                "--no-plugin-dirs",
+                "--no-cache-dir",
+                "--no-playlist",
+                "--playlist-items",
+                "1",
+                "--proxy",
+                "",
+                "--no-progress",
+                "--quiet",
+                "--no-warnings",
+                "--socket-timeout",
+                "15",
+                "--retries",
+                "1",
+                "--extractor-retries",
+                "1",
+                "--max-filesize",
                 str(max_bytes),
+                "--compat-options",
+                "prefer-legacy-http-handler,no-certifi",
+                "--format",
+                "b[ext=mp4][protocol=https]/b[ext=mp4][protocol=http]",
+                "--match-filter",
+                "!is_live & !is_upcoming",
+                "--output",
+                str(workspace / "media.%(ext)s"),
+                "--dump-single-json",
+                "--no-simulate",
+                "--",
+                url,
             ]
-        # Worker owns networking guards. No shell, user config, cookies, external ffmpeg, or parent env changes.
-        completed = subprocess.run(
-            command,
-            cwd=Path(__file__).resolve().parents[3],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            check=False,
-        )
-        if completed.returncode != 0:
-            # Never expose downloader stderr: it can contain signed URLs and provider responses.
-            raise RetrievalError(
-                "MEDIA_UNAVAILABLE", "The submitted video could not be retrieved."
+            if urlsplit(url).path.lower().endswith((".jpg", ".jpeg")):
+                command = [
+                    sys.executable,
+                    "-m",
+                    "backend.services.external_apis._retrieval_worker",
+                    "--direct-image",
+                    url,
+                    "--output-file",
+                    str(workspace / "media.jpg"),
+                    "--max-bytes",
+                    str(max_bytes),
+                ]
+            # Worker owns networking guards. No shell, user config, cookies, external ffmpeg, or parent env changes.
+            completed = subprocess.run(
+                command,
+                cwd=Path(__file__).resolve().parents[3],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                check=False,
             )
-        post = _result(url, platform, workspace, completed.stdout, max_bytes)
-        owned_store: TigerDataPostStore | None = None
-        try:
-            if storage is None:
-                owned_store = TigerDataPostStore.from_env()
-                storage = owned_store
-            storage.save_post(post)
-        except Exception:  # noqa: BLE001 - redact connector diagnostics at the persistence boundary
-            raise RetrievalError(
-                "STORAGE_FAILED",
-                "The retrieved media could not be saved to storage.",
-            ) from None
-        finally:
-            if owned_store is not None:
-                try:
-                    owned_store.close()
-                except Exception as close_error:  # noqa: BLE001 - preserve the committed save and redact diagnostics
-                    logger.warning(
-                        "Tiger Data connection cleanup failed (%s)",
-                        type(close_error).__name__,
-                    )
-
-    except Exception as exc:
-        if (
-            workspace is not None
-            and workspace.parent == base
-            and workspace.name.startswith("quantro-post-")
-        ):
-            try:
-                shutil.rmtree(workspace)
-            except OSError as cleanup_error:
-                logger.warning(
-                    "Retrieval workspace cleanup failed (%s)",
-                    type(cleanup_error).__name__,
+            if completed.returncode != 0:
+                # Never expose downloader stderr: it can contain signed URLs and provider responses.
+                raise RetrievalError(
+                    "MEDIA_UNAVAILABLE", "The submitted video could not be retrieved."
                 )
-        if isinstance(exc, RetrievalError):
+            post = _result(url, platform, workspace, completed.stdout, max_bytes)
+            owned_store: TigerDataPostStore | None = None
+            try:
+                if storage is None:
+                    owned_store = TigerDataPostStore.from_env()
+                    storage = owned_store
+                storage.save_post(post)
+            except Exception:  # noqa: BLE001 - redact connector diagnostics at the persistence boundary
+                raise RetrievalError(
+                    "STORAGE_FAILED",
+                    "The retrieved media could not be saved to storage.",
+                ) from None
+            finally:
+                if owned_store is not None:
+                    try:
+                        owned_store.close()
+                    except Exception as close_error:  # noqa: BLE001 - preserve the committed save and redact diagnostics
+                        logger.warning(
+                            "Tiger Data connection cleanup failed (%s)",
+                            type(close_error).__name__,
+                        )
+
+        except Exception as exc:
+            if (
+                workspace is not None
+                and workspace.parent == base
+                and workspace.name.startswith("quantro-post-")
+            ):
+                try:
+                    shutil.rmtree(workspace)
+                except OSError as cleanup_error:
+                    logger.warning(
+                        "Retrieval workspace cleanup failed (%s)",
+                        type(cleanup_error).__name__,
+                    )
+            if isinstance(exc, RetrievalError):
+                raise
+            if isinstance(exc, subprocess.TimeoutExpired):
+                raise RetrievalError(
+                    "MEDIA_TIMEOUT",
+                    "Video retrieval timed out.",
+                    retryable=True,
+                    status_code=504,
+                ) from None
+            if isinstance(exc, OSError):
+                raise RetrievalError(
+                    "STORAGE_FAILED", "The downloaded media could not be stored."
+                ) from None
             raise
-        if isinstance(exc, subprocess.TimeoutExpired):
-            raise RetrievalError(
-                "MEDIA_TIMEOUT",
-                "Video retrieval timed out.",
-                retryable=True,
-                status_code=504,
-            ) from None
-        if isinstance(exc, OSError):
-            raise RetrievalError(
-                "STORAGE_FAILED", "The downloaded media could not be stored."
-            ) from None
-        raise
-    return post
+        return validate_contract_result(_ReturnModel, post, _ContractStage.RETRIEVE_POST, json_native=True)
+    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+        raise _normalize_contract_exception(_ContractStage.RETRIEVE_POST, exc) from None
 
 
 def handle_post_trigger(

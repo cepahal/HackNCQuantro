@@ -15,8 +15,13 @@ from typing import Protocol
 from urllib.parse import urlsplit
 
 from ..external_apis.photon import send_summary_request
-from .errors import ErrorCode, QuantroError, Stage
-from .types import DeliveryResult
+from ..shared.contracts import validate_contract_result
+from ..shared.errors import ErrorCode, QuantroError, Stage
+from ..shared.errors import QuantroError as _ContractError
+from ..shared.errors import Stage as _ContractStage
+from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.types import DeliveryResult
+from ..shared.types import DeliveryResult as _ReturnModel
 
 
 @dataclass(frozen=True)
@@ -135,36 +140,42 @@ def send_summary(
     provider: MessagingProvider | None = None,
     tracker: DeliveryTracker | None = None,
 ) -> DeliveryResult:
-    if job_id is None:
-        job_id = _delivery_job_id(report_url)
-    provider = provider if provider is not None else get_messaging_provider()
-    tracker = tracker if tracker is not None else get_delivery_tracker()
-
-    # The Photon bridge owns durable, payload-aware delivery tracking across restarts.
-    if isinstance(provider, PhotonProvider):
-        receipt = provider.send_report(conversation_id, summary, report_url, job_id=job_id)
-        return DeliveryResult(
-            conversation_id=conversation_id, message_id=receipt.message_id, status="accepted"
-        )
-
-    if job_id is not None and not tracker.check_and_record(conversation_id, job_id):
-        existing_id = tracker.get_message_id(conversation_id, job_id)
-        if existing_id is None:
-            raise _send_failed("A summary for this job is already being sent.")
-        return DeliveryResult(conversation_id=conversation_id, message_id=existing_id, status="accepted")
-
+    # aligned with shared/types.py on 2026-10-10
     try:
-        receipt = provider.send(conversation_id, format_summary_message(summary, report_url))
-    except Exception as exc:
-        if job_id is not None:
-            tracker.release(conversation_id, job_id)
-        raise _send_failed("The summary message could not be sent.") from exc
+        if any(not isinstance(value, str) or not value.strip() for value in (conversation_id, summary, report_url)):
+            raise _ContractError("MESSAGE_SEND_FAILED", _ContractStage.SEND_SUMMARY)
+        if job_id is None:
+            job_id = _delivery_job_id(report_url)
+        provider = provider if provider is not None else get_messaging_provider()
+        tracker = tracker if tracker is not None else get_delivery_tracker()
 
-    if not receipt.accepted or not receipt.message_id:
-        if job_id is not None:
-            tracker.release(conversation_id, job_id)
-        raise _send_failed("The messaging provider did not accept the summary.")
+        # The Photon bridge owns durable, payload-aware delivery tracking across restarts.
+        if isinstance(provider, PhotonProvider):
+            receipt = provider.send_report(conversation_id, summary, report_url, job_id=job_id)
+            return validate_contract_result(_ReturnModel, DeliveryResult(
+                conversation_id=conversation_id, message_id=receipt.message_id, status="accepted"
+            ), _ContractStage.SEND_SUMMARY, json_native=False)
 
-    if job_id is not None:
-        tracker.record_message_id(conversation_id, job_id, receipt.message_id)
-    return DeliveryResult(conversation_id=conversation_id, message_id=receipt.message_id, status="accepted")
+        if job_id is not None and not tracker.check_and_record(conversation_id, job_id):
+            existing_id = tracker.get_message_id(conversation_id, job_id)
+            if existing_id is None:
+                raise _send_failed("A summary for this job is already being sent.")
+            return validate_contract_result(_ReturnModel, DeliveryResult(conversation_id=conversation_id, message_id=existing_id, status="accepted"), _ContractStage.SEND_SUMMARY, json_native=False)
+
+        try:
+            receipt = provider.send(conversation_id, format_summary_message(summary, report_url))
+        except Exception as exc:
+            if job_id is not None:
+                tracker.release(conversation_id, job_id)
+            raise _send_failed("The summary message could not be sent.") from exc
+
+        if not receipt.accepted or not receipt.message_id:
+            if job_id is not None:
+                tracker.release(conversation_id, job_id)
+            raise _send_failed("The messaging provider did not accept the summary.")
+
+        if job_id is not None:
+            tracker.record_message_id(conversation_id, job_id, receipt.message_id)
+        return validate_contract_result(_ReturnModel, DeliveryResult(conversation_id=conversation_id, message_id=receipt.message_id, status="accepted"), _ContractStage.SEND_SUMMARY, json_native=False)
+    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+        raise _normalize_contract_exception(_ContractStage.SEND_SUMMARY, exc) from None

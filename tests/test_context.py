@@ -1,5 +1,6 @@
 import unittest
 
+from backend.services.shared.errors import QuantroError
 from backend.services.specialist.context import select_surrounding_context
 
 
@@ -119,7 +120,7 @@ class ContextTests(unittest.TestCase):
     def test_rejects_unverified_alignment(self):
         self.alignment["status"] = "no_verified_match"
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(QuantroError):
             select_surrounding_context(self.alignment, self.features)
 
 

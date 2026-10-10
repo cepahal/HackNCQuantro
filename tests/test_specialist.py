@@ -286,8 +286,9 @@ def test_not_assessed_stays_not_assessed(clip, context, comparison):
 def test_context_rejects_invalid_processed_range(clip, source):
     alignment = verify_and_align(clip, source)
     source['transcript']['processed_ranges'][0]['start_seconds'] = float('nan')
-    with pytest.raises(ValueError):
+    with pytest.raises(QuantroError) as error:
         select_surrounding_context(alignment, source)
+    assert error.value.stage.value == 'select_surrounding_context'
 
 
 def test_sdk_accepts_structured_output_schemas():
