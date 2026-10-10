@@ -9,6 +9,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -388,6 +389,53 @@ def _result(
     return Post.model_validate(post).model_dump(mode="json")
 
 
+def _retrieve_split_media(url: str, workspace: Path, max_bytes: int, deadline: float) -> str:
+    """Guarded network downloads followed by strictly local MP4 remuxing."""
+    def remaining():
+        seconds = deadline - time.monotonic()
+        if seconds <= 0:
+            raise subprocess.TimeoutExpired("split retrieval", 0)
+        return seconds
+
+    result = subprocess.run(
+        [sys.executable, "-m", "backend.services.external_apis._retrieval_worker",
+         "--split-media", url, "--workspace", str(workspace), "--max-bytes", str(max_bytes)],
+        cwd=Path(__file__).resolve().parents[3], capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=remaining(), check=False,
+    )
+    if result.returncode == 4:
+        raise RetrievalError("MEDIA_TOO_LARGE", "No available video and audio combination fits the download limit.", status_code=413)
+    if result.returncode:
+        raise RetrievalError("MEDIA_UNAVAILABLE", "The separate video and audio streams could not be retrieved.")
+    streams = [workspace / "video.mp4", workspace / "audio.m4a"]
+    total = 0
+    for path in streams:
+        if path.is_symlink() or not path.is_file():
+            raise RetrievalError("MEDIA_UNAVAILABLE", "A downloaded media stream is missing.")
+        size = path.stat().st_size
+        total += size
+        if total > max_bytes:
+            raise RetrievalError("MEDIA_TOO_LARGE", "The submitted video exceeds the download limit.", status_code=413)
+        if not _is_complete_mp4(path, size):
+            raise RetrievalError("MEDIA_UNAVAILABLE", "A downloaded media stream is invalid.")
+    # Fixed filenames, forced container demuxers, and file-only protocols keep
+    # FFmpeg away from remote URLs, playlists, and downloader-provided paths.
+    command = ["ffmpeg", "-nostdin", "-v", "error", "-y"]
+    for path in streams:
+        command.extend(["-protocol_whitelist", "file", "-f", "mov", "-i", str(path)])
+    command.extend(["-map", "0:v:0", "-map", "1:a:0", "-c", "copy",
+                    "-map_metadata", "-1", "-movflags", "+faststart", "-f", "mp4", str(workspace / "media.mp4")])
+    try:
+        merged = subprocess.run(command, capture_output=True, timeout=remaining(), check=False)
+    except FileNotFoundError:
+        raise RetrievalError("MEDIA_UNAVAILABLE", "FFmpeg is required to combine video and audio.") from None
+    if merged.returncode:
+        raise RetrievalError("MEDIA_UNAVAILABLE", "The downloaded video and audio could not be combined.")
+    for path in streams:
+        path.unlink()
+    return result.stdout
+
+
 class PostStorage(Protocol):
     def save_post(self, post: Post) -> None: ...
 
@@ -479,6 +527,7 @@ def retrieve_post(
                     str(max_bytes),
                 ]
             # Worker owns networking guards. No shell, user config, cookies, external ffmpeg, or parent env changes.
+            deadline = time.monotonic() + timeout
             completed = subprocess.run(
                 command,
                 cwd=Path(__file__).resolve().parents[3],
@@ -489,12 +538,15 @@ def retrieve_post(
                 timeout=timeout,
                 check=False,
             )
-            if completed.returncode != 0:
+            stdout = completed.stdout
+            if completed.returncode != 0 and platform == "youtube" and "Requested format is not available" in completed.stderr:
+                stdout = _retrieve_split_media(url, workspace, max_bytes, deadline)
+            elif completed.returncode != 0:
                 # Never expose downloader stderr: it can contain signed URLs and provider responses.
                 raise RetrievalError(
                     "MEDIA_UNAVAILABLE", "The submitted video could not be retrieved."
                 )
-            post = _result(url, platform, workspace, completed.stdout, max_bytes)
+            post = _result(url, platform, workspace, stdout, max_bytes)
             owned_store: TigerDataPostStore | None = None
             try:
                 if storage is None:
