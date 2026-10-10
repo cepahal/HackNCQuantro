@@ -88,7 +88,7 @@ Latest full offline backend suite: **751 passed, 5 skipped, 45 subtests passed i
 External providers and inaccessible media can still fail. The fixes aim to prevent missing local prerequisites and incorrect failure classification; they do not promise arbitrary URLs always produce a verified source or a report within 60 seconds.
 
 
-## Backend audit reconciliation and deployment gate — 2026-10-10
+## Backend audit reconciliation and deployment gate â€” 2026-10-10
 
 Merged teammate main855e0f6 with our tested reliability branch5d002b9. Kept the
 canonical Exa/Whisper adapters, word timestamps, artifact cleanup, frontend UI,
@@ -117,7 +117,7 @@ The supplied16-gap audit was reconciled as follows:
 | Media HTTP/CORS | HEAD, conditional304, single-range206/416, ignored unsupported range forms, exposed playback headers, local host aliases. |
 | Webhook hardening/leftovers | Documented separate signing secret+signed timestamp; durable Tiger claims across restarts; dead direct_image comparison removed; browser configuration errors redacted. Archived HTTP transport remains unverified for outbound API; Spectrum remains primary. |
 
-Final frozen-code checks:887 backend tests passed,6 intentionally skipped,
+Final frozen-code checks after the teammate retrieval merge:899 backend tests passed,7 intentionally skipped,
 45subtests passed; mypy43source files clean with third-party missing stubs excluded;
 RuffF/E9 and generated frontend type check passed; pipcheck clean. Frontend40tests,
 typecheck/lint/production build passed. Spectrum123tests passed and one intentional
@@ -145,3 +145,22 @@ The Docker CLI exists locally but its daemon is not running, so no image-build p
 is claimed. HTTP background tasks are not a durable queue; a crash after claiming
 an event requires operator review. No arbitrary confidence uplift or unsupported
 Instagram/TikTok success is claimed.
+
+
+### Final teammate merge and Render handoff (2026-10-10)
+
+Preserved teammate commit `2d496b1` for explicit separate YouTube audio/video
+downloads and local MP4 remuxing, using one canonical split-download path.
+Retained our typed contracts, actual FFprobe metadata, combined byte budget,
+shared timeout, file-only FFmpeg inputs and artifact cleanup. Two former private
+helper tests now exercise the canonical path and retain real FFmpeg verification.
+Final isolated suite: 899 passed, 7 skipped, 45 subtests passed. Mypy (43 files),
+Ruff, generated frontend types and dependency checks passed. The seven skips are
+four opt-in network tests, one opt-in database smoke test, and two Windows
+symlink-privilege tests.
+
+The user selected paid Render. The blueprint targets one 1 CPU / 2 GB backend
+instance, independently billed from the Pro workspace. Public deployment,
+private Tiger TLS variables, the production backend URL and Vercel redeployment
+remain operator acceptance gates; no hosted memory or cloud-IP download success
+is implied by local tests. See `docs/HOSTING.md` for current configuration steps.

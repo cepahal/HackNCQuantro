@@ -2,8 +2,66 @@
 
 The frontend can stay on Vercel. The backend needs FFmpeg, Whisper, temporary
 video files, and outbound TLS/TCP access to Tiger Data. A frontend deployment
-does not provide that backend. No hosting service has been created or purchased
-as part of this assessment.
+does not provide that backend. The repository now selects paid Render compute;
+changing this file does not itself create or deploy a hosting service.
+
+## Render: selected backend deployment
+
+The root `render.yaml` selects `1c-2g`: 1 CPU and 2 GB RAM, formerly called
+Standard. [The current plan mapping](https://render.com/docs/compute-plans)
+accepts both names. Its published compute rate is $25/month, prorated while
+active. A purchased Pro **workspace** is a separate subscription and does not
+upgrade a Free web service's RAM automatically. The cost comparisons below
+exclude that already selected workspace fee.
+
+1. In the intended Render workspace, create a Blueprint from
+   `cepahal/HackNCQuantro`, branch `main`, using the root `render.yaml`. Review
+   the paid compute before applying. If configuring a web service manually,
+   choose Docker, `1c-2g` / Standard compute, and one instance.
+2. Keep the repository root as the service root: the blueprint already sets
+   Dockerfile Path `./backend/Dockerfile.vercel` and Docker Context `./backend`.
+   Do not combine these repo-relative paths with another `/backend` root.
+   [Render's Docker fields](https://render.com/docs/blueprint-spec) describe these
+   paths. Leave Docker Command empty; the image uses `0.0.0.0` and Render's `PORT`.
+3. Fill `sync: false` values privately from the existing verified configuration:
+   both Tiger URLs, table prefix, Gemini key/model, Exa key, and applicable
+   messaging values. Preserve Tiger TLS verification. Translate any certificate
+   path embedded in a DSN to a real Linux container path. If the server requires
+   the existing custom CA, provision that public CA and point both clients to
+   its mounted path; the system CA path in the blueprint is sufficient only when
+   it actually validates the Tiger server. Never upload credentials in source.
+4. Set `FRONTEND_ORIGIN=https://quantro-ten.vercel.app` and
+   `REPORT_BASE_URL=https://quantro-ten.vercel.app`. Preserve
+   `TRANSCRIPTION_PROVIDER=whisper` and the image's baked
+   `WHISPER_MODEL=/opt/quantro/whisper`; do not copy the laptop's `small.en`
+   override or a Windows `MEDIA_TOOLS_DIR` path.
+5. Keep health check `/openapi.json`. After deployment, verify its actual HTTPS
+   service URL returns the analysis, status, report, and ingest routes. This
+   proves startup, not Gemini, search, download, or full-analysis success. Use the
+   URL assigned to this service; the already occupied `quantro-api.onrender.com`
+   hostname was found to serve an unrelated application.
+6. Set Vercel Production `NEXT_PUBLIC_API_BASE_URL` to that verified Render HTTPS
+   origin. Remove a stale `NEXT_PUBLIC_REPORT_API_BASE_URL` or set it to the same
+   origin. Redeploy Vercel so the public variables reach the browser bundle.
+   Keep all provider/Tiger credentials exclusively in backend private settings.
+7. From the deployed frontend, verify CORS preflight, a real analysis, status
+   polling, report/display retrieval, and media playback. Observe Linux peak RAM
+   and temporary disk use; 2 GB is an initial capacity choice, not a measured
+   full-pipeline guarantee. Admit only one demo analysis at a time until a tested
+   global concurrency gate exists.
+
+The Python Docker service does **not** start the Node Photon Spectrum bridge.
+Its dispatcher currently connects to a loopback backend, so moving only Python
+to Render does not move the local iMessage workflow. Keep the verified local
+bridge/backend pair running for that workflow until a supported deployment of
+both has been configured and tested; do not point its loopback setting at an
+invented public-host environment variable.
+
+[Render documents long HTTP responses up to 100 minutes](https://render.com/docs/heroku),
+whereas [Railway closes a request after five minutes without transferred data](https://docs.railway.com/networking/public-networking/specs-and-limits)
+and permits up to 15 minutes with ongoing transfer. Browser/client timeouts and
+the application's stale-job cutoff remain independent. After a dropped request,
+recover using the existing status endpoint instead of automatically resubmitting.
 
 ## Railway: the current free service limits do not safely fit
 
@@ -22,7 +80,8 @@ as part of this assessment.
 There is no 8 GB free service trial. The 8 GB per-replica figure belongs to the
 paid Hobby plan. Extra credits do not increase the free service RAM limit.
 
-Local small-Whisper testing reached approximately 980 MiB. Even interpreting the
+An isolated macOS small-Whisper test recorded approximately 980 MiB, as documented
+in `docs/PROVIDERS.md`; this is not a Linux whole-pipeline benchmark. Interpreting the
 trial limit as 1 GiB leaves only about 44 MiB. Retrieval permits 100,000,000-byte
 media files, and `tigerdata_storage.py` reads a complete file into memory before
 uploading it. Subsequent candidate retrieval can run while Whisper remains
@@ -55,14 +114,49 @@ subscription charges.
 
 ### Existing-repository configuration if the resource gate is resolved
 
-Use one backend service from `main`, root directory `/backend`,
-`RAILWAY_DOCKERFILE_PATH=Dockerfile.vercel`, and watch path `/backend/**`.
-The existing Dockerfile binds `0.0.0.0` and consumes Railway's `PORT`; no start
-command override is needed. Use `/openapi.json` for the health check and one
-replica. Keep Tiger and provider values in private service variables. Preserve
-the image's baked Whisper model path. See the official
-[Dockerfile](https://docs.railway.com/builds/dockerfiles) and
-[monorepo](https://docs.railway.com/guides/deploying-a-monorepo) instructions.
+Configure this through the dashboard. Railway's current
+[Config as Code documentation](https://docs.railway.com/config-as-code) says new
+services cannot adopt `railway.json` / `railway.toml`; legacy support ends on
+December 1, 2026. No obsolete config file or new IaC dependency is added here.
+
+1. After choosing a plan with sufficient resources, create an empty backend
+   service, then connect `cepahal/HackNCQuantro`, branch `main`. Configure its
+   Root Directory as `/backend` before deploying. This makes Docker `COPY`
+   instructions resolve against the existing backend requirements and source.
+2. In service Variables set `RAILWAY_DOCKERFILE_PATH=Dockerfile.vercel`.
+   Set Watch Paths to `/backend/**`. Leave the Start Command override empty:
+   the Docker CMD already binds `0.0.0.0` and consumes Railway's injected `PORT`.
+   See the official [Dockerfile](https://docs.railway.com/builds/dockerfiles) and
+   [monorepo](https://docs.railway.com/guides/deploying-a-monorepo) instructions.
+3. Use one replica, an initial 2 GB RAM limit, and
+   [Healthcheck Path](https://docs.railway.com/deployments/healthchecks)
+   `/openapi.json`. This checks startup; it does not prove provider readiness or
+   serialize analyses. The single-analysis demo restriction below still applies.
+4. Add existing real values privately to Railway Variables using the root
+   `.env.example` as the name reference: `TIGER_DATABASE_URL`, `TIGERDATA_DSN`,
+   their existing table-prefix/TLS settings, `SEARCH_PROVIDER`, its provider key,
+   `GEMINI_API_KEY`, and `GEMINI_MODEL`. Set `APP_ENV=production` and
+   `REPORT_STORE=tiger`. Preserve verified Tiger TLS settings and provision any
+   referenced certificate file securely inside the container; a laptop file
+   path will not exist there. Never upload the local env file to GitHub.
+5. Set backend `FRONTEND_ORIGIN=https://quantro-ten.vercel.app` and
+   `REPORT_BASE_URL=https://quantro-ten.vercel.app`. Do not copy the local
+   `WHISPER_MODEL=small.en` override: the Docker image already sets
+   `WHISPER_MODEL=/opt/quantro/whisper` to its baked model. Do not copy a Windows
+   `MEDIA_TOOLS_DIR`; FFmpeg and ffprobe are installed on the image's PATH.
+6. Deploy, then use Settings / Networking / Generate Domain. Test the actual
+   generated HTTPS origin's `/openapi.json`; confirm it contains
+   `/analyze/{job_id}/run`, `/analyze/{job_id}/status`, `/reports/{report_id}`, and
+   `/ingest/{job_id}`. Confirm a real Tiger connection and startup checks pass.
+7. In the Vercel project's Production environment set `NEXT_PUBLIC_API_BASE_URL`
+   to that verified HTTPS backend origin. Set `NEXT_PUBLIC_REPORT_API_BASE_URL`
+   to the same origin or remove a stale temporary-gateway override. Redeploy
+   Vercel: public Next.js variables are baked into the frontend build. Provider
+   keys and Tiger credentials belong only in backend private variables.
+8. From `https://quantro-ten.vercel.app`, verify the analysis POST, status polling,
+   report, display, and media requests use the new origin. Verify the CORS
+   preflight permits that exact frontend origin and a real report renders.
+   Also test downloads from this cloud IP; local success does not establish it.
 
 ## Paid Railway versus paid Render
 
@@ -165,9 +259,10 @@ Verify Tiger TLS, a full analysis, and large-media playback on the chosen host.
 
 ## Other free options
 
-- [Hugging Face Spaces](https://huggingface.co/docs/hub/spaces-overview) provides
-  16 GB RAM on free CPU hardware, but outbound ports are limited to 80, 443, and
-  8080. The current direct Tiger PostgreSQL connection cannot work unchanged.
+- [Hugging Face Spaces](https://huggingface.co/docs/hub/spaces-overview) has
+  16 GB RAM on CPU Basic with no hourly hardware charge, but new Docker/Gradio
+  Spaces require a paid account plan. Outbound ports are limited to 80, 443, and
+  8080, so the current direct Tiger connection cannot work unchanged.
 - [AWS Free Plan](https://aws.amazon.com/free/free-tier-faqs/) offers eligible new
   accounts credits for up to six months. It is temporary credit, not indefinite
   free hosting; account eligibility and instance capacity must be checked.

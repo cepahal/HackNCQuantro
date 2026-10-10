@@ -3,7 +3,9 @@ services:
     name: quantro-api
     runtime: docker
     branch: main
-    plan: free
+    # Standard compute: 1 CPU / 2 GB; separate from a Pro workspace subscription.
+    plan: 1c-2g
+    numInstances: 1
     dockerfilePath: ./backend/Dockerfile.vercel
     dockerContext: ./backend
     # Served only after startup has connected to Tiger; no database query per probe.

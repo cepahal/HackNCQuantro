@@ -9,6 +9,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -301,71 +302,6 @@ def _probe_download(path: Path, *, is_image: bool) -> dict[str, Any]:
         ) from None
 
 
-def _merge_local_streams(workspace: Path, max_bytes: int) -> None:
-    """Merge separate guarded HTTP downloads without giving FFmpeg network access."""
-    audio = workspace / "media.m4a"
-    if not audio.exists():
-        return
-    video = workspace / "media.mp4"
-    if any(path.is_symlink() or not path.is_file() for path in (video, audio)):
-        raise RetrievalError(
-            "MEDIA_UNAVAILABLE", "The downloaded streams are incomplete."
-        )
-    if sum(path.stat().st_size for path in (video, audio)) > max_bytes:
-        raise RetrievalError(
-            "MEDIA_UNAVAILABLE", "The downloaded streams exceed the size limit."
-        )
-    executable = shutil.which("ffmpeg")
-    if executable is None:
-        raise RetrievalError(
-            "PROCESSING_FAILED", "ffmpeg is required to merge downloaded media."
-        )
-    merged = workspace / "merged.mp4"
-    result = subprocess.run(
-        [
-            executable,
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-nostdin",
-            "-protocol_whitelist",
-            "file,pipe",
-            "-i",
-            str(video),
-            "-protocol_whitelist",
-            "file,pipe",
-            "-i",
-            str(audio),
-            "-map",
-            "0:v:0",
-            "-map",
-            "1:a:0",
-            "-c",
-            "copy",
-            "-movflags",
-            "+faststart",
-            str(merged),
-        ],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=60,
-        check=False,
-    )
-    if (
-        result.returncode != 0
-        or not merged.is_file()
-        or merged.stat().st_size > max_bytes
-    ):
-        raise RetrievalError(
-            "PROCESSING_FAILED",
-            "The downloaded streams could not be merged within the size limit.",
-        )
-    merged.replace(video)
-    audio.unlink()
-
-
 def _result(
     url: str, platform: str, workspace: Path, stdout: str, max_bytes: int
 ) -> dict[str, Any]:
@@ -511,6 +447,51 @@ def _result(
     return Post.model_validate(post).model_dump(mode="json")
 
 
+def _retrieve_split_media(url: str, workspace: Path, max_bytes: int, deadline: float) -> str:
+    """Guarded network downloads followed by strictly local MP4 remuxing."""
+    def remaining() -> float:
+        seconds = deadline - time.monotonic()
+        if seconds <= 0:
+            raise subprocess.TimeoutExpired("split retrieval", 0)
+        return seconds
+
+    result = subprocess.run(
+        [sys.executable, "-m", "backend.services.external_apis._retrieval_worker",
+         "--split-media", url, "--workspace", str(workspace), "--max-bytes", str(max_bytes)],
+        cwd=Path(__file__).resolve().parents[3], capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=remaining(), check=False,
+    )
+    if result.returncode:
+        raise RetrievalError("MEDIA_UNAVAILABLE", "The separate video and audio streams could not be retrieved.")
+    streams = [workspace / "video.mp4", workspace / "audio.m4a"]
+    total = 0
+    for path in streams:
+        if path.is_symlink() or not path.is_file():
+            raise RetrievalError("MEDIA_UNAVAILABLE", "A downloaded media stream is missing.")
+        size = path.stat().st_size
+        total += size
+        if total > max_bytes:
+            raise RetrievalError("MEDIA_TOO_LARGE", "The submitted video exceeds the download limit.", status_code=413)
+        if not _is_complete_mp4(path, size):
+            raise RetrievalError("MEDIA_UNAVAILABLE", "A downloaded media stream is invalid.")
+    # Fixed filenames, forced container demuxers, and file-only protocols keep
+    # FFmpeg away from remote URLs, playlists, and downloader-provided paths.
+    command = ["ffmpeg", "-nostdin", "-v", "error", "-y"]
+    for path in streams:
+        command.extend(["-protocol_whitelist", "file", "-f", "mov", "-i", str(path)])
+    command.extend(["-map", "0:v:0", "-map", "1:a:0", "-c", "copy",
+                    "-map_metadata", "-1", "-movflags", "+faststart", "-f", "mp4", str(workspace / "media.mp4")])
+    try:
+        merged = subprocess.run(command, capture_output=True, timeout=remaining(), check=False)
+    except FileNotFoundError:
+        raise RetrievalError("MEDIA_UNAVAILABLE", "FFmpeg is required to combine video and audio.") from None
+    if merged.returncode:
+        raise RetrievalError("MEDIA_UNAVAILABLE", "The downloaded video and audio could not be combined.")
+    for path in streams:
+        path.unlink()
+    return result.stdout
+
+
 class PostStorage(Protocol):
     def save_post(self, post: dict[str, Any]) -> None: ...
 
@@ -585,7 +566,7 @@ def _download_and_probe(
                 "--compat-options",
                 "prefer-legacy-http-handler,no-certifi",
                 "--format",
-                "bv[ext=mp4][protocol=https]/b[ext=mp4][protocol=https]/b[ext=mp4][protocol=http],ba[ext=m4a][protocol=https]/b[ext=mp4][protocol=https]/b[ext=mp4][protocol=http]",
+                "b[ext=mp4][protocol=https]/b[ext=mp4][protocol=http]",
                 "--match-filter",
                 "!is_live & !is_upcoming",
                 "--output",
@@ -608,6 +589,7 @@ def _download_and_probe(
                     str(max_bytes),
                 ]
             # Worker owns networking guards. No shell, user config, cookies, external ffmpeg, or parent env changes.
+            deadline = time.monotonic() + timeout
             completed = subprocess.run(
                 command,
                 cwd=Path(__file__).resolve().parents[3],
@@ -618,7 +600,10 @@ def _download_and_probe(
                 timeout=timeout,
                 check=False,
             )
-            if completed.returncode != 0:
+            stdout = completed.stdout
+            if completed.returncode != 0 and platform == "youtube" and "Requested format is not available" in completed.stderr:
+                stdout = _retrieve_split_media(url, workspace, max_bytes, deadline)
+            elif completed.returncode != 0:
                 # Never expose downloader stderr: it can contain signed URLs and provider responses.
                 raise RetrievalError(
                     "MEDIA_UNAVAILABLE",
@@ -633,8 +618,7 @@ def _download_and_probe(
                         )
                     ),
                 )
-            _merge_local_streams(workspace, max_bytes)
-            post = _result(url, platform, workspace, completed.stdout, max_bytes)
+            post = _result(url, platform, workspace, stdout, max_bytes)
             post["post_id"] = post_id or post["post_id"]
             post["candidate_id"] = candidate_id
             owned_store: TigerDataPostStore | None = None

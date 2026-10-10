@@ -96,11 +96,12 @@ results URL polls persisted job state without starting another analysis. The sta
 route returns only job status, a completed report ID, and a safe failure envelope.
 It is not a durable task queue: interrupted jobs still require a new submission.
 
-The HTTP Photon webhook reserves inbound conversation/job pairs while processing.
-An analysis or summary-delivery failure releases the reservation for a later retry;
-a retry of a completed analysis reuses its report. Successful replies remain deduplicated
-in the process-local tracker. Cross-process/restart deduplication still requires durable
-inbound tracking; the Spectrum sidecar retains its separate persistent queue.
+The optional HTTP Photon webhook uses durable Tiger-backed inbound and summary
+reservations. Confirmed retryable failures before any summary attempt can release
+the job reservation; raw-event replay claims and uncertain delivery attempts remain
+reserved to prevent duplicate messages. Completed analysis retries reuse their
+report. This is deduplication, not a durable task queue. The primary Spectrum
+sidecar retains its separate persistent queue and must be deployed separately.
 
 ## Reconciled reliability guards
 

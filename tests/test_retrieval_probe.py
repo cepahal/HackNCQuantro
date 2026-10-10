@@ -3,6 +3,7 @@
 import json
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -96,25 +97,30 @@ def test_actual_mp4_is_measured_from_local_bytes(tmp_path: Path):
     assert measured["has_audio"] is False
 
 
-def test_merge_rejects_aggregate_size_before_external_process(monkeypatch, tmp_path):
-    (tmp_path / "media.mp4").write_bytes(b"v" * 6)
-    (tmp_path / "media.m4a").write_bytes(b"a" * 6)
+def test_merge_rejects_aggregate_size_before_ffmpeg(monkeypatch, tmp_path):
+    container = b"".join((8).to_bytes(4, "big") + kind for kind in (b"ftyp", b"moov", b"mdat"))
+    (tmp_path / "video.mp4").write_bytes(container)
+    (tmp_path / "audio.m4a").write_bytes(container)
 
-    def forbidden(*args, **kwargs):
+    def worker_only(command, **kwargs):
+        if "--split-media" in command:
+            return subprocess.CompletedProcess(command, 0, "{}", "")
         pytest.fail("oversized streams must not reach FFmpeg")
 
-    monkeypatch.setattr(retrieval.subprocess, "run", forbidden)
-    with pytest.raises(retrieval.RetrievalError, match="exceed the size limit"):
-        retrieval._merge_local_streams(tmp_path, 10)
+    monkeypatch.setattr(retrieval.subprocess, "run", worker_only)
+    with pytest.raises(retrieval.RetrievalError, match="exceeds the download limit"):
+        retrieval._retrieve_split_media(
+            "https://youtube.com/watch?v=test", tmp_path, 30, time.monotonic() + 30
+        )
 
 
 @pytest.mark.skipif(
     not shutil.which("ffmpeg") or not shutil.which("ffprobe"),
     reason="system FFmpeg required",
 )
-def test_actual_separate_streams_merge_into_audio_video_mp4(tmp_path):
-    video = tmp_path / "media.mp4"
-    audio = tmp_path / "media.m4a"
+def test_actual_separate_streams_merge_into_audio_video_mp4(monkeypatch, tmp_path):
+    video = tmp_path / "video.mp4"
+    audio = tmp_path / "audio.m4a"
     subprocess.run(
         [
             "ffmpeg",
@@ -155,9 +161,19 @@ def test_actual_separate_streams_merge_into_audio_video_mp4(tmp_path):
         capture_output=True,
         timeout=30,
     )
-    retrieval._merge_local_streams(tmp_path, 1_000_000)
-    result = retrieval._probe_download(video, is_image=False)
+    original_run = subprocess.run
+
+    def downloaded_streams(command, **kwargs):
+        if "--split-media" in command:
+            return subprocess.CompletedProcess(command, 0, "{}", "")
+        return original_run(command, **kwargs)
+
+    monkeypatch.setattr(retrieval.subprocess, "run", downloaded_streams)
+    retrieval._retrieve_split_media(
+        "https://youtube.com/watch?v=test", tmp_path, 1_000_000, time.monotonic() + 30
+    )
+    result = retrieval._probe_download(tmp_path / "media.mp4", is_image=False)
     assert result["has_audio"] is True
     assert result["duration_seconds"] == pytest.approx(0.8, abs=0.1)
     assert (result["width"], result["height"]) == (160, 120)
-    assert not audio.exists() and not (tmp_path / "merged.mp4").exists()
+    assert not audio.exists() and not video.exists()
