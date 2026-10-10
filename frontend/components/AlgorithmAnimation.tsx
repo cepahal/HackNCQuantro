@@ -63,11 +63,14 @@ export default function AlgorithmAnimation() {
         if (cancelled) break;
         setStep(1);
         await Promise.all([
-          animate(".stage-target", {
-            left: "38%", top: "calc(65% - 14px)", backgroundColor: "#e73552",
-          }, { duration: 0.9, ease: "easeInOut" }),
+          animate(".stage-target", { backgroundColor: "#e73552" }, { duration: 0.3 }),
           animate(".stage-source", { y: 0 }, { duration: 0.3 }),
         ]);
+        await pause(500);
+        if (cancelled) break;
+        await animate(".stage-target", {
+          left: "38%", top: "calc(65% - 14px)",
+        }, { duration: 0.9, ease: "easeInOut" });
         await pause(350);
 
         if (cancelled) break;
