@@ -1,0 +1,894 @@
+[
+  {
+    "case": "choose_clean",
+    "provider": "exa",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"decade is out of landing a man on the moon and returning\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": 0.014,
+    "results": [
+      {
+        "url": "https://science.nasa.gov/humans-in-space/astronauts/excerpt-from-the-special-message-to-the-congress-on-urgent-national-needs/",
+        "title": "Excerpt from the 'Special Message to the Congress on Urgent National Needs' - NASA Science",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "President John F. Kennedy's May 25, 1961 Speech before ...",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/60-years-ago-president-kennedy-proposes-moon-landing-goal-in-speech-to-congress/",
+        "title": "60 Years Ago: President Kennedy Proposes Moon Landing Goal in Speech to Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-to-joint-session-of-congress-may-25-1961",
+        "title": "Address to Joint Session of Congress May 25, 1961",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://airandspace.si.edu/stories/editorial/we-choose-go-moon-jfks-moon-shot",
+        "title": "\"We Choose to go to the Moon:\" JFK's Moon Shot",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:57:34.374769+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 5.071
+  },
+  {
+    "case": "choose_clean",
+    "provider": "serpapi",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"decade is out of landing a man on the moon and returning\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": null,
+    "results": [
+      {
+        "url": "https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-to-joint-session-of-congress-may-25-1961",
+        "title": "Address to Joint Session of Congress May 25, 1961",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.facebook.com/61588107472812/posts/we-choose-to-go-to-the-moon-in-this-decade-and-do-the-other-things-not-because-t/122121293481270249/",
+        "title": "President John F. Kennedy's moon speech inspired nation",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "President John F. Kennedy's May 25, 1961 Speech before ...",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.quora.com/When-President-Kennedy-called-for-putting-a-man-on-the-moon-by-the-end-of-the-1960s-how-realistic-was-that-goal",
+        "title": "When President Kennedy called for putting a man on the ...",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.presidency.ucsb.edu/documents/special-message-the-congress-urgent-national-needs",
+        "title": "Special Message to the Congress on Urgent National Needs",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:57:39.447253+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 3.106
+  },
+  {
+    "case": "choose_compressed",
+    "provider": "exa",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"We choose to go to the moon in this decade and do\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": 0.014,
+    "results": [
+      {
+        "url": "https://science.nasa.gov/humans-in-space/astronauts/excerpt-from-the-special-message-to-the-congress-on-urgent-national-needs/",
+        "title": "Excerpt from the 'Special Message to the Congress on Urgent National Needs' - NASA Science",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.rice.edu/jfk-speech",
+        "title": "John F. Kennedy Speech | Rice University",
+        "query": "\"We choose to go to the moon in this decade and do\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/60-years-ago-president-kennedy-proposes-moon-landing-goal-in-speech-to-congress/",
+        "title": "60 Years Ago: President Kennedy Proposes Moon Landing Goal in Speech to Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.presidency.ucsb.edu/documents/address-rice-university-houston-the-nations-space-effort",
+        "title": "Address at Rice University in Houston on the Nation's Space Effort | The American Presidency Project",
+        "query": "\"We choose to go to the moon in this decade and do\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "The Decision to Go to the Moon: President John F. Kennedy's May 25, 1961 Speech before a Joint Session of Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:57:42.554530+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 3.747
+  },
+  {
+    "case": "choose_compressed",
+    "provider": "serpapi",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"We choose to go to the moon in this decade and do\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": null,
+    "results": [
+      {
+        "url": "https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-to-joint-session-of-congress-may-25-1961",
+        "title": "Address to Joint Session of Congress May 25, 1961",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://x.com/NASA_Astronauts/status/1142968221617668096?lang=bg",
+        "title": "ARCHIVED NASA Astronauts",
+        "query": "\"We choose to go to the moon in this decade and do\"",
+        "query_rank": 1,
+        "downloader_url_gate": "accepted_not_download_tested"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "President John F. Kennedy's May 25, 1961 Speech before ...",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.quora.com/Why-did-President-John-F-Kennedy-say-we-choose-to-go-to-the-moon",
+        "title": "Why did President John F. Kennedy say \u201cwe choose to go ...",
+        "query": "\"We choose to go to the moon in this decade and do\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.presidency.ucsb.edu/documents/special-message-the-congress-urgent-national-needs",
+        "title": "Special Message to the Congress on Urgent National Needs",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:57:46.302351+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 1.948
+  },
+  {
+    "case": "choose_noise",
+    "provider": "exa",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"decade is out of landing a man on the moon and returning\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": 0.014,
+    "results": [
+      {
+        "url": "https://science.nasa.gov/humans-in-space/astronauts/excerpt-from-the-special-message-to-the-congress-on-urgent-national-needs/",
+        "title": "Excerpt from the 'Special Message to the Congress on Urgent National Needs' - NASA Science",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "President John F. Kennedy's May 25, 1961 Speech before ...",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/60-years-ago-president-kennedy-proposes-moon-landing-goal-in-speech-to-congress/",
+        "title": "60 Years Ago: President Kennedy Proposes Moon Landing Goal in Speech to Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-to-joint-session-of-congress-may-25-1961",
+        "title": "Address to Joint Session of Congress May 25, 1961",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://airandspace.si.edu/stories/editorial/we-choose-go-moon-jfks-moon-shot",
+        "title": "\"We Choose to go to the Moon:\" JFK's Moon Shot",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:57:48.253900+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 0.498
+  },
+  {
+    "case": "choose_noise",
+    "provider": "serpapi",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"decade is out of landing a man on the moon and returning\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": null,
+    "results": [
+      {
+        "url": "https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-to-joint-session-of-congress-may-25-1961",
+        "title": "Address to Joint Session of Congress May 25, 1961",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.facebook.com/61588107472812/posts/we-choose-to-go-to-the-moon-in-this-decade-and-do-the-other-things-not-because-t/122121293481270249/",
+        "title": "President John F. Kennedy's moon speech inspired nation",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "President John F. Kennedy's May 25, 1961 Speech before ...",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.quora.com/When-President-Kennedy-called-for-putting-a-man-on-the-moon-by-the-end-of-the-1960s-how-realistic-was-that-goal",
+        "title": "When President Kennedy called for putting a man on the ...",
+        "query": "\"decade is out of landing a man on the moon and returning\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.presidency.ucsb.edu/documents/special-message-the-congress-urgent-national-needs",
+        "title": "Special Message to the Congress on Urgent National Needs",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:57:48.753366+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 0.416
+  },
+  {
+    "case": "commit_clean",
+    "provider": "exa",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"out of landing a man on the moon and returning him safely\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": 0.014,
+    "results": [
+      {
+        "url": "https://science.nasa.gov/humans-in-space/astronauts/excerpt-from-the-special-message-to-the-congress-on-urgent-national-needs/",
+        "title": "Excerpt from the 'Special Message to the Congress on Urgent National Needs' - NASA Science",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/60-years-ago-president-kennedy-proposes-moon-landing-goal-in-speech-to-congress/",
+        "title": "60 Years Ago: President Kennedy Proposes Moon Landing Goal in Speech to Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.american-spacecraft.org/documents/sp-4503/document-5.html",
+        "title": "John F. Kennedy, Excerpts from \"Urgent National Needs\" speech to a Joint Session of Congress, 25 May 1961",
+        "query": "\"out of landing a man on the moon and returning him safely\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "The Decision to Go to the Moon: President John F. Kennedy's May 25, 1961 Speech before a Joint Session of Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/50-years-ago-perform-a-manned-lunar-landing-and-return/",
+        "title": "50 Years Ago: \u201cPerform a Manned Lunar Landing and Return\u201d - NASA",
+        "query": "\"out of landing a man on the moon and returning him safely\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:57:49.173269+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 2.074
+  },
+  {
+    "case": "commit_clean",
+    "provider": "serpapi",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"out of landing a man on the moon and returning him safely\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": null,
+    "results": [],
+    "recorded_at": "2026-10-10T20:57:51.248904+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "error",
+    "error_type": "ReadTimeout",
+    "elapsed_seconds": 40.247
+  },
+  {
+    "case": "commit_compressed",
+    "provider": "exa",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"out of landing a man on the moon and returning him safely\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": 0.014,
+    "results": [
+      {
+        "url": "https://science.nasa.gov/humans-in-space/astronauts/excerpt-from-the-special-message-to-the-congress-on-urgent-national-needs/",
+        "title": "Excerpt from the 'Special Message to the Congress on Urgent National Needs' - NASA Science",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/60-years-ago-president-kennedy-proposes-moon-landing-goal-in-speech-to-congress/",
+        "title": "60 Years Ago: President Kennedy Proposes Moon Landing Goal in Speech to Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.american-spacecraft.org/documents/sp-4503/document-5.html",
+        "title": "John F. Kennedy, Excerpts from \"Urgent National Needs\" speech to a Joint Session of Congress, 25 May 1961",
+        "query": "\"out of landing a man on the moon and returning him safely\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "The Decision to Go to the Moon: President John F. Kennedy's May 25, 1961 Speech before a Joint Session of Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/50-years-ago-perform-a-manned-lunar-landing-and-return/",
+        "title": "50 Years Ago: \u201cPerform a Manned Lunar Landing and Return\u201d - NASA",
+        "query": "\"out of landing a man on the moon and returning him safely\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:58:31.500160+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 0.626
+  },
+  {
+    "case": "commit_compressed",
+    "provider": "serpapi",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"out of landing a man on the moon and returning him safely\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": null,
+    "results": [],
+    "recorded_at": "2026-10-10T20:58:32.126927+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "error",
+    "error_type": "ReadTimeout",
+    "elapsed_seconds": 40.363
+  },
+  {
+    "case": "commit_noise",
+    "provider": "exa",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"out of landing a man on the moon and returning him safely\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": 0.014,
+    "results": [
+      {
+        "url": "https://science.nasa.gov/humans-in-space/astronauts/excerpt-from-the-special-message-to-the-congress-on-urgent-national-needs/",
+        "title": "Excerpt from the 'Special Message to the Congress on Urgent National Needs' - NASA Science",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/60-years-ago-president-kennedy-proposes-moon-landing-goal-in-speech-to-congress/",
+        "title": "60 Years Ago: President Kennedy Proposes Moon Landing Goal in Speech to Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.american-spacecraft.org/documents/sp-4503/document-5.html",
+        "title": "John F. Kennedy, Excerpts from \"Urgent National Needs\" speech to a Joint Session of Congress, 25 May 1961",
+        "query": "\"out of landing a man on the moon and returning him safely\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "The Decision to Go to the Moon: President John F. Kennedy's May 25, 1961 Speech before a Joint Session of Congress - NASA",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/50-years-ago-perform-a-manned-lunar-landing-and-return/",
+        "title": "50 Years Ago: \u201cPerform a Manned Lunar Landing and Return\u201d - NASA",
+        "query": "\"out of landing a man on the moon and returning him safely\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:59:12.493100+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 0.68
+  },
+  {
+    "case": "commit_noise",
+    "provider": "serpapi",
+    "query_provider": "whisper",
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"out of landing a man on the moon and returning him safely\""
+    ],
+    "source_group": "kennedy",
+    "split": "development",
+    "requests_attempted": 2,
+    "api_cost_usd": null,
+    "results": [
+      {
+        "url": "https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-to-joint-session-of-congress-may-25-1961",
+        "title": "Address to Joint Session of Congress May 25, 1961",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.facebook.com/StarlightMemoir/posts/on-may-25-1961-before-a-tense-joint-session-of-the-united-states-congress-presid/122166190376830775/",
+        "title": "\"On May 25, 1961, before a tense joint session ... - Facebook",
+        "query": "\"out of landing a man on the moon and returning him safely\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nasa.gov/history/the-decision-to-go-to-the-moon/",
+        "title": "President John F. Kennedy's May 25, 1961 Speech before ...",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.quora.com/When-Kennedy-said-America-would-put-a-man-on-the-moon-before-the-end-of-the-decade-how-realistic-did-public-and-experts-think-that-was",
+        "title": "When Kennedy said America would put a man on the ...",
+        "query": "\"out of landing a man on the moon and returning him safely\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.presidency.ucsb.edu/documents/special-message-the-congress-urgent-national-needs",
+        "title": "Special Message to the Congress on Urgent National Needs",
+        "query": "\"I believe that this nation should commit itself to achieving the goal\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:59:13.173417+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 38.875
+  },
+  {
+    "case": "smallstep_clean",
+    "provider": "exa",
+    "query_provider": "whisper",
+    "queries": [
+      "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+      "\"one or two inches although the surface appears to be\""
+    ],
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "requests_attempted": 2,
+    "api_cost_usd": 0.014,
+    "results": [
+      {
+        "url": "https://podscripts.co/podcasts/the-harland-highway/podcast-107",
+        "title": "The Harland Highway - Podcast 107 Transcript and Discussion",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nationalgeographic.com/history/article/apollo-11-armstrong-aldrin-collins-capcom",
+        "title": "What Apollo 11 astronauts actually said when they got to the moon | National Geographic",
+        "query": "\"one or two inches although the surface appears to be\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.facebook.com/groups/dadjokesusa/posts/1122524728769057/",
+        "title": "Mary's lamb with sooty feet",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://courier.unesco.org/en/articles/first-men-moon",
+        "title": "The first men on the Moon | The UNESCO Courier",
+        "query": "\"one or two inches although the surface appears to be\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.musixmatch.com/lyrics/TheNobleStrain/Jacob-s-Ladder",
+        "title": "Jacob's Ladder Lyrics - TheNobleStrain",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T20:59:52.049718+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 3.293
+  },
+  {
+    "case": "smallstep_clean",
+    "provider": "serpapi",
+    "query_provider": "whisper",
+    "queries": [
+      "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+      "\"one or two inches although the surface appears to be\""
+    ],
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "requests_attempted": 1,
+    "api_cost_usd": null,
+    "results": [],
+    "recorded_at": "2026-10-10T20:59:55.343819+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "error",
+    "error_type": "ReadTimeout",
+    "elapsed_seconds": 40.346
+  },
+  {
+    "case": "smallstep_compressed",
+    "provider": "exa",
+    "query_provider": "whisper",
+    "queries": [
+      "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+      "\"That's one small step for man one giant leap for man\""
+    ],
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "requests_attempted": 2,
+    "api_cost_usd": 0.014,
+    "results": [
+      {
+        "url": "https://podscripts.co/podcasts/the-harland-highway/podcast-107",
+        "title": "The Harland Highway - Podcast 107 Transcript and Discussion",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "http://digitize.gp.lib.mi.us/history/newspapers/grossePointeNews/year_ranges/1960s/1969/pdf/1969-07-24.pdf",
+        "title": "ews .'lrosse",
+        "query": "\"That's one small step for man one giant leap for man\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.facebook.com/groups/dadjokesusa/posts/1122524728769057/",
+        "title": "Mary's lamb with sooty feet",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.smithsonianmag.com/smart-news/lightning-jupiter-apollo-13s-call-help-hear-some-nasas-greatest-recordings-180953128/",
+        "title": "From Lightning on Jupiter to Apollo 13's Call for Help, Hear Some of NASA's Greatest Recordings",
+        "query": "\"That's one small step for man one giant leap for man\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.musixmatch.com/lyrics/TheNobleStrain/Jacob-s-Ladder",
+        "title": "Jacob's Ladder Lyrics - TheNobleStrain",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T21:00:35.693632+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 13.519
+  },
+  {
+    "case": "smallstep_compressed",
+    "provider": "serpapi",
+    "query_provider": "whisper",
+    "queries": [
+      "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+      "\"That's one small step for man one giant leap for man\""
+    ],
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "requests_attempted": 1,
+    "api_cost_usd": null,
+    "results": [],
+    "recorded_at": "2026-10-10T21:00:49.214328+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "error",
+    "error_type": "ReadTimeout",
+    "elapsed_seconds": 41.323
+  },
+  {
+    "case": "smallstep_noise",
+    "provider": "exa",
+    "query_provider": "whisper",
+    "queries": [
+      "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+      "\"one or two inches although the surface appears to be very very\""
+    ],
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "requests_attempted": 2,
+    "api_cost_usd": 0.014,
+    "results": [
+      {
+        "url": "https://podscripts.co/podcasts/the-harland-highway/podcast-107",
+        "title": "The Harland Highway - Podcast 107 Transcript and Discussion",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.nationalgeographic.com/history/article/apollo-11-armstrong-aldrin-collins-capcom",
+        "title": "What Apollo 11 astronauts actually said when they got to the moon | National Geographic",
+        "query": "\"one or two inches although the surface appears to be very very\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.facebook.com/groups/dadjokesusa/posts/1122524728769057/",
+        "title": "Mary's lamb with sooty feet",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://courier.unesco.org/en/articles/first-men-moon",
+        "title": "The first men on the Moon | The UNESCO Courier",
+        "query": "\"one or two inches although the surface appears to be very very\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.musixmatch.com/lyrics/TheNobleStrain/Jacob-s-Ladder",
+        "title": "Jacob's Ladder Lyrics - TheNobleStrain",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 3,
+        "downloader_url_gate": "unsupported_or_invalid"
+      }
+    ],
+    "recorded_at": "2026-10-10T21:01:30.540610+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 2.4
+  },
+  {
+    "case": "smallstep_noise",
+    "provider": "serpapi",
+    "query_provider": "whisper",
+    "queries": [
+      "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+      "\"one or two inches although the surface appears to be very very\""
+    ],
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "requests_attempted": 2,
+    "api_cost_usd": null,
+    "results": [
+      {
+        "url": "https://www.youtube.com/watch?v=IryztvKxtO8",
+        "title": "Whom Have I",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 1,
+        "downloader_url_gate": "accepted_not_download_tested"
+      },
+      {
+        "url": "https://www.facebook.com/groups/FlatEarthDiscuss/posts/1723317528833328/",
+        "title": "Why water behaves uniquely on Earth's surface",
+        "query": "\"one or two inches although the surface appears to be very very\"",
+        "query_rank": 1,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.shazam.com/song/163838866/at-the-foot-of-the-cross",
+        "title": "At the Foot of the Cross - Easter Brothers: Song Lyrics, ...",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://quizlet.com/904848451/chapter-131-and-132-flash-cards/",
+        "title": "Chapter 13.1 and 13.2 Flashcards",
+        "query": "\"one or two inches although the surface appears to be very very\"",
+        "query_rank": 2,
+        "downloader_url_gate": "unsupported_or_invalid"
+      },
+      {
+        "url": "https://www.youtube.com/channel/UC1EU1yisWGvWlJUUr3iWb8w",
+        "title": "AT THE FEET OF THE LAMB",
+        "query": "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+        "query_rank": 3,
+        "downloader_url_gate": "accepted_not_download_tested"
+      }
+    ],
+    "recorded_at": "2026-10-10T21:01:32.941925+00:00",
+    "equivalent_recording_review": "pending",
+    "download_and_alignment": "not_run",
+    "status": "ok",
+    "exact_target_rank": null,
+    "exact_target_top1": false,
+    "exact_target_top5": false,
+    "elapsed_seconds": 2.153
+  }
+]
