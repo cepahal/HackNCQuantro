@@ -1,9 +1,10 @@
 # Quantro Runbook
 
-Owner: Bhrigu (integration / reporting: `build_report`, `save_report_and_complete_job`,
-`display_report`, `send_summary`, `run_analysis`).
+Owner: Bhrigu (integration and reporting: `build_report`, `save_report_and_complete_job`,
+`display_report`, `send_summary`, `run_analysis`). The flow, function owners, env var
+owners and failure modes are in [INTEGRATION.md](INTEGRATION.md).
 
-## 1. Install
+## 1. Setup
 
 ### Backend (Python 3.11+)
 
@@ -12,101 +13,158 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # then fill in keys; never commit .env
+mkdir -p ../.secrets && chmod 700 ../.secrets
+cp .env.example ../.secrets/.env && chmod 600 ../.secrets/.env   # fill in values there
 ```
+
+Secrets live in the repo-root `.secrets/.env`. The folder is git-ignored and is loaded
+first by the API and the Tiger CLI; `backend/.env` is only a fallback. Never put real
+keys in a tracked file. It needs at least:
+
+```bash
+TIGER_DATABASE_URL=postgres://<user>:<password>@<host>:<port>/tsdb?sslmode=require
+TIGER_TABLE_PREFIX=quantro_
+REPORT_STORE=tiger
+REPORT_BASE_URL=http://localhost:3000
+GEMINI_API_KEY=<key>
+GEMINI_MODEL=gemini-flash-latest
+```
+
+Retrieval and search also need `TIGERDATA_DSN` in the root `.env.local`. See
+[retrieve_post.md](retrieve_post.md) and `docs/source_search.md`.
+
+### Verify the Tiger Data connection
+
+The URL is read from `.env` so it never lands in shell history:
+
+```bash
+cd backend
+psql "$(grep '^TIGER_DATABASE_URL=' ../.secrets/.env | cut -d= -f2-)" -c 'select 1'
+python -m services.storage.tiger list     # recent jobs as JSON ([] on a fresh database)
+```
+
+The API creates `quantro_jobs`, `quantro_posts` and `quantro_reports` on first boot.
 
 ### Frontend (Node 20+)
 
 ```bash
 cd frontend
 npm install
-npm run dev            # http://localhost:3000
+npm run dev                 # http://localhost:3000
 ```
 
-As of this writing `frontend/package.json` is an empty placeholder, so these commands
-fail until the Next.js app is initialized (frontend owner).
+`frontend/package.json` and the pages are still empty placeholders (Grant), so these
+commands fail until the Next.js app is initialized.
 
-## 2. Environment template (`backend/.env.example`)
+## 2. Smoke test
+
+`tests/test_smoke_e2e.py` drives `/ingest`, `/analyze/{job_id}/run` and `/reports/{id}`
+through the real ASGI app against a real Postgres. It replaces the eight upstream
+functions with contract-shaped fixtures and deletes the rows it writes. It is skipped
+when `TIGER_DATABASE_URL` is unset.
+
+Against a local Postgres (no TLS needed on localhost), from the repo root:
 
 ```bash
-REPORT_BASE_URL=http://localhost:3000
-REPORT_STORE=memory
-SNOWFLAKE_ACCOUNT=
-SNOWFLAKE_USER=
-SNOWFLAKE_PASSWORD=
-SNOWFLAKE_DATABASE=
-SNOWFLAKE_SCHEMA=
-SNOWFLAKE_WAREHOUSE=
-PHOTON_API_KEY=
-PHOTON_BASE_URL=
-PHOTON_SENDER_ID=
-RETRIEVAL_PROVIDER_API_KEY=
-SEARCH_PROVIDER_API_KEY=
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-1.5-pro
-TRANSCRIPTION_API_KEY=
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-NEXT_PUBLIC_REPORT_BASE_URL=http://localhost:3000
+createdb quantro_smoke      # once
+TIGER_DATABASE_URL=postgresql://localhost:5432/quantro_smoke pytest tests/test_smoke_e2e.py -v
 ```
 
-`REPORT_STORE` is `memory` (default) or `snowflake` (not implemented yet). In-memory
-reports, job statuses and delivery records are lost when the backend restarts.
+Against Tiger Data, using `backend/.env`:
 
-Submitted-post media has its own Tiger Data storage: set `TIGERDATA_DSN` in ignored
-root `.env.local` (or the process environment) and apply
-`backend/services/external_apis/tigerdata_schema.sql` once. `retrieve_post(url)`
-saves JPG/MP4 bytes and the unchanged Post metadata before returning success.
-See [retrieve_post setup and contract](retrieve_post.md). Report persistence above
-is a separate stage.
+```bash
+pytest tests/test_smoke_e2e.py -v
+```
 
-## 3. Verify
+## 3. Run the demo
+
+```bash
+# terminal 1: API
+cd backend && source .venv/bin/activate
+uvicorn main:app --port 8000
+
+# terminal 2: frontend
+cd frontend && npm run dev
+```
+
+| URL | What |
+|---|---|
+| http://localhost:8000/docs | API explorer (`/ingest/{job_id}`, `/analyze/{job_id}/run`, `/reports/{report_id}`) |
+| http://localhost:8000/reports/report_demo_001 | Raw sanitized report JSON |
+| http://localhost:3000 | Submission page (frontend) |
+| http://localhost:3000/reports/report_demo_001 | Report page (frontend). This is the link sent over iMessage. |
+
+`uvicorn backend.main:app --port 8000` from the repo root is equivalent.
+
+### curl
+
+Ingest only. This retrieves the post, extracts features and stores both in Tiger Data:
+
+```bash
+curl -sS -X POST http://localhost:8000/ingest/demo_001 \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
+# {"job_id":"demo_001","url":"…","post_id":"post_…","media_id":"media_…",
+#  "transcript_status":"complete","sentence_count":12,"frames_count":12,"persisted_at":"…Z"}
+```
+
+Full analysis. This runs ingest itself, so the call above is optional. Leave out
+`conversation_id` to skip the iMessage reply:
+
+```bash
+curl -sS -X POST http://localhost:8000/analyze/demo_001/run \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "conversation_id": "demo-conversation"}'
+# {"job_id":"demo_001","outcome":"matched","report_id":"report_demo_001",
+#  "report_url":"http://localhost:3000/reports/report_demo_001",
+#  "delivery_status":"accepted","delivery_warning":null,"warnings":[]}
+```
+
+Fetch the report, then inspect the job:
+
+```bash
+curl -sS http://localhost:8000/reports/report_demo_001
+cd backend && python -m services.storage.tiger show demo_001
+```
+
+Errors come back as `{"error": {"code", "stage", "message", "retryable"}}`. Status
+codes: 400 bad URL or platform, 404 media unavailable, 502 transcription failed, 500
+search, processing or storage failure, 422 bad request body or job ID. Re-running the
+same `job_id` is safe and returns the same `report_id`.
+
+## 4. Verify before pushing
 
 Run from the repo root unless noted.
 
 ```bash
-# Contract types import (requires ReportV2 in types.py)
 cd backend && python -c "from services.reporting.types import ReportV2; print('types ok')" && cd ..
-
-# Tests (pytest.ini adds . and backend/ to the import path)
 pytest tests/ -v
-
-# API boots; open http://localhost:8000/docs and confirm POST /analyze/{job_id}/run
-cd backend && uvicorn main:app --reload --port 8000
-
-# No local paths or secrets in reporting code
-grep -r "local_path\|/tmp/\|api_key\|secret" backend/services/reporting/
+cd backend && uvicorn main:app --port 8000          # boots clean, Ctrl-C to stop
+cd backend && python -m services.storage.tiger list # real Tiger Data
+grep -r "/tmp/\|local_path\|api_key\|secret" backend/services/reporting/
 ```
 
-The grep always matches `build_report.py`, because the sanitizer has to list the keys
-and path prefixes it strips. Anything outside that file is a real finding:
+The grep is never empty, and that is expected. `build_report.py` names the keys and
+path prefixes its sanitizer strips. `types.py` declares the internal `local_path` and
+`image_path` fields that the sanitizer removes, and docstrings describe the rule. A
+match in any other file is a real finding. To list only lines that are not the
+denylist or the internal models:
 
 ```bash
-grep -rn --include='*.py' "local_path\|/tmp/\|api_key\|secret" backend/services/reporting/ \
-  | grep -v '^backend/services/reporting/build_report.py:'
+grep -rn --include='*.py' "/tmp/\|local_path\|api_key\|secret" backend/services/reporting/ \
+  | grep -v -e '^backend/services/reporting/build_report.py:' -e '^backend/services/reporting/types.py:'
 ```
 
-## 4. Pre-demo checklist
+## 5. Pre-demo checklist
 
-- [ ] `backend/.env` exists and required keys are filled
-- [ ] `pytest tests/ -v` is green
-- [ ] `uvicorn main:app --port 8000` boots with no traceback
-- [ ] `npm run dev` boots on http://localhost:3000
-- [ ] http://localhost:8000/docs shows `POST /analyze/{job_id}/run`
-- [ ] No `/tmp/` or local paths in reporting code (section 3 grep)
-- [ ] `git status` does not list `backend/.env` or any `.env`
-- [ ] One end-to-end run succeeds: submit a post, report saved, report page opens
-- [ ] Screenshot the report page as a fallback for the live demo
-
-## 5. Not my job
-
-Ask the owner directly; the reporting layer only consumes these outputs.
-
-| Owner | Scope |
-|---|---|
-| Abdullah | `retrieve_post`, `extract_media_features`, `build_search_queries`, `search_candidates` |
-| Jason | `retrieve_candidate_media`, `verify_and_align`, `select_surrounding_context`, `compare_context_and_caption` |
-| Grant | Frontend pages: `frontend/app/page.tsx` (submission), `frontend/app/results/page.tsx`, report page at `/reports/[id]` |
-
-The Abdullah/Jason split above follows pipeline order and still needs confirmation.
-The backend links to `{REPORT_BASE_URL}/reports/{report_id}`; the README's `/report/[id]`
-must be renamed to match, or the iMessage link will 404.
+- [ ] `backend/.env` has a valid `TIGER_DATABASE_URL` (one line, `sslmode=require`) and a rotated password
+- [ ] `psql … -c 'select 1'` and `python -m services.storage.tiger list` both succeed
+- [ ] `GEMINI_API_KEY` set; `which ffmpeg ffprobe` finds both
+- [ ] `TIGERDATA_DSN` set in root `.env.local`, and the search corpus is seeded with the demo source video
+- [ ] `run_analysis.py` imports Abdullah's real search functions, not `_stubs` (see INTEGRATION.md)
+- [ ] `pytest tests/ -v` is green, including `test_smoke_e2e.py` against local Postgres
+- [ ] `uvicorn main:app --port 8000` boots with no traceback; `/docs` lists all three routes
+- [ ] `npm run dev` serves http://localhost:3000, and `/reports/[id]` exists (the link is `/reports/`, not `/report/`)
+- [ ] One full curl run of the demo URL returns `outcome: "matched"`, and the report page opens
+- [ ] `git status` shows no `.env` files staged
+- [ ] Screenshot the report page and save the curl output as a fallback

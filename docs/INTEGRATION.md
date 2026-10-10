@@ -1,0 +1,174 @@
+# Quantro integration map
+
+How one submitted URL becomes a saved report and an iMessage reply, who owns each
+step, and what to check when it breaks. Operator commands live in [RUNBOOK.md](RUNBOOK.md).
+
+## Flow
+
+```text
+POST /analyze/{job_id}/run  {url, conversation_id?}
+        │
+        ▼
+URL ─► retrieve_post ─► extract_media_features ─► Tiger Data
+       (Abdullah)       (Jason)                   quantro_jobs  status=running → ingested
+                                                  quantro_posts post_json + features_json (internal, keeps local paths)
+        │
+        ▼
+build_search_queries ─► search_candidates(limit=5)
+(Abdullah)              (Abdullah)
+        │                 ├─ raises            → SEARCH_FAILED (retryable). Job failed. No report. Never "no match".
+        │                 └─ [] candidates     → outcome = no_verified_match, jump to build_report
+        ▼
+[candidate loop, for each candidate]
+    retrieve_candidate_media ─► extract_media_features ─► verify_and_align
+    (Abdullah)                  (Jason)                   (Jason)
+    any failure → skip candidate, add a warning + limitation
+    viable = status "verified" AND confidence level in {high, moderate}
+        │
+        ▼
+pick best viable source (level, then clip_coverage_ratio; a tie adds "Multiple plausible sources remain.")
+        │
+        ▼
+select_surrounding_context ─► compare_context_and_caption(clip_features, context, submitted caption)
+(Jason)                       (Jason)
+        │
+        ▼
+build_report ─► save_report_and_complete_job ─► send_summary (only if conversation_id)
+(Bhrigu)        (Bhrigu)                         (Bhrigu → Photon)
+                quantro_reports INSERT … ON CONFLICT (report_id) DO NOTHING
+                quantro_jobs status=completed
+                                                 failure → delivery_status "failed" + warning; report is kept
+        │
+        ▼
+AnalysisResult {job_id, outcome, report_id, report_url, delivery_status, delivery_warning, warnings}
+GET /reports/{report_id} → sanitized ReportV2 JSON (no local_path / image_path / "/tmp/")
+```
+
+`report_id` is always `report_<job_id>`, so re-running a job returns the same report
+and never adds rows. Every stage failure is a `QuantroError {code, stage, message,
+retryable}`, and the job row records `error_code` and `error_stage`.
+
+## Upstream functions
+
+| # | Function | Import path | Owner |
+|---|---|---|---|
+| 1 | `retrieve_post(url)` | `backend.services.external_apis.retrieve_post` | Abdullah |
+| 2 | `extract_media_features(media, options)` | `backend.services.processing.preprocessing` | Jason |
+| 3 | `build_search_queries(features, post)` | `backend.services.external_apis.build_search_queries` | Abdullah |
+| 4 | `search_candidates(queries, limit)` | `backend.services.external_apis.search_candidates` | Abdullah |
+| 5 | `retrieve_candidate_media(candidate)` | `backend.services.external_apis.retrieve_candidate_media` | Abdullah |
+| 6 | `verify_and_align(clip_features, candidate_features)` | `backend.services.specialist.alignment` | Jason |
+| 7 | `select_surrounding_context(alignment, candidate_features, options)` | `backend.services.specialist.context` | Jason |
+| 8 | `compare_context_and_caption(clip_features, context, caption)` | `backend.services.specialist.comparison` | Jason |
+
+Functions 3–5 arrived on `origin/main` in commit `b586148`. Until that is merged
+locally, `run_analysis.py` binds them from `backend/services/reporting/_stubs.py`,
+which raises, so a real run stops at `SEARCH_FAILED`. To switch over, replace
+`from . import _stubs as candidate_search` and the three aliases under it with:
+
+```python
+from ..external_apis.build_search_queries import build_search_queries
+from ..external_apis.search_candidates import search_candidates
+from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
+```
+
+Their outputs (`{queries, warnings}`, `{candidates, warnings}`, and a Post) already
+match what `run_analysis` validates.
+
+## Environment variables
+
+The API and the Tiger CLI load the git-ignored repo-root `.secrets/.env` first, then
+`backend/.env` as a fallback (an already-set key is never overridden). Abdullah's
+storage also reads the root `.env` and `.env.local`. Keep real values only in
+`.secrets/.env`.
+
+| Variable | Read by | Owner | Notes |
+|---|---|---|---|
+| `TIGER_DATABASE_URL` | `storage/tiger.py` (API startup, CLI) | Bhrigu | Required. Remote hosts need `sslmode=require` (or `verify-ca`/`verify-full`). |
+| `TIGER_TABLE_PREFIX` | `storage/tiger.py` | Bhrigu | Default `quantro_`. Lowercase letters, digits, `_`. |
+| `REPORT_STORE` | `save_report.get_report_store()` | Bhrigu | `tiger` (default), `memory` (tests), `snowflake` (stub). The API routes always use the Tiger store. |
+| `REPORT_BASE_URL` | `save_report.py`, CORS in `main.py` | Bhrigu | Frontend origin; report links are `{REPORT_BASE_URL}/reports/{report_id}`. |
+| `TIGERDATA_DSN` (fallback `DATABASE_URL`) | `external_apis/tigerdata_storage.py` | Abdullah | Retrieval media store and the search corpus. Separate from `TIGER_DATABASE_URL`. |
+| `TIGERDATA_SSL_ROOT_CERT` | `external_apis/tigerdata_storage.py` | Abdullah | Default `system`. |
+| `SNOWFLAKE_ACCOUNT`, `_USER`, `_PASSWORD`/`_TOKEN`, `_DATABASE`, `_SCHEMA`, `_WAREHOUSE`, `_MEDIA_STAGE`, `_POSTS_TABLE` | `external_apis/snowflake_storage.py` | Abdullah | Optional Snowflake track. |
+| `RETRIEVAL_PROVIDER_API_KEY`, `SEARCH_PROVIDER`, `SEARCH_PROVIDER_API_KEY` | nothing yet | Abdullah | Present in env templates. Search currently uses the Tiger Data corpus and needs no key. |
+| `GEMINI_API_KEY` | `specialist/gemini.py` | Jason | Required for transcription (function 2) and comparison (function 8). |
+| `GEMINI_MODEL` | `specialist/gemini.py` | Jason | Default `gemini-flash-latest`. Ignore the old `gemini-1.5-pro` example. |
+| `TRANSCRIPTION_PROVIDER`, `TRANSCRIPTION_API_KEY` | nothing | Jason | Transcription goes through Gemini. |
+| `PHOTON_API_KEY`, `PHOTON_BASE_URL`, `PHOTON_SENDER_ID`, `PHOTON_BRIDGE_TOKEN`, `PHOTON_BRIDGE_PORT`, `PHOTON_DATA_DIR` | Photon bridge on unmerged branch `codex/photon-messaging` | Photon bridge: `iner54`; `send_summary` caller: Bhrigu | On `main`, `PhotonProvider` is still a stub, so sends report `delivery_status: "failed"`. |
+| `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_REPORT_BASE_URL` | frontend (not built yet) | Grant | `http://localhost:8000` and `http://localhost:3000` locally. |
+
+## What to check when it breaks
+
+Find the failing stage first. The API error body and the job row both carry it:
+
+```bash
+cd backend && python -m services.storage.tiger list          # status, error_code, error_stage per job
+cd backend && python -m services.storage.tiger show <job_id> # full job, post, features and report JSON
+```
+
+### 1. Tiger Data connection
+
+- **Symptom:** the API refuses to start with `TIGER_DATABASE_URL is not set` or
+  `must include sslmode=require`. Or the CLI says `could not connect to Tiger Data`.
+  Or requests fail with `STORAGE_FAILED` (HTTP 500).
+- **Check:**
+  - The variable is a single line in `backend/.env`: `postgres://user:pass@host:port/db?sslmode=require`.
+  - Run `psql "<that URL>" -c 'select 1'`.
+  - The password was rotated after the old one leaked to git.
+  - Your network can reach the Tiger service.
+- **Note:** retrieval uses a different variable, `TIGERDATA_DSN`. A working API with
+  failing retrieval usually means that one is missing from the root `.env.local`.
+
+### 2. Transcription key missing
+
+- **Symptom:** `TRANSCRIPTION_FAILED` at stage `extract_media_features` (HTTP 502).
+  The job is marked `failed`, and no post row is written.
+- **Check:**
+  - `GEMINI_API_KEY` is set in the environment the API runs in.
+  - `GEMINI_MODEL` names a model your key can use with audio input.
+  - `ffmpeg` and `ffprobe` are on `PATH` (`which ffmpeg`); without them extraction fails the same way.
+
+### 3. Search provider failure or rate limit
+
+- **Symptom:** `SEARCH_FAILED` at stage `search_candidates` (HTTP 500, `retryable: true`),
+  with no report saved. This is deliberately never reported as `no_verified_match`.
+- **Check:**
+  - The provider today is Abdullah's Tiger Data post corpus, so failures are usually
+    `TIGERDATA_DSN`, missing grants, or the schema/GIN index not applied
+    (`external_apis/tigerdata_schema.sql`).
+  - A third-party provider added later will surface HTTP 429 the same way. Wait and re-run
+    the same `job_id`; it is idempotent.
+- **Note:** an empty corpus legitimately returns `no_verified_match`. Seed it by calling
+  `retrieve_post(source_url)` for known sources.
+
+### 4. Photon sender ID wrong
+
+- **Symptom:** `AnalysisResult.delivery_status == "failed"` with
+  `delivery_warning: "The summary message could not be sent."`. The report is still
+  saved and opens at `report_url`.
+- **Check:**
+  - On `main` this always happens, because `PhotonProvider` is a stub until
+    `codex/photon-messaging` is merged.
+  - After the merge, confirm that `PHOTON_SENDER_ID` matches the sender registered with
+    Photon, and that `PHOTON_BASE_URL`/`PHOTON_API_KEY` belong to the same account.
+  - Re-running the job re-attempts the send. Deliveries are de-duplicated per
+    `(job_id, conversation_id)` only after a successful send.
+
+### 5. JSONB too large
+
+- **Symptom:** `STORAGE_FAILED` at `save_report_and_complete_job`, or at ingest, on a very
+  long recording. Postgres rejects a single `jsonb` value above about 255 MB, and large
+  values also slow inserts until statement timeouts fire.
+- **Check:** find the biggest stored values:
+
+  ```sql
+  select report_id, pg_size_pretty(pg_column_size(report_json)::bigint)
+  from quantro_reports order by pg_column_size(report_json) desc limit 5;
+  select job_id, pg_size_pretty(pg_column_size(features_json)::bigint)
+  from quantro_posts order by pg_column_size(features_json) desc limit 5;
+  ```
+
+- **Note:** reports hold transcripts and frame metadata, never image bytes, and
+  `EXTRACTION_OPTIONS` caps frames at 12. Transcript length is the variable to limit,
+  for example by capping recording duration before extraction.
