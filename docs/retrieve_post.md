@@ -2,8 +2,9 @@
 
 This modular stage handles a submitted URL, downloads JPG/MP4, then returns the
 **version 2 Post from HackNC (4).pdf, pages 3-5**. Pass its complete `media` object
-directly to the extraction stage. Default retrieval needs an accessible media URL
-and the downloader dependency; it does not load Snowflake or require credentials.
+directly to the extraction stage. Default retrieval requires an accessible media
+URL and configured Tiger Data storage. It returns success only after the actual
+JPG/MP4 bytes and complete, unchanged Post metadata commit to Tiger Data.
 
 Run from the repository root after `pip install -r backend/requirements.txt`:
 
@@ -113,51 +114,57 @@ with dotted paths. It excludes the intentionally null `candidate_id` and private
 metadata uses `warnings: []`. These fields describe available retrieval evidence,
 not the truth of a caption or the reliability of an account.
 
-## Optional Snowflake persistence
+## Required Tiger Data persistence
 
-Pass an explicit store only when persistence is wanted. The caller creates and closes
-that store; retrieval never provisions an account, loads cloud settings, or connects
-to Snowflake by default. The optional helper uses the official Python connector to
-upload actual bytes with file `PUT` and save the complete Post as metadata.
+`retrieve_post(url)` creates its default `TigerDataPostStore`, saves the actual
+downloaded media bytes and complete Post, and closes its own connection. Persistence
+is mandatory for a successful default call. The unchanged Post is returned only
+after the database confirms the inserted post ID and the transaction commits.
 
-```python
-from backend.services.external_apis.retrieve_post import retrieve_post
-from backend.services.external_apis.snowflake_storage import SnowflakePostStore
+Before the first default call:
 
-store = SnowflakePostStore.from_env()
-try:
-    post = retrieve_post(url, storage=store)
-finally:
-    store.close()
-```
+1. Install `backend/requirements.txt` from the repository root.
+2. Apply `backend/services/external_apis/tigerdata_schema.sql` once in the target
+   Tiger Data/PostgreSQL database using a migration role. Grant the backend role
+   `USAGE` on `quantro_retrieval` and `INSERT`/`SELECT` on `quantro_retrieval.posts`.
+   The runtime creates no schema or table.
+3. Set the server-only connection settings in ignored root `.env.local`:
 
-Merge Snowflake values from `.env.example` into the existing ignored root `.env`.
-Set `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, and either `SNOWFLAKE_PASSWORD` or
-`SNOWFLAKE_TOKEN`, plus the warehouse/database/schema context for the team's account.
-The token is optional. A nonblank token takes precedence when both credentials are
-present and uses programmatic access token authentication; otherwise the connector
-receives the password unchanged. Authentication errors are returned without retrying
-with the other credential. The account's authentication policy may require MFA or
-another supported authentication method instead of password access; see the
-[official connector authentication guide](https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-connect).
+   ```dotenv
+   TIGERDATA_DSN=postgresql://<user>:<password>@<host>:<port>/<database>
+   TIGERDATA_SSL_ROOT_CERT=system
+   ```
 
-Keep existing HTTP/report, Photon, AI and other teammate settings in the same `.env`.
-This helper reads its Snowflake settings without changing those values or the process
-environment. Never put credentials in code, Git or chat.
+The existing root `.env` is tracked. Keep credentials in `.env.local` or the process
+environment; an ignore rule does not remove a file already tracked by Git. Preserve
+teammates' existing settings. Settings load from root `.env`, then `.env.local`, then
+the process environment, with later values overriding earlier values. Loading does
+not mutate the process environment or change other settings. `DATABASE_URL` is a
+fallback only when `TIGERDATA_DSN` is absent; an explicitly blank primary value fails
+configuration rather than selecting a different database.
 
-Run `backend/services/external_apis/snowflake_schema.sql` once in the chosen schema.
-Custom stage/table names are supported through the example variables; create those
-objects in the schema explicitly if changing the names. This module runs no DDL.
+The DSN must identify one explicit TCP host, without `service`, `hostaddr`, or
+multiple hosts. A specified port must be valid; it defaults to PostgreSQL's 5432
+when omitted. The connection
+forces certificate and hostname verification (`sslmode=verify-full`), a 10-second
+connection timeout, and a 120-second statement timeout. System root certificates
+are the default; set `TIGERDATA_SSL_ROOT_CERT` to a trusted CA file when needed.
 
-When an explicit store is supplied, the helper verifies PUT's uploaded status and
-byte counts, then inserts metadata and commits before retrieval returns success.
-A failed upload or metadata insert produces `STORAGE_FAILED` and local cleanup.
-A file that uploads before an insert fails can remain orphaned on the stage; no unrelated stage
-files are removed. `playback_url` stays null because private staged media is not a
-public player URL. Snowflake rows include the stage path, media ID, byte count and
-SHA-256 digest. The metadata VARIANT preserves the entire v2 Post, including profile
-fields and retrieval provenance, unchanged; no additional schema migration is needed
-for v2.
+`quantro_retrieval.posts` stores the file in `media_bytes BYTEA`, the unchanged v2
+Post in `metadata JSONB`, plus post/media IDs, MIME type, byte count, SHA-256 digest
+and creation timestamp. One bound `INSERT ... RETURNING post_id` and commit persist
+bytes and metadata atomically. A failed insert or commit rolls back and produces
+`STORAGE_FAILED`; retrieval cleans up its local media. This storage path requires
+no S3 bucket, public media URL, Snowflake stage, or separate upload transaction.
+`media.playback_url` remains null.
+
+For tests or a caller-managed connection, pass a store implementing
+`save_post(post)` through `storage=store`. The caller owns and closes an injected
+store. An injected database connection must be dedicated to this store, idle on
+entry, and have autocommit disabled: `save_post` commits or rolls back its
+transaction. Injection preserves the same Post contract and failure behavior; the
+production default remains Tiger Data. The existing Snowflake helper is retained
+for compatibility and is not invoked by default.
 
 ## Supported retrieval
 
@@ -171,9 +178,10 @@ access policies. The current downloader uses no browser cookie and does not requ
 `RETRIEVAL_PROVIDER_API_KEY`; it uses yt-dlp for video and direct HTTP for JPEG.
 
 The download subprocess deadline defaults to 120 seconds (`timeout_seconds=`).
-An explicitly supplied Snowflake store has separate login/network/query timeouts.
-The retrieval byte cap defaults to 100 MB (`max_bytes=`); optional Snowflake storage
-accepts files up to 100 MB. Direct JPEG streams enforce the byte cap while writing.
+Tiger Data has separate connection/query timeouts; the download deadline does not
+cover database persistence. The retrieval byte cap defaults to 100 MB
+(`max_bytes=`), and Tiger Data storage accepts files up to 100 MB. Direct JPEG
+streams enforce the byte cap while writing.
 Video advertised length and final size are checked;
 unknown-length videos can temporarily exceed the accepted cap, so production workers
 should use disk quotas.
@@ -187,13 +195,14 @@ they are for extraction on the shared backend filesystem, not public media URLs.
 
 ## Verification
 
-`python -m pytest tests/test_retrieve_post.py tests/test_retrieval_worker.py tests/test_snowflake_storage.py`
+`python -m pytest tests/test_retrieve_post.py tests/test_retrieval_worker.py tests/test_tigerdata_storage.py tests/test_snowflake_storage.py`
 
 Tests cover exact v2 Post/error contracts, nullable metadata and provenance,
-downstream handoff, JPEG/MP4, standalone retrieval, explicitly requested persistence,
-preservation of all v2 metadata, Snowflake PUT result verification, safe failures,
-and cleanup.
-No live Snowflake save is claimed until credentials and schema are configured.
+downstream handoff, JPEG/MP4, default persistence and injected stores, preservation
+of all v2 metadata, Tiger Data bytes/JSON transaction bindings and rollback, TLS/DSN
+settings, safe failures, and cleanup. Existing Snowflake compatibility tests remain.
+Live Tiger Data authentication, schema setup and persistence remain unverified
+until the team's connection settings and database are configured.
 
 ## Change log
 
@@ -216,3 +225,11 @@ No live Snowflake save is claimed until credentials and schema are configured.
   MP4 and a real 6,412-byte JPG (128x128), returned JSON-native Posts and retained
   usable local files without loading Snowflake. No credentials or Snowflake setup
   are required for standalone retrieval.
+- 2026-10-10: superseded the prior standalone default with mandatory Tiger Data
+  persistence. Default calls store actual JPG/MP4 bytes and the complete unchanged
+  v2 Post in `quantro_retrieval.posts` within one verified insert/commit transaction,
+  then return the existing extraction contract. Added explicit one-time migration
+  and `.env.local` setup instructions, environment precedence, TLS requirements,
+  and storage failure behavior. The root `.env` is tracked, so secrets belong in
+  ignored `.env.local` or the process environment. No live cloud persistence or
+  S3 integration is claimed; the user will configure connection settings later.

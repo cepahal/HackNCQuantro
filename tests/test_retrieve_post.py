@@ -60,6 +60,8 @@ class SaveStore:
         self.media_bytes: list[bytes] = []
         self.failure = failure
         self.closed = False
+        self.close_calls = 0
+        self.factory_calls = 0
 
     def save_post(self, post: Post) -> None:
         self.posts.append(post)
@@ -70,11 +72,27 @@ class SaveStore:
 
     def close(self) -> None:
         self.closed = True
+        self.close_calls += 1
 
 
 @pytest.fixture
 def recording_store() -> SaveStore:
     return SaveStore()
+
+
+@pytest.fixture(autouse=True)
+def default_store(monkeypatch: pytest.MonkeyPatch) -> SaveStore:
+    store = SaveStore()
+
+    def configured_store() -> SaveStore:
+        store.factory_calls += 1
+        return store
+
+    monkeypatch.setattr(
+        "backend.services.external_apis.tigerdata_storage.TigerDataPostStore.from_env",
+        configured_store,
+    )
+    return store
 
 
 class Downloader:
@@ -611,7 +629,7 @@ def test_explicit_storage_is_persisted_once_before_return(
 
 
 def test_injected_store_receives_exact_downstream_post(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
 ) -> None:
     install(monkeypatch)
     supplied_store = SaveStore()
@@ -624,6 +642,8 @@ def test_injected_store_receives_exact_downstream_post(
         Path(post["media"]["local_path"]).read_bytes()
     ]
     assert not supplied_store.closed
+    assert default_store.factory_calls == 0
+    assert default_store.posts == []
 
 
 def test_storage_failure_returns_safe_error_and_removes_media(
@@ -1159,8 +1179,12 @@ def test_cleanup_failure_preserves_the_original_safe_retrieval_error(
     ("url", "content"),
     [(POST_URL, MP4), ("https://cdn.example.com/photo.jpg", JPEG)],
 )
-def test_default_download_returns_post_without_snowflake_settings_or_imports(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, url: str, content: bytes
+def test_default_download_persists_in_tigerdata_without_snowflake_settings_or_imports(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    default_store: SaveStore,
+    url: str,
+    content: bytes,
 ) -> None:
     for name in tuple(os.environ):
         if name.startswith("SNOWFLAKE_"):
@@ -1182,9 +1206,15 @@ def test_default_download_returns_post_without_snowflake_settings_or_imports(
     assert post["post_id"]
     assert Path(post["media"]["local_path"]).read_bytes() == content
     assert json.loads(json.dumps(post, allow_nan=False)) == post
+    assert default_store.factory_calls == 1
+    assert default_store.posts == [post]
+    assert default_store.media_bytes == [content]
+    assert default_store.close_calls == 1
 
 
-def test_retrieval_module_import_is_independent_of_snowflake_and_dotenv() -> None:
+def test_retrieval_module_import_does_not_load_snowflake_or_database_connectors() -> (
+    None
+):
     script = """
 import importlib.abc
 import sys
@@ -1193,8 +1223,9 @@ class NoStorage(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         if (fullname.startswith('snowflake')
                 or fullname == 'backend.services.external_apis.snowflake_storage'
-                or fullname == 'dotenv'):
-            raise AssertionError('Standalone retrieval imported storage dependencies')
+                or fullname == 'dotenv'
+                or fullname.startswith('psycopg')):
+            raise AssertionError('Retrieval module imported optional database connectors')
         return None
 
 sys.meta_path.insert(0, NoStorage())
@@ -1226,11 +1257,100 @@ def test_trigger_with_explicit_storage_failure_returns_safe_error_and_cleans_med
         "error": {
             "code": "STORAGE_FAILED",
             "stage": "retrieve_post",
-            "message": "The retrieved media could not be saved to the supplied storage.",
+            "message": "The retrieved media could not be saved to storage.",
             "retryable": False,
         }
     }
     assert secret not in json.dumps(result)
     assert len(store.posts) == 1
     assert not store.closed
+    assert_clean(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "diagnostic",
+    [
+        "Set TIGERDATA_DSN before storage",
+        "postgresql://user:private-password@private-db.invalid/app",
+    ],
+)
+def test_default_tigerdata_configuration_failure_is_redacted_and_cleans_media(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, diagnostic: str
+) -> None:
+    install(monkeypatch)
+
+    def unavailable_store() -> SaveStore:
+        raise RuntimeError(diagnostic)
+
+    monkeypatch.setattr(
+        "backend.services.external_apis.tigerdata_storage.TigerDataPostStore.from_env",
+        unavailable_store,
+    )
+
+    with pytest.raises(RetrievalError) as caught:
+        retrieve_post(POST_URL, output_dir=tmp_path)
+
+    assert caught.value.code == "STORAGE_FAILED"
+    assert caught.value.stage == "retrieve_post"
+    assert diagnostic not in json.dumps(caught.value.as_dict())
+    assert caught.value.__suppress_context__
+    assert_clean(tmp_path)
+
+
+def test_default_tigerdata_save_failure_closes_owned_store_and_cleans_media(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
+) -> None:
+    install(monkeypatch)
+    secret = "private-tigerdata-connection-details"
+    default_store.failure = RuntimeError(secret)
+
+    with pytest.raises(RetrievalError) as caught:
+        retrieve_post(POST_URL, output_dir=tmp_path)
+
+    assert caught.value.code == "STORAGE_FAILED"
+    assert secret not in json.dumps(caught.value.as_dict())
+    assert default_store.factory_calls == 1
+    assert len(default_store.posts) == 1
+    assert default_store.close_calls == 1
+    assert_clean(tmp_path)
+
+
+def test_default_tigerdata_close_failure_preserves_committed_success_and_redacts_details(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    install(monkeypatch)
+    secret = "private-tigerdata-cleanup-details"
+
+    class CloseFailureStore(SaveStore):
+        def close(self) -> None:
+            super().close()
+            raise RuntimeError(secret)
+
+    store = CloseFailureStore()
+    monkeypatch.setattr(
+        "backend.services.external_apis.tigerdata_storage.TigerDataPostStore.from_env",
+        lambda: store,
+    )
+
+    post = retrieve_post(POST_URL, output_dir=tmp_path)
+
+    assert store.posts == [post]
+    assert store.media_bytes == [MP4]
+    assert store.close_calls == 1
+    assert Path(post["media"]["local_path"]).read_bytes() == MP4
+    assert secret not in json.dumps(post) + caplog.text
+
+
+def test_invalid_media_never_opens_default_tigerdata_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, default_store: SaveStore
+) -> None:
+    install(monkeypatch, content=b"not-found error page")
+
+    with pytest.raises(RetrievalError) as caught:
+        retrieve_post(POST_URL, output_dir=tmp_path)
+
+    assert caught.value.code == "MEDIA_UNAVAILABLE"
+    assert default_store.factory_calls == 0
+    assert default_store.posts == []
+    assert default_store.close_calls == 0
     assert_clean(tmp_path)
