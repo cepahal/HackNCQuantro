@@ -51,3 +51,23 @@ The root `.env.example` dropped keys no code reads: `RETRIEVAL_PROVIDER_API_KEY`
 
 No tracked `.DS_Store`, `__pycache__`, `.pyc`, `.bak` or `.orig` files, and no duplicate
 requirement entries, were found.
+
+## Pass 3 — Grant's frontend (`origin/feature/frontend-work`) becomes the UI
+
+Grant's pages and components replaced the earlier MVP UI in `frontend/`. His mock data
+layer was replaced by the canonical client (`lib/api.ts`), types (`lib/api-types.ts`) and
+display rules (`lib/display.ts`). Main-side files restore from `25d092d`; Grant's from `b859a0b`.
+
+| File | Reason | Replacement | Restore from |
+|---|---|---|---|
+| `frontend/lib/fixtures.ts` | Grant's mock dog-foster report; the UI now loads real reports | `GET /reports/{report_id}` via `lib/api.ts` | `b859a0b` |
+| `frontend/lib/schema.ts` | Zod report schema duplicating the runtime guard; dropped the `zod` dependency | `assertReport` in `lib/api.ts` | `b859a0b` |
+| `frontend/lib/types.ts` | Second copy of the ReportV2 types | `lib/api-types.ts` (`ReportV2`) | `b859a0b` |
+| `frontend/components/ShareButton.tsx` | Duplicates Grant's "Copy link" button in the report header | `app/results/page.tsx` | `25d092d` |
+| `frontend/components/PhotonBanner.tsx` | No slot in Grant's layout; the number now fills his hero note | `app/page.tsx` (`NEXT_PUBLIC_PHOTON_NUMBER`) | `25d092d` |
+| `frontend/components/ReportPage.tsx` | Report loading moved into Grant's results page | `app/results/page.tsx` | `25d092d` |
+| `frontend/components/ConfidenceSection.tsx` | Unused after Grant's `ResultCard` instruments replaced it | `components/ResultCard.tsx` + `lib/display.ts` | `25d092d` |
+
+The "Kept" row above for `frontend/app/results/page.tsx` is superseded: it is now Grant's
+report page (`/results?id=`, also accepting `?report_id=`). `/reports/{id}` and `/results/{id}`
+redirect to it.

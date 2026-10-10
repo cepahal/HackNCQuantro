@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getReport, ingest, mediaUrl, publicUrl, QuantroApiError, runAnalysis } from "../lib/api.ts";
+import {
+  analysisInFlight, getReport, ingest, mediaUrl, publicUrl, QuantroApiError, runAnalysis, startAnalysis,
+} from "../lib/api.ts";
 import type { ReportV2 } from "../lib/api-types.ts";
 import { reportFixture } from "./fixtures/report_v2.ts";
 
@@ -56,6 +58,30 @@ test("runAnalysis posts the URL to a fresh job route and validates the echoed jo
   await runAnalysis("https://example.com/post", "chat_1");
   assert.deepEqual(calls[1]?.body, { url: "https://example.com/post", conversation_id: "chat_1" });
   assert.notEqual(calls[0]?.url, calls[1]?.url);
+});
+
+test("startAnalysis returns its job id immediately and keeps the pending result for the results page", async (t) => {
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    const jobId = /\/analyze\/([^/]+)\/run$/.exec(url)?.[1] ?? "";
+    return Response.json({
+      job_id: jobId, report_id: `report_${jobId}`, report_url: `http://localhost:3000/reports/report_${jobId}`,
+      outcome: "matched", delivery_status: "skipped", delivery_warning: null, warnings: [],
+    });
+  });
+  const jobId = startAnalysis("https://example.com/post");
+  assert.match(jobId, /^job_[0-9a-f-]{36}$/);
+  const run = analysisInFlight(jobId);
+  assert.equal(run?.url, "https://example.com/post");
+  assert.equal((await run!.result).report_id, `report_${jobId}`);
+  assert.equal(analysisInFlight("job_unknown"), undefined);
+});
+
+test("a failed startAnalysis rejects only where it is awaited", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    error: { code: "SEARCH_FAILED", stage: "search_candidates", message: "Search is unavailable.", retryable: true },
+  }, { status: 502 }));
+  const run = analysisInFlight(startAnalysis("https://example.com/post"));
+  await assert.rejects(run!.result, (error: unknown) => error instanceof QuantroApiError && error.code === "SEARCH_FAILED");
 });
 
 test("runAnalysis rejects a result for a different job", async (t) => {

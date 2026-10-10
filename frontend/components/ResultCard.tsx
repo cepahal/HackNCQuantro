@@ -1,86 +1,40 @@
-import type { EditCounts, ReportMedia, ReportV2 } from "../lib/api-types";
+"use client";
+import { useMemo, useState } from "react";
+import type { ReportV2 as Report } from "../lib/api-types";
 import { mediaUrl, publicUrl } from "../lib/api";
-import { confidenceDisplay, displayCount, NO_SOURCE_MESSAGE, NOT_ASSESSED, posterCard, timeRange, UNAVAILABLE } from "../lib/display";
-import ConfidenceSection from "./ConfidenceSection";
+import { CONFIDENCE_NOTE, confidenceDisplay, levelLabel, secondsLabel, UNAVAILABLE } from "../lib/display";
+import { compact, date, percent, time, unique } from "../lib/format";
+import { derive, sentenceLookup } from "../lib/view-model";
+import MediaSlot from "./MediaSlot";
 
-const editLabels: Record<keyof EditCounts, string> = {
-  matched_passages: "Matched passages", source_gaps: "Source gaps", unmatched_clip_segments: "Unmatched clip segments",
-  confirmed_added_segments: "Confirmed added segments", confirmed_deleted_segments: "Confirmed deleted segments",
-};
-
-function MediaPanel({ title, media }: { title: string; media: ReportMedia }) {
-  const { post, transcript } = media;
-  const source = publicUrl(post.post_url);
-  const playback = mediaUrl(post.media);
-  return <section className="panel" aria-label={title}><h2>{title}</h2><h3>{post.title || "Untitled post"}</h3>
-    {playback && (post.media.mime_type === "image/jpeg"
-      ? <img className="media" src={playback} alt={post.title || title}/>
-      : <video className="media" controls preload="metadata" src={playback}/>)}
-    {source && <a href={source} target="_blank" rel="noopener noreferrer">Open post ↗</a>}
-    <dl className="metadata"><div><dt>Platform</dt><dd>{post.platform}</dd></div>
-      <div><dt>Published</dt><dd>{post.published_at ?? UNAVAILABLE}</dd></div>
-      <div><dt>Duration</dt><dd>{post.media.duration_seconds === null ? UNAVAILABLE : `${post.media.duration_seconds.toFixed(1)}s`}</dd></div></dl>
-    <p>{post.caption || "No caption was available."}</p>
-    <h3>Transcript ({transcript.status})</h3>
-    {transcript.sentences.length ? <ol className="transcript">{transcript.sentences.map((sentence) => <li key={sentence.sentence_id}>
-      <span className="timestamp">{timeRange(sentence.start_seconds, sentence.end_seconds)}</span> {sentence.text}</li>)}</ol>
-      : <p>No transcript was available.</p>}
-  </section>;
+export default function ResultCard({report}:{report:Report}){
+ const[selection,setSelection]=useState<{kind:"match"|"gap";id:string}|null>(null);const[mobilePlayer,setMobilePlayer]=useState<"source"|"clip">("source");const[transcriptTab,setTranscriptTab]=useState<"source"|"clip">("clip");const metrics=useMemo(()=>derive(report),[report]);const alignment=report.alignment;const comparison=report.comparison;const source=report.source;const submitted=report.submitted;
+ const mapSelect=(kind:"match"|"gap",id:string)=>setSelection(previous=>previous?.id===id&&previous.kind===kind?null:{kind,id});
+ const timeline=(which:"clip"|"source")=>{const duration=which==="clip"?submitted.post.media.duration_seconds:source?.post.media.duration_seconds;if(!duration||!alignment)return null;type Segment={id:string;start:number;end:number;label:string;kind:"match"|"gap"|"unmatched"};const segments:Segment[]=[];alignment.matches.forEach((m,index)=>segments.push({id:m.match_id,start:which==="clip"?m.clip_start_seconds:m.source_start_seconds,end:which==="clip"?m.clip_end_seconds:m.source_end_seconds,label:`${index+1}`,kind:"match"}));if(which==="clip")alignment.edit_analysis.unmatched_clip_ranges.forEach((g,index)=>segments.push({id:`unmatched-${index}`,start:g.start_seconds,end:g.end_seconds,label:"",kind:"unmatched"}));else alignment.edit_analysis.source_gaps.forEach((g,index)=>segments.push({id:`gap-${index}`,start:g.start_seconds,end:g.end_seconds,label:"",kind:"gap"}));return <div className="map-row"><div className="map-label">{which==="clip"?"Submitted clip":"Source recording"}<small style={{display:"block",color:"var(--muted)"}}>0–{time(duration)}</small></div><div className="map-track">{segments.sort((a,b)=>a.start-b.start).map(segment=><button key={segment.id} title={segment.kind==="gap"?`Left out ${time(segment.start)}–${time(segment.end)}`:`${which} passage ${time(segment.start)}–${time(segment.end)}`} onClick={()=>segment.kind==="gap"?mapSelect("gap",segment.id):segment.kind==="match"&&mapSelect("match",segment.id)} className={`map-segment ${segment.kind==="gap"?"map-gap":segment.kind==="unmatched"?"map-unmatched":""}`} style={{left:`${segment.start/duration*100}%`,width:`${(segment.end-segment.start)/duration*100}%`,minWidth:segment.end-segment.start>0?"4px":0}}>{segment.label}</button>)}</div></div>};
+ const selectedMatch=selection?.kind==="match"?alignment?.matches.find(match=>match.match_id===selection.id):null;const gapIndex=selection?.kind==="gap"?Number(selection.id.replace("gap-","")):null;const selectedGap=gapIndex!=null?alignment?.edit_analysis.source_gaps[gapIndex]:null;
+ const player=(media:NonNullable<typeof submitted> ,label:string)=>{const playback=mediaUrl(media.post.media);const image=media.post.media.mime_type.startsWith("image/");return <div className="hatch"><div className="panel"><div className="subtle" style={{padding:"12px 14px"}}>{label}</div>{playback&&!image?<video controls playsInline style={{width:"100%",display:"block",aspectRatio:label==="Source video"?"16/9":"9/16",background:"#111"}} src={playback}/>:<MediaSlot src={image?playback??undefined:undefined} alt={image&&playback?media.post.title||label:`${label} preview unavailable`} ratio={label==="Source video"?"16/9":"9/16"}/>}{!playback&&<a style={{display:"block",padding:12,fontSize:13}} href={publicUrl(media.post.post_url)??undefined} target="_blank" rel="noopener noreferrer">View original post ↗</a>}</div></div>};
+ const transcript=(media:NonNullable<typeof submitted>,label:string,forSource=false)=> <div className="transcript"><h3>{label} transcript <span className="subtle">· {media.transcript.status.replace("_"," ")}</span></h3>{media.transcript.sentences.length?media.transcript.sentences.map(sentence=>{const gap=forSource&&alignment?.edit_analysis.source_gaps.some(g=>sentence.start_seconds>=g.start_seconds&&sentence.start_seconds<g.end_seconds);const key=forSource&&comparison?.findings.some(f=>f.evidence.some(e=>e.sentence_ids.some(ref=>sentenceLookup(media.transcript,ref)?.sentence_id===sentence.sentence_id)));return <div className={`sentence ${gap?"gap":""} ${key?"key":""}`} key={sentence.sentence_id}><time>{time(sentence.start_seconds)}–{time(sentence.end_seconds)} {sentence.speaker_id&&`· ${sentence.speaker_id}`}</time>{gap&&<small style={{color:"var(--red)"}}>Left out of your version · </small>}{key&&<small style={{color:"var(--red)"}}>▪ Key · </small>}{sentence.text}</div>}):<p style={{padding:16,color:"var(--muted)"}}>Transcript unavailable.</p>}</div>;
+ const poster=(item:NonNullable<typeof submitted>,label:string)=><article className="poster"><p className="subtle">POSTER DATA (NOT A RELIABILITY SIGNAL)</p><h3 style={{fontWeight:400,fontSize:22}}>{label}</h3><dl>{[["Platform",item.post.platform],["Handle",item.post.author.handle||"Unavailable"],["Name",item.post.author.display_name||"Unavailable"],["Published",date(item.post.published_at)],["Caption",item.post.caption||"Unavailable"],["Duration",item.post.media.duration_seconds==null?UNAVAILABLE:time(item.post.media.duration_seconds)],["Resolution",item.post.media.width&&item.post.media.height?`${item.post.media.width}×${item.post.media.height}`:"Unavailable"],["FPS",item.post.media.fps??"Unavailable"],["Audio",item.post.media.has_audio==null?"Unavailable":item.post.media.has_audio?"Yes":"No"],["Views",compact(item.post.engagement.views_count)],["Likes",compact(item.post.engagement.likes_count)],["Comments",compact(item.post.engagement.comments_count)],["Shares",compact(item.post.engagement.shares_count)],["Followers",compact(item.post.author.followers_count)],["Following",compact(item.post.author.following_count)],["Posts",compact(item.post.author.posts_count)],["Verified",item.post.author.verified==null?"Unavailable":item.post.author.verified?"Yes":"No"]].map(([key,value])=><div key={String(key)}><dt>{key}</dt><dd>{value}</dd></div>)}</dl><a href={publicUrl(item.post.post_url)??undefined} target="_blank" rel="noopener noreferrer">View post ↗</a></article>;
+ if(report.outcome==="no_verified_match")return <><section className="hatch"><div className="panel" style={{padding:24}}><p className="error-text">No verified match does not establish that the clip is accurate or unedited.</p><div className="players">{player(submitted,"Submitted clip")}</div></div></section><section className="report-section"><h2>Submitted transcript.</h2>{transcript(submitted,"Submitted clip")}</section><section className="report-section"><div className="poster-grid">{poster(submitted,"Submitted post")}</div></section><Limitations report={report}/></>;
+ return <>
+ <section className="instrument-grid" aria-label="Evidence metrics">
+ <Instrument index="1/4" title="Source-match confidence" value={alignment?levelLabel(alignment.match_quality.confidence.level):"Not assessed"} confidence={alignment?.match_quality.confidence} />
+ <Instrument index="2/4" title="Submitted clip aligned" value={confidenceDisplay(report).clip_coverage?.value??"Not assessed"} detail={`${secondsLabel(alignment?.match_quality.matched_clip_seconds)} of ${secondsLabel(submitted.post.media.duration_seconds)} · ${alignment?.edit_analysis.counts.unmatched_clip_segments??"Not assessed"} unmatched · Transcript similarity: ${String(alignment?.match_quality.metrics.find(metric=>metric.name==="transcript_similarity")?.value??"Not assessed")}`} />
+ <Instrument index="3/4" title="Left out of your version" value={secondsLabel(metrics.gapSeconds)} detail={`${percent(metrics.leftOutPct)} of passage span · ${alignment?.edit_analysis.counts.source_gaps??"Not assessed"} gaps`} />
+ <Instrument index="4/4" title="Context-assessment confidence" value={comparison?.context_assessment==="not_assessed"||!comparison?"Context assessment unavailable":levelLabel(comparison.assessment_confidence.level)} confidence={comparison?.context_assessment==="not_assessed"?undefined:comparison?.assessment_confidence} />
+ </section>
+ <section className="report-section"><h2>Where the clip meets the source.</h2><div className="hatch map-frame"><div className="panel" style={{padding:16}}><div className="desktop-map">{timeline("clip")}{timeline("source")}<div className="timeline-axis"><span>0:00</span><span>~25%</span><span>~50%</span><span>~75%</span><span>End</span></div></div><div className="mobile-only"><p className="subtle">PASSAGE MAP</p>{alignment?.matches.map((match,i)=><div key={match.match_id}><button className="selection-card" style={{width:"100%",textAlign:"left"}} onClick={()=>mapSelect("match",match.match_id)}>Passage {i+1} · Clip {time(match.clip_start_seconds)}–{time(match.clip_end_seconds)} → Source {time(match.source_start_seconds)}–{time(match.source_end_seconds)}</button>{alignment.edit_analysis.source_gaps.filter(g=>g.before_match_id===match.match_id).map((gap,j)=><button key={j} className="selection-card" style={{width:"100%",textAlign:"left",borderColor:"var(--red)"}} onClick={()=>mapSelect("gap",`gap-${alignment.edit_analysis.source_gaps.indexOf(gap)}`)}>Left out {time(gap.start_seconds)}–{time(gap.end_seconds)} · {secondsLabel(gap.end_seconds-gap.start_seconds)}</button>)}</div>)}</div>{selection&&<div className="selection-card" aria-live="polite"><strong>{selectedMatch?`Passage · clip ${time(selectedMatch.clip_start_seconds,true)}–${time(selectedMatch.clip_end_seconds,true)} ↔ source ${time(selectedMatch.source_start_seconds,true)}–${time(selectedMatch.source_end_seconds,true)}`:`Left out · ${time(selectedGap?.start_seconds,true)}–${time(selectedGap?.end_seconds,true)}`}</strong>{selectedMatch&&<p>{selectedMatch.evidence.map(e=>`${e.method}: ${e.description}`).join(" ")}</p>}{selectedMatch&&(()=>{const ratio=(selectedMatch.clip_end_seconds-selectedMatch.clip_start_seconds)/(selectedMatch.source_end_seconds-selectedMatch.source_start_seconds);return ratio<.95||ratio>1.05?<p className="subtle">≈{(ratio<1?1/ratio:ratio).toFixed(2)}× {ratio<1?"faster":"slower"}</p>:null})()}{selectedGap&&<p>{source?.transcript.sentences.filter(s=>s.start_seconds>=selectedGap.start_seconds&&s.start_seconds<selectedGap.end_seconds).map(s=>s.text).join(" ")}</p>}<button className="btn btn-outline" onClick={()=>setSelection(null)}>Close details</button></div>}</div></div><p className="subtle">Matched passages: {alignment?.edit_analysis.counts.matched_passages??"Not assessed"} · Source gaps between matched passages: {alignment?.edit_analysis.counts.source_gaps??"Not assessed"} · Unmatched submitted segments: {alignment?.edit_analysis.counts.unmatched_clip_segments??"Not assessed"}{metrics.outOfOrder&&" · Passages out of order"}</p></section>
+ {comparison?.context_assessment!=="not_assessed"&&comparison&&<section className="report-section"><h2>The <span className="accent-underline">context</span> cut out.</h2><div className="claim-grid"><div className="claim-box"><span className="claim-label">The caption says</span><p>{submitted.post.caption||"No caption was provided."}</p><small className="subtle">Caption is the poster’s claim, not verified.</small></div><div className="claim-box"><span className="claim-label">The source says</span><p>{comparison.findings[0]?.evidence[0]?.quote||"No key quote available."}</p><small className="subtle">{comparison.findings[0]?.evidence[0]?time(comparison.findings[0].evidence[0].start_seconds):"Timestamp unavailable"}</small></div></div><p className="step-copy">{captionText(comparison.caption_assessment)} {contextText(comparison.context_assessment)}</p><p className="subtle">These assessments concern this recording and caption, not universal truth.</p></section>}
+ {comparison?.context_assessment==="not_assessed"&&<p className="error-card">Context assessment unavailable.</p>}
+ <section className="report-section"><h2>Source video and submitted clip.</h2><div className="mobile-only" style={{display:"flex",gap:8,marginBottom:12}}><button className="btn btn-outline" onClick={()=>setMobilePlayer("source")}>Source</button><button className="btn btn-outline" onClick={()=>setMobilePlayer("clip")}>Clip</button></div><div className="players"><div className={`player-wrap ${mobilePlayer==="source"?"active":""}`}>{source&&player(source,"Source video")}</div><div className={`player-wrap ${mobilePlayer==="clip"?"active":""}`}>{player(submitted,"Submitted clip")}</div></div></section>
+ <section className="report-section"><h2>Key moments.</h2>{!comparison?.findings.length&&<p className="step-copy">No key moments were recorded.</p>}<div className="claim-grid">{comparison?.findings.slice(0,5).map(finding=><article className="claim-box" key={finding.finding_id}><span className="claim-label">KEY · {finding.type.replaceAll("_"," ")}</span><p>{finding.evidence[0]?.quote}</p><p className="step-copy">{finding.explanation}</p></article>)}</div></section>
+ <section className="report-section"><h2>Transcript.</h2><div className="mobile-only" style={{display:"flex",gap:8,marginBottom:12}}><button className="btn btn-outline" onClick={()=>setTranscriptTab("clip")}>Clip</button><button className="btn btn-outline" onClick={()=>setTranscriptTab("source")}>Source</button></div><div className="transcript-grid"><div className={transcriptTab==="clip"?"active":"player-wrap"}>{transcript(submitted,"Submitted clip")}</div>{source&&<div className={transcriptTab==="source"?"active":"player-wrap"}>{transcript(source,"Source",true)}</div>}</div></section>
+ <section className="report-section"><h2>Poster details.</h2><div className="poster-grid">{poster(submitted,"Submitted post")}{source&&poster(source,"Source post")}</div>{submitted.post.published_at&&source?.post.published_at&&<p className="subtle">Source post is {Math.max(0,Math.floor((Date.parse(submitted.post.published_at)-Date.parse(source.post.published_at))/86400000))} days older than the submitted post.</p>}</section>
+ <section className="report-section"><details className="evidence-details"><summary>Evidence &amp; provenance</summary><h3>Methods used</h3><p>{alignment?.match_quality.methods_used.join(" · ")||"Not assessed"}</p>{alignment?.matches.map(match=><article className="evidence-details" key={match.match_id}><strong>{match.match_id}</strong>{match.evidence.map((e,i)=><p key={i}>{e.method}: {e.description}<br/><small>{[...e.clip_refs,...e.source_refs].map(ref=>sentenceLookup(submitted.transcript,ref)?.text||sentenceLookup(source?.transcript||submitted.transcript,ref)?.text||ref).join(" · ")}</small></p>)}</article>)}{source?.post.retrieval.warnings.map(w=><p key={w}>{w}</p>)}</details></section>
+ <Limitations report={report}/>
+ </>;
 }
-
-function PosterPanel({ title, media }: { title: string; media: ReportMedia }) {
-  const card = posterCard(media.post.author);
-  return <div className="card" aria-label={title}><h3>{title}</h3>
-    <dl className="metadata"><div><dt>Handle</dt><dd>{card.handle}</dd></div>
-      <div><dt>Followers</dt><dd>{card.followers_count}</dd></div>
-      <div><dt>Verified</dt><dd>{card.verified}</dd></div></dl></div>;
-}
-
-export default function ResultCard({ report }: { report: ReportV2 }) {
-  const alignment = report.alignment;
-  const edit = alignment?.edit_analysis ?? null;
-  return <article><div className="verdict"><span className="eyebrow">Analysis result</span>
-    <h1>{report.outcome === "matched" ? "A source match was verified" : NO_SOURCE_MESSAGE}</h1>
-    <p>{report.summary || report.comparison?.summary || "There is not enough evidence to assess the post’s context."}</p></div>
-
-    <div className="panels"><MediaPanel title="Submitted post" media={report.submitted}/>
-      {report.outcome === "matched" && report.source
-        ? <MediaPanel title="Matched source" media={report.source}/>
-        : <section className="panel" aria-label="Matched source"><h2>Matched source</h2><p role="status">{NO_SOURCE_MESSAGE}</p></section>}</div>
-
-    <section className="panel"><h2>Confidence</h2><ConfidenceSection {...confidenceDisplay(report)}/>
-      {report.comparison && <p>Context: {report.comparison.context_assessment.replaceAll("_", " ")}. Caption: {report.comparison.caption_assessment.replaceAll("_", " ")}.</p>}</section>
-
-    <section className="panel" aria-label="Poster metadata"><h2>Poster metadata</h2><div className="cards">
-      <PosterPanel title="Submitted poster" media={report.submitted}/>
-      {report.outcome === "matched" && report.source && <PosterPanel title="Source poster" media={report.source}/>}</div></section>
-
-    <section className="panel"><h2>Findings and evidence</h2>
-      {report.comparison?.findings.length ? report.comparison.findings.map((finding) => <div key={finding.finding_id}>
-        <h3>{finding.type.replaceAll("_", " ")}</h3><p>{finding.explanation}</p>
-        {finding.evidence.map((evidence, index) => <blockquote key={index}>{evidence.quote}<footer>{timeRange(evidence.start_seconds, evidence.end_seconds)}</footer></blockquote>)}</div>)
-        : <p>No findings were recorded.</p>}</section>
-
-    <section className="panel"><h2>Edit analysis</h2>
-      {edit ? <>
-        <p>Status: {edit.status.replaceAll("_", " ")}. {edit.scope}</p>
-        <dl className="metadata">{(Object.keys(editLabels) as Array<keyof EditCounts>).map((key) => <div key={key}><dt>{editLabels[key]}</dt>
-          <dd>{displayCount(edit.counts[key], NOT_ASSESSED)}</dd></div>)}</dl>
-        {alignment!.matches.length > 0 && <table><thead><tr><th>Passage</th><th>Submitted clip</th><th>Source</th></tr></thead><tbody>
-          {alignment!.matches.map((match) => <tr key={match.match_id}><td>{match.match_id}</td>
-            <td>{timeRange(match.clip_start_seconds, match.clip_end_seconds)}</td><td>{timeRange(match.source_start_seconds, match.source_end_seconds)}</td></tr>)}</tbody></table>}
-        <h3>Source gaps</h3>{edit.source_gaps.length
-          ? <ul>{edit.source_gaps.map((gap, index) => <li key={index}>{timeRange(gap.start_seconds, gap.end_seconds)}</li>)}</ul> : <p>None recorded.</p>}
-        <h3>Unmatched clip ranges</h3>{edit.unmatched_clip_ranges.length
-          ? <ul>{edit.unmatched_clip_ranges.map((range, index) => <li key={index}>{timeRange(range.start_seconds, range.end_seconds)}</li>)}</ul> : <p>None recorded.</p>}
-      </> : <p>Status: {NOT_ASSESSED}. Edits can only be analyzed against a verified source.</p>}</section>
-
-    {Boolean(report.context?.windows.length) && <section className="panel"><h2>Surrounding source context</h2>{report.context!.windows.map((window) => <details key={window.context_id}>
-      <summary>{timeRange(window.requested_start_seconds, window.requested_end_seconds)} · {window.coverage}</summary>
-      {window.sentences.length ? window.sentences.map((sentence) => <p key={sentence.sentence_id}><span className="timestamp">{timeRange(sentence.start_seconds, sentence.end_seconds)}</span> {sentence.text}</p>) : <p>Context was unavailable for this window.</p>}
-    </details>)}</section>}
-
-    <section className="panel"><h2>Limitations</h2>{report.limitations.length
-      ? <ul>{report.limitations.map((limitation, index) => <li key={index}>{limitation}</li>)}</ul> : <p>No additional limitations were recorded.</p>}</section>
-  </article>;
-}
+function Instrument({index,title,value,detail,confidence}:{index:string;title:string;value:string;detail?:string;confidence?:{level:string;method:string;basis:string[];limitations:string[]}}){const n=confidence?.level==="high"?3:confidence?.level==="moderate"?2:confidence?.level==="low"?1:0;return <article className="instrument"><div className="instrument-head"><span>{title}</span><span>{index}</span></div><div className="instrument-body"><p className="instrument-value">{value}</p>{confidence&&<div className="meter" aria-label={`${n} of 3 confidence segments`}>{[1,2,3].map(i=><i key={i} className={i<=n?"on":""}/>)}</div>}<p>{detail||confidence?.method||"Not assessed"}</p>{confidence&&<><ul>{confidence.basis.map(item=><li key={item}>{item}</li>)}</ul>{confidence.limitations.map(item=><p key={item}>{item}</p>)}<p>{CONFIDENCE_NOTE}</p></>}</div></article>}
+function Limitations({report}:{report:Report}){const limitations=unique([...report.limitations,...(report.alignment?.limitations||[]),...(report.comparison?.limitations||[])]);return <section className="report-section"><h2>Limitations.</h2><ul>{limitations.map(item=><li key={item} className="step-copy">{item}</li>)}</ul></section>}
+function captionText(value:string){return ({supported_by_context:"The caption is supported by the surrounding context.",contradicted_by_context:"The caption is contradicted by the surrounding context.",uncertain:"We can’t tell whether the context supports the caption.",not_provided:"No caption was provided.",not_assessed:"Caption not assessed."} as Record<string,string>)[value]||"Caption not assessed."}
+function contextText(value:string){return ({material_context_missing:"Material context is missing from the submitted clip.",no_material_difference_found:"No material difference found.",uncertain:"Context is uncertain.",not_assessed:"Context assessment unavailable."} as Record<string,string>)[value]||"Context assessment unavailable."}

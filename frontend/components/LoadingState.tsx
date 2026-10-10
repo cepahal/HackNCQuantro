@@ -1,3 +1,2 @@
-export default function LoadingState({ message = "Loading the report…" }: { message?: string }) {
-  return <div className="notice" role="status" aria-live="polite">{message}</div>;
-}
+const stages=["retrieving","transcribing","searching","aligning","building_report"];
+export default function LoadingState({job}:{job:{stage?:string}|null}){const active=stages.indexOf(job?.stage||"");return <section className="hatch" aria-live="polite"><div className="panel" style={{padding:24}}><p className="subtle">ANALYSIS IN PROGRESS</p><h2 style={{fontWeight:400}}>Finding the source.</h2><p className="step-copy">We’re following the media and checking its surrounding context.</p><ol style={{listStyle:"none",padding:0,display:"grid",gap:12}}>{stages.map((stage,index)=><li key={stage} style={{display:"flex",gap:12,alignItems:"center",color:index<=active?"var(--ink)":"var(--muted)"}}><span style={{width:20,height:20,borderRadius:"50%",border:`1px solid ${index===active?"var(--red)":"var(--line)"}`,background:index<active?"var(--red)":"white",display:"inline-block"}}/>{stage.replaceAll("_"," ")}{index===active&&<span className="subtle">Working…</span>}</li>)}</ol></div></section>}

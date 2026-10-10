@@ -1,7 +1,8 @@
 # Quantro web MVP
 
 Next.js App Router frontend for the existing FastAPI analysis and saved-report endpoints.
-Requires Node 24. Dependencies are Next.js, React, and TypeScript; there is no separate UI framework.
+Requires Node 24. The UI is Grant's design (`app/globals.css`, Tailwind 4 via PostCSS, and
+framer-motion for the homepage algorithm animation) on Next.js, React, and TypeScript.
 
 ```powershell
 npm --prefix frontend ci
@@ -14,8 +15,11 @@ For deployment, set that variable to the actual public frontend origin. Configur
 `NEXT_PUBLIC_API_BASE_URL` in private `frontend/.env.local` before building if the browser-visible
 backend is not `http://localhost:8000`. This is a public URL, never a credential.
 
-The home page submits `{url}` to `POST /analyze/{job_id}/run`, then reads the saved ReportV2
-from `GET /reports/{report_id}`. Shared frontend links use `/reports/{report_id}`.
+The "Try now" dialog starts `POST /analyze/{job_id}/run` with `{url}` and opens
+`/results?job={job_id}`, which shows the loading state until the request returns and then
+replaces the URL with `/results?id={report_id}` and reads `GET /reports/{report_id}`.
+`/reports/{report_id}` (the backend's iMessage link) and `/results/{report_id}` redirect there.
+Video file upload is not supported by the backend yet; the dialog asks for a post link instead.
 Reports show source evidence, available transcripts, source-match and context-assessment
 confidence separately, clip coverage, and limitations. JPG/MP4 playback uses a returned
 `playback_url`, or the backend `GET /media/{media_id}` endpoint. The backend remains responsible
@@ -24,6 +28,7 @@ for URL validation, provider calls, persistence, and safe public report serializ
 ```powershell
 npm --prefix frontend test
 npm --prefix frontend run typecheck
+npm --prefix frontend run lint
 npm --prefix frontend run build
 npm --prefix frontend start
 ```

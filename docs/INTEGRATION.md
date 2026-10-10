@@ -96,7 +96,7 @@ blank template; keep credentials out of tracked files.
 | `SPECTRUM_PROJECT_ID`, `SPECTRUM_PROJECT_SECRET` | Photon sidecar `backend/services/photon` (`--imessage` mode) | Photon sidecar: `iner54` | From Photon project Settings. Only needed for real iMessage; terminal mode runs without them. |
 | `PHOTON_BRIDGE_TOKEN`, `PHOTON_BRIDGE_PORT`, `PHOTON_DATA_DIR` | `external_apis/photon.py` and the sidecar | Photon sidecar: `iner54`; `send_summary` caller: Bhrigu | Token authenticates Python → loopback bridge `127.0.0.1:8766`. Delivery ledger persists in `PHOTON_DATA_DIR`. |
 | `PHOTON_API_KEY`, `PHOTON_BASE_URL`, `PHOTON_SENDER_ID` | `services/messaging/photon.py` (`POST /webhooks/photon`) | Bhrigu | Alternative HTTP webhook path. Assumed contract: `POST {base}/messages` with bearer key; inbound `X-Photon-Signature` = hex HMAC-SHA256 of the raw body keyed with `PHOTON_API_KEY`. Confirm with Photon. |
-| `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_REPORT_BASE_URL`, `NEXT_PUBLIC_PHOTON_NUMBER` | `frontend/lib/api.ts`, `ShareButton.tsx`, `PhotonBanner.tsx` | Grant | `http://localhost:8000` and `http://localhost:3000` locally. Inlined at build time. |
+| `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_PHOTON_NUMBER` | `frontend/lib/api.ts`, `frontend/app/page.tsx` (hero note) | Grant | `http://localhost:8000` locally. Inlined at build time. `NEXT_PUBLIC_REPORT_BASE_URL` is no longer read; the report page's Copy link uses the page URL. |
 
 ## What to check when it breaks
 

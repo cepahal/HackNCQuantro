@@ -1,32 +1,19 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import Navbar from "../components/Navbar";
 import InputForm from "../components/InputForm";
-import LoadingState from "../components/LoadingState";
-import { QuantroApiError, runAnalysis } from "../lib/api";
+import AsciiLens from "../components/AsciiLens";
+import AlgorithmAnimation from "../components/AlgorithmAnimation";
 
-interface Failure { message: string; code: string | null }
-
-export default function Home() {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<Failure | null>(null);
-  async function analyze(url: string) {
-    if (busy) return;
-    setBusy(true); setFailure(null);
-    try {
-      const result = await runAnalysis(url);
-      router.push(`/results/${encodeURIComponent(result.report_id)}`);
-    } catch (error) {
-      setFailure(error instanceof QuantroApiError
-        ? { message: error.message, code: error.code ?? `HTTP ${error.status}` }
-        : { message: error instanceof Error ? error.message : "Analysis failed. Please try again.", code: null });
-      setBusy(false);
-    }
-  }
-  return <><section className="hero"><span className="eyebrow">Check the context</span><h1>A clip rarely tells the whole story.</h1>
-    <p>Submit an accessible public video or JPG. Quantro searches the indexed source recordings, compares the evidence, and explains what remains uncertain.</p>
-    <InputForm busy={busy} onSubmit={analyze}/></section>
-    {busy && <LoadingState message="Downloading media and comparing source evidence. Longer recordings can take several minutes; keep this page open."/>}
-    {failure && <div role="alert" className="notice error"><strong>{failure.message}</strong>{failure.code && <p>Error code: <code>{failure.code}</code></p>}</div>}</>;
-}
+const PHOTON_NUMBER=process.env.NEXT_PUBLIC_PHOTON_NUMBER?.trim();
+const steps=[
+ {title:"Send it in.",copy:"Share a post, screenshot, or clip with our iMessage agent, or upload it here. We pull the video, the caption, and everything visible in it: speech, on-screen text, and frames.",labels:["Caption · dog foster clip","Speech · 7 sentences","Duration · 0:58","Resolution · 1080×1920"]},
+ {title:"Find the source.",copy:"We search for longer recordings, match distinctive spoken passages, and compare frames to confirm it is the same recording, not just a similar one.",labels:["Candidate 01 · verified source","Source-match confidence · High","Basis · transcript + visual match"]},
+ {title:"See what was left out.",copy:"We lay your clip against the source, map every cut, and read the context around it. You get the evidence, the timestamps, and how sure we are. Never a verdict.",labels:["Matched passages · 3","Source gaps · 2","Left out · 48 seconds"]},
+];
+function ReelConveyor(){return <div className="conveyor" aria-hidden="true">{[0,1,2,3,4,5].map((item)=><div className="reel" key={item}><span className="reel-label">▪ {item%2?"Source 1:07–1:35":"Clip 0:15–0:43"}</span></div>)}<div className="missing-slot">▪ missing context</div>{[6,7,8].map(item=><div className="reel" key={item}><span className="reel-label">▪ Source 1:35–2:00</span></div>)}</div>}
+export default function HomePage(){const[upload,setUpload]=useState(false);return <><Navbar/><main><section className="page-wrap hero"><div><h1>You deserve<br className="desktop-break"/> the truth.</h1><p className="hero-copy">Unzoom is a cloud-based data authenticity provider that finds the <span className="red-phrase">context left out</span> of <span className="accent-underline">social media posts</span>.</p><div className="hero-buttons"><button className="btn btn-black" onClick={()=>setUpload(true)}>Try now</button><Link className="btn btn-outline" href="#how">How it works</Link></div><p className="small-note">Share → Messages → {PHOTON_NUMBER||"our verification number"}.</p></div><div className="hero-art"><AsciiLens/><ReelConveyor/></div></section>
+<section className="page-wrap section" id="how"><h2>Filling in the <span className="accent-underline">gaps</span>.</h2><p className="section-intro">Misleading media spreads because checking it is too much work. Unzoom does the checking.</p><div className="step-grid">{steps.map((step,index)=><article key={step.title} tabIndex={0} className="step-frame"><div className="hatch"><div className="panel step-visual"><div className="diagram"><div className="mini-source"><span className="scanline"/></div><div className="rows">{step.labels.map(label=><span key={label}>{label}</span>)}</div></div></div></div><p className="step-kicker">STEP 0{index+1}</p><h3 className="step-title">{step.title}</h3><p className="step-copy">{step.copy}</p></article>)}</div><div className="center-cta"><button onClick={()=>setUpload(true)} className="btn btn-black">Upload file</button></div></section>
+<section className="page-wrap section" id="algorithm"><h2>How Unzoom splices it back together.</h2><p className="section-intro">A source match is only the beginning. We map the passages and bring the surrounding context back into view.</p><AlgorithmAnimation/></section></main><footer className="footer"><div className="page-wrap footer-inner"><Link className="brand" href="/" aria-label="Unzoom home"><Image className="brand-image" src="/logo.png" alt="Unzoom" width={180} height={31} /></Link><p>You deserve the truth.</p><p>Built at HackNC</p><p>© 2026 Unzoom</p></div></footer><InputForm open={upload} onClose={()=>setUpload(false)}/></>}

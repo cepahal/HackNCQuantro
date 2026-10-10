@@ -1,8 +1,7 @@
-import PhotonBanner from "../../../components/PhotonBanner";
-import ReportPage from "../../../components/ReportPage";
-import ShareButton from "../../../components/ShareButton";
+import { redirect } from "next/navigation";
 
-export default async function Results({ params }: { params: Promise<{ reportId: string }> }) {
+// Share links copied before the /results?id= page existed use /results/{id}.
+export default async function SharedReport({ params }: { params: Promise<{ reportId: string }> }) {
   const { reportId } = await params;
-  return <><ShareButton reportId={reportId}/><PhotonBanner/><ReportPage reportId={reportId}/></>;
+  redirect(`/results?id=${encodeURIComponent(reportId)}`);
 }

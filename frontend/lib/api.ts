@@ -112,10 +112,33 @@ function assertIngestResult(data: unknown, jobId: string): IngestResult {
   return data as unknown as IngestResult;
 }
 
-export async function runAnalysis(url: string, conversationId?: string): Promise<AnalysisResult> {
-  const jobId = `job_${crypto.randomUUID()}`;
+export async function runAnalysis(
+  url: string, conversationId?: string, jobId = `job_${crypto.randomUUID()}`,
+): Promise<AnalysisResult> {
   const body = conversationId === undefined ? { url } : { url, conversation_id: conversationId };
   return assertAnalysisResult(await postJson(`/analyze/${encodeURIComponent(jobId)}/run`, body), jobId);
+}
+
+export interface AnalysisInFlight {
+  url: string;
+  result: Promise<AnalysisResult>;
+}
+
+const inFlight = new Map<string, AnalysisInFlight>();
+
+/** Starts the synchronous analysis and returns its job id so another page can await it after client-side navigation. */
+export function startAnalysis(url: string): string {
+  const jobId = `job_${crypto.randomUUID()}`;
+  const result = runAnalysis(url, undefined, jobId);
+  // The awaiting page reports the rejection; this only stops an unhandled-rejection report before it mounts.
+  result.catch(() => undefined);
+  inFlight.set(jobId, { url, result });
+  return jobId;
+}
+
+/** Undefined after a full page load: the request lived in the previous page's memory. */
+export function analysisInFlight(jobId: string): AnalysisInFlight | undefined {
+  return inFlight.get(jobId);
 }
 
 export async function getReport(reportId: string): Promise<ReportV2> {
