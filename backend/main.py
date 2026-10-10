@@ -66,7 +66,12 @@ from backend.routes.photon_webhook import router as photon_webhook_router
 from backend.services.shared.errors import QuantroError
 from backend.services.storage.tiger import TigerStore
 
-FRONTEND_ORIGIN = os.getenv("REPORT_BASE_URL", "http://localhost:3000").rstrip("/")
+FRONTEND_ORIGINS = sorted({
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    *[origin.strip().rstrip("/") for origin in os.getenv("REPORT_BASE_URL", "").split(",") if origin.strip()],
+    *[origin.strip().rstrip("/") for origin in os.getenv("REPORT_ALLOWED_ORIGINS", "").split(",") if origin.strip()],
+})
 
 
 @asynccontextmanager
@@ -91,7 +96,7 @@ async def handle_quantro_error(request: Request, error: QuantroError):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_ORIGIN],
+    allow_origins=FRONTEND_ORIGINS,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "Range"],
 )

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  analysisInFlight, getReport, ingest, mediaUrl, publicUrl, QuantroApiError, runAnalysis, startAnalysis, waitForReport,
+  analysisInFlight, getReport, ingest, mediaUrl, publicUrl, QuantroApiError, ReportNotFoundError, runAnalysis, startAnalysis, waitForReport,
 } from "../lib/api.ts";
 import type { ReportV2 } from "../lib/api-types.ts";
 import { reportFixture } from "./fixtures/report_v2.ts";
@@ -106,10 +106,10 @@ test("ingest posts to the ingest route and returns the typed IngestResult", asyn
   assert.deepEqual(JSON.parse(String((options as RequestInit).body)), { url: "https://example.com/post" });
 });
 
-test("non-envelope errors still throw QuantroApiError without a code", async (t) => {
+test("a missing report is normalized to a non-retryable report-not-found error", async (t) => {
   t.mock.method(globalThis, "fetch", async () => Response.json({ error: { message: "Report not found" } }, { status: 404 }));
   await assert.rejects(getReport("report_missing"), (error: unknown) =>
-    error instanceof QuantroApiError && error.status === 404 && error.code === null && error.message === "Report not found");
+    error instanceof ReportNotFoundError && error.code === "REPORT_NOT_FOUND" && !error.retryable && error.message === "Report not found.");
 });
 
 test("connection errors hide raw transport details", async (t) => {
@@ -119,7 +119,7 @@ test("connection errors hide raw transport details", async (t) => {
 
 test("invalid identifiers do not issue requests", async (t) => {
   const fetch = t.mock.method(globalThis, "fetch", async () => { throw new Error("unexpected fetch"); });
-  await assert.rejects(getReport("../../private"), /identifier is invalid/);
+  await assert.rejects(getReport("../../private"), (error: unknown) => error instanceof ReportNotFoundError);
   await assert.rejects(ingest("../private", "https://example.com/post"), /identifier is invalid/);
   assert.equal(fetch.mock.callCount(), 0);
 });
@@ -127,6 +127,7 @@ test("invalid identifiers do not issue requests", async (t) => {
 test("media links use the byte-serving API and reject non-HTTP schemes", () => {
   assert.match(mediaUrl({ media_id: "media_1", playback_url: null }) ?? "", /\/media\/media_1$/);
   assert.equal(publicUrl("javascript:alert(1)"), null);
+  assert.equal(publicUrl("//evil.example/x"), null);
   assert.equal(publicUrl("file:///private"), null);
   assert.equal(publicUrl("https://name:secret@example.com"), null);
   assert.equal(mediaUrl({ media_id: "../private", playback_url: null }), null);
@@ -163,4 +164,24 @@ test("refresh recovery polls running jobs until the saved report exists", async 
     : {job_id: "job_saved", status: "completed", report_id: "report_job_saved", error: null}));
   assert.equal(await waitForReport("job_saved"), "report_job_saved");
   assert.equal(calls, 2);
+});
+
+test("saved-report polling rejects a mismatched job ID and unknown status", async (t) => {
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => Response.json(++calls === 1
+    ? { job_id: "job_other", status: "running", report_id: null, error: null }
+    : { job_id: "job_saved", status: "mystery", report_id: null, error: null }));
+  await assert.rejects(waitForReport("job_saved"), /invalid job status/);
+  await assert.rejects(waitForReport("job_saved"), /unknown job status/);
+});
+
+test("saved-report polling rejects completed jobs without a usable report ID", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({ job_id: "job_saved", status: "completed", report_id: null, error: null }));
+  await assert.rejects(waitForReport("job_saved"), /invalid report identifier/);
+});
+
+test("saved-report polling reports a bounded timeout", async (t) => {
+  t.mock.method(globalThis, "setTimeout", ((callback: () => void) => { queueMicrotask(callback); return 0; }) as unknown as typeof setTimeout);
+  t.mock.method(globalThis, "fetch", async () => Response.json({ job_id: "job_saved", status: "running", report_id: null, error: null }));
+  await assert.rejects(waitForReport("job_saved"), /taking longer than expected/);
 });

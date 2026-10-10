@@ -1,6 +1,7 @@
 import type {
   AssessmentBlock, Author, CaptionAssessment, ConfidenceLevel, ConfidenceObject, ContextAssessment, DisplayModel, ReportV2,
 } from "./api-types";
+import { percent } from "./format.ts";
 
 // Wording mirrors backend/services/reporting/display_report.py.
 export const SOURCE_MATCH_LABEL = "Source-match confidence";
@@ -34,7 +35,7 @@ export function levelLabel(level: ConfidenceLevel): string {
 
 /** Null means unknown, so it is never shown as 0. */
 export function displayCount(value: number | null, missing: string): string {
-  return value === null ? missing : value.toLocaleString("en-US");
+  return value === null || !Number.isFinite(value) ? missing : value.toLocaleString("en-US");
 }
 
 function assessmentBlock(label: string, confidence: ConfidenceObject | null): AssessmentBlock {
@@ -44,20 +45,19 @@ function assessmentBlock(label: string, confidence: ConfidenceObject | null): As
 }
 
 export function confidenceDisplay(report: ReportV2): ConfidenceDisplay {
-  const matched = report.outcome === "matched" && report.alignment !== null;
-  const quality = matched ? report.alignment!.match_quality : null;
+  const quality = report.outcome === "matched" ? report.alignment?.match_quality ?? null : null;
   const context = assessmentBlock(CONTEXT_ASSESSMENT_LABEL, report.comparison?.assessment_confidence ?? null);
   return {
     source_match: quality ? assessmentBlock(SOURCE_MATCH_LABEL, quality.confidence) : null,
     clip_coverage: quality ? {
       label: CLIP_COVERAGE_LABEL,
-      value: quality.clip_coverage_ratio === null ? NOT_ASSESSED : `${Math.round(quality.clip_coverage_ratio * 100)}%`,
+      value: percent(quality.clip_coverage_ratio),
       description: quality.matched_clip_seconds === null
         ? NOT_ASSESSED : `${quality.matched_clip_seconds} seconds aligned to the selected source.`,
     } : null,
     context_assessment: context,
     confidence_note: CONFIDENCE_NOTE,
-    no_source_message: matched ? null : NO_SOURCE_MESSAGE,
+    no_source_message: report.outcome === "no_verified_match" ? NO_SOURCE_MESSAGE : null,
     context_unavailable_message: context.value === NOT_ASSESSED ? CONTEXT_UNAVAILABLE_MESSAGE : null,
   };
 }
@@ -102,8 +102,10 @@ function sentence(text: string): string {
 export function generatedSummary(report: ReportV2): string {
   const parts: string[] = [];
   const quality = report.outcome === "matched" ? report.alignment?.match_quality ?? null : null;
-  if (!quality) {
+  if (report.outcome === "no_verified_match") {
     parts.push(`${NO_SOURCE_MESSAGE} for this post. That does not establish that the clip is accurate or unedited.`);
+  } else if (!quality) {
+    parts.push("A source recording was matched, but alignment details are unavailable.");
   } else {
     const level = quality.confidence.level;
     parts.push(level === "not_assessed"
@@ -111,7 +113,7 @@ export function generatedSummary(report: ReportV2): string {
       : `A source recording was matched with ${levelLabel(level).toLowerCase()} source-match confidence.`);
     if (quality.clip_coverage_ratio !== null) {
       const aligned = quality.matched_clip_seconds === null ? "" : ` (${Math.round(quality.matched_clip_seconds * 10) / 10} seconds)`;
-      parts.push(`${Math.round(quality.clip_coverage_ratio * 100)}% of the submitted clip${aligned} aligned to the selected source.`);
+      parts.push(`${percent(quality.clip_coverage_ratio)} of the submitted clip${aligned} aligned to the selected source.`);
     }
   }
   const comparison = report.comparison;

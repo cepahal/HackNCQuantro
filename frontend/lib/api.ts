@@ -38,7 +38,9 @@ export class QuantroApiError extends Error {
 }
 
 function apiBase(): string {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  return process.env.NODE_ENV === "production" ? "" : "http://localhost:8000";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,9 +64,11 @@ function toApiError(status: number, data: unknown): QuantroApiError {
 }
 
 async function request(path: string, options?: RequestInit): Promise<unknown> {
+  const base = apiBase();
+  if (!base) throw new Error("The analysis service URL is not configured.");
   let response: Response;
   try {
-    response = await fetch(`${apiBase()}${path}`, { ...options, cache: "no-store" });
+    response = await fetch(`${base}${path}`, { ...options, cache: "no-store" });
   } catch (error) {
     if (options?.signal?.aborted) throw error;
     throw new Error("Could not reach the analysis service. Check that the backend is running.");
@@ -143,8 +147,24 @@ export function analysisInFlight(jobId: string): AnalysisInFlight | undefined {
 }
 
 export async function getReport(reportId: string): Promise<ReportV2> {
-  if (!REPORT_ID.test(reportId)) throw new Error("The report identifier is invalid.");
-  return assertReport(await request(`/reports/${encodeURIComponent(reportId)}`));
+  if (!REPORT_ID.test(reportId)) throw new ReportNotFoundError();
+  try {
+    return assertReport(await request(`/reports/${encodeURIComponent(reportId)}`));
+  } catch (error) {
+    if (error instanceof QuantroApiError && error.status === 404) throw new ReportNotFoundError();
+    throw error;
+  }
+}
+
+export class ReportNotFoundError extends Error {
+  readonly code = "REPORT_NOT_FOUND";
+  readonly stage = "load_report";
+  readonly retryable = false;
+
+  constructor() {
+    super("Report not found.");
+    this.name = "ReportNotFoundError";
+  }
 }
 
 export async function ingest(jobId: string, url: string): Promise<IngestResult> {
@@ -153,7 +173,7 @@ export async function ingest(jobId: string, url: string): Promise<IngestResult> 
 }
 
 export function publicUrl(value: string | null | undefined): string | null {
-  if (!value) return null;
+  if (!value || value.startsWith("//")) return null;
   try {
     const url = new URL(value, apiBase());
     return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password ? url.href : null;
