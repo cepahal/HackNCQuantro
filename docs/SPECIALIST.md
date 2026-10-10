@@ -16,12 +16,22 @@ The default Gemini model is `gemini-flash-latest`. Use an audio/image capable
 model available to your project, with JSON schema support. Do not use the old
 `gemini-1.5-pro` example in RUNBOOK.md.
 
-Set privately in the root `.env` or backend `.env` (root takes precedence):
+Set privately in ignored root `.env.local`; it overrides root/backend `.env`
+placeholders and any previously loaded environment value. Do not commit keys:
 
 ```dotenv
 GEMINI_API_KEY=your-private-key
 GEMINI_MODEL=gemini-flash-latest
 ```
+
+The Gemini SDK uses system-trusted root certificates with certificate and hostname
+verification enabled. This supports local trusted network certificates without
+disabling TLS verification.
+
+2026-10-10 configuration handoff: added private local environment loading and
+verified system TLS. The configured SDK authenticated successfully using model
+listing; 393 tests passed with 2 skips. No API key is committed. Generation and
+transcription quality still require a separate approved-media test.
 
 The repository does not include credentials. Missing keys fail explicitly.
 Runtime model/network authorization and transcription quality must be verified

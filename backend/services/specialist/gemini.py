@@ -1,5 +1,6 @@
 """Private Gemini adapter used only by Jason's specialist stages."""
 import os
+import ssl
 from pathlib import Path
 
 from ..reporting.errors import QuantroError, ErrorCode
@@ -11,12 +12,17 @@ def client_and_model(stage):
     root = Path(__file__).resolve().parents[3]
     load_dotenv(root / '.env')
     load_dotenv(root / 'backend' / '.env')
+    # Private local settings override the team's tracked placeholders.
+    load_dotenv(root / '.env.local', override=True)
     key = os.getenv('GEMINI_API_KEY')
     model = os.getenv('GEMINI_MODEL', 'gemini-flash-latest')
     if not key:
         raise QuantroError(ErrorCode.PROCESSING_FAILED, stage,
                            'GEMINI_API_KEY is not configured.')
-    return genai.Client(api_key=key, http_options={'timeout': 120000}), model
+    return genai.Client(api_key=key, http_options={
+        'timeout': 120000,
+        'client_args': {'verify': ssl.create_default_context()},
+    }), model
 
 
 def generate_json(client, model, contents, schema, stage, code=ErrorCode.PROCESSING_FAILED):
