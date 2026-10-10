@@ -97,15 +97,17 @@ def build_search_queries(features: dict[str, Any], post: Post) -> Queries:
                     result["queries"].append(phrase)
                     seen.add(phrase.casefold())
 
+            spoken = []
             if transcript["status"] != "unavailable":
-                spoken = [_phrase(item["text"], minimum=4) for item in sentences[:500]]
-                for phrase in [p for p in spoken if p is not None][:4]:
-                    append(phrase)
-            for item in visible[:3]:
-                append(_phrase(item["text"]))
-            title = post["title"]
-            if title is not None:
-                append(_phrase(title))
+                spoken = [p for item in sentences[:500] if (p := _phrase(item["text"], minimum=4))][:4]
+            visual = [p for item in visible[:3] if (p := _phrase(item["text"]))]
+            title = _phrase(post["title"]) if post["title"] is not None else None
+            # Providers may execute only four queries. Put different evidence types
+            # in that prefix so a speech-heavy clip cannot crowd out visual clues.
+            for phrase in [*spoken[:1], *visual[:1], title, *spoken[1:2]]:
+                append(phrase)
+            for phrase in [*spoken[2:], *visual[1:]]:
+                append(phrase)
             caption = post["caption"]
             if caption is not None:
                 caption_phrase = _phrase(caption)

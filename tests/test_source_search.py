@@ -538,3 +538,12 @@ def test_modules_import_in_both_repository_launch_modes(inside_backend: bool) ->
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_bounded_provider_prefix_includes_ocr_and_title(features, post):
+    features["transcript"]["sentences"] = [{"text": f"Distinctive spoken passage number {n} about bridges"} for n in range(5)]
+    features["visual_text"] = [{"text": "City Council Meeting"}]
+    queries = build_search_queries(features, post)["queries"]
+    assert '"City Council Meeting"' in queries[:4]
+    assert '"Example Interview"' in queries[:4]
+    assert sum("Distinctive spoken" in query for query in queries[:4]) == 2

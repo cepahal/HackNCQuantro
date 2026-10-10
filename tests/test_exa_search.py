@@ -63,7 +63,7 @@ def test_partial_failure_warning_and_bounded_queries():
     assert p.find_posts(['a','b','c','d','e'],5)==[]
     assert len(calls)==4
     assert any('failed' in w for w in p.warnings)
-    assert any('first four' in w for w in p.warnings)
+    assert any('first three' in w for w in p.warnings)
     p.close()
 
 
@@ -90,3 +90,36 @@ def test_candidate_retrieval_enables_guarded_page_extraction(monkeypatch):
             'title':None,'publisher':None,'published_at':None,'snippet':None,'discovered_by_queries':['q']})
     assert seen['allow_webpage'] is True
     assert error.value.stage.value=='retrieve_candidate_media'
+
+
+def test_recording_links_survive_candidate_limit_without_claiming_verification():
+    def handler(request):
+        return httpx.Response(200, json={"results": [
+            {"url": "https://example.org/article", "title": "Related article"},
+            {"url": "https://www.youtube.com/watch?v=source", "title": "Recording"},
+            {"url": "https://example.org/full.mp4", "title": "Full recording"},
+        ]})
+    provider = ExaSearch("test", client=client(handler))
+    result = search_candidates(["speech"], 3, provider=provider)
+    assert [item["url"] for item in result["candidates"]] == [
+        "https://www.youtube.com/watch?v=source", "https://example.org/full.mp4", "https://example.org/article"]
+    assert all(item["discovered_by_queries"] == ["speech"] for item in result["candidates"])
+    assert any("not verified" in warning for warning in result["warnings"])
+    provider.close()
+
+
+def test_video_host_search_adds_recordings_within_four_call_budget():
+    import json
+    requests = []
+    def handler(request):
+        body = json.loads(request.content); requests.append(body)
+        url = "https://www.youtube.com/watch?v=full" if body.get("includeDomains") else "https://example.org/article"
+        return httpx.Response(200, json={"results": [{"url": url}]})
+    provider = ExaSearch("test", client=client(handler))
+    result = search_candidates(["spoken phrase", "visible title", "post title", "extra speech"], 5, provider=provider)
+    assert len(requests) == 4
+    assert requests[1]["includeDomains"] == ["youtube.com", "vimeo.com", "archive.org"]
+    assert {body["query"] for body in requests} == {"spoken phrase", "visible title", "post title"}
+    assert result["candidates"][0]["url"] == "https://www.youtube.com/watch?v=full"
+    assert result["candidates"][0]["discovered_by_queries"] == ["spoken phrase"]
+    provider.close()

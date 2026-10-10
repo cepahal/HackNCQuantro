@@ -1,5 +1,6 @@
 """Bounded Exa web discovery; results remain unverified candidate pages."""
 from datetime import UTC, datetime
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -21,15 +22,24 @@ class ExaSearch:
 
     def find_posts(self, queries, limit):
         self.warnings = ['Exa results are possible sources, not verified matches or established original uploads.']
-        selected = queries[:4]
+        selected = queries[:3]
         if len(selected) < len(queries):
-            self.warnings.append('Search was bounded to the first four queries.')
+            self.warnings.append('Search was bounded to the first three clues plus a video-host search.')
         pages, failed, retryable = [], 0, False
-        for query in selected:
+        searches = [(query, None) for query in selected]
+        if selected:
+            # Preserve open-web coverage and add one recording-focused request.
+            # includeDomains is the documented Exa filter (not a site: operator).
+            searches.insert(1, (selected[0], ["youtube.com", "vimeo.com", "archive.org"]))
+            self.warnings.append('One search targets YouTube, Vimeo and Internet Archive; other recording hosts may be missed.')
+        for query, domains in searches:
             try:
+                payload = {'query': query, 'type': 'auto', 'numResults': min(limit, 10)}
+                if domains is not None:
+                    payload['includeDomains'] = domains
                 response = self._client.post('https://api.exa.ai/search',
                     headers={'x-api-key': self._key},
-                    json={'query': query, 'type': 'auto', 'numResults': min(limit, 10)})
+                    json=payload)
                 response.raise_for_status()
                 raw = response.json()['results']
                 if not isinstance(raw, list):
@@ -80,5 +90,17 @@ class ExaSearch:
                     order.append(url)
                 if query not in unique[url][1]:
                     unique[url][1].append(query)
+        # Prefer recording-shaped URLs within the already-fetched results. Keep
+        # article pages as fallbacks: they may embed media the worker can extract.
+        # This is a retrieval heuristic, never evidence that the source matches.
+        def recording_priority(url):
+            try:
+                _, platform = _validate_url(url)
+                return 0 if platform != "direct_image" and not urlsplit(url).path.lower().endswith((".jpg", ".jpeg")) else 1
+            except QuantroError:
+                return 1
+        order.sort(key=recording_priority)
+        if any(recording_priority(url) == 0 for url in order):
+            self.warnings.append('Recording links were prioritized over general pages for retrieval; source identity still requires alignment.')
         self.warnings = list(dict.fromkeys(self.warnings))
         return [unique[url] for url in order[:limit]]
