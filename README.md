@@ -1,5 +1,9 @@
 # HackNCQuantro
 
+Photon setup and the Python `send_summary` adapter are documented in
+[backend/services/photon/README.md](backend/services/photon/README.md).
+Copy the blank `.env.example` only for a fresh checkout; keep real credentials in ignored `.env`.
+
 Task 1 — Build the iMessage verification agent
 Photon
 track
