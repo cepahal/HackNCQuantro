@@ -29,3 +29,5 @@
 .stage-fragment-4{left:calc(43% - 125px);top:calc(25% + 77px)}
 .stage-status{position:absolute;right:8%;bottom:10%;font-size:12px;color:var(--muted);z-index:5}
 @media(max-width:600px){.stage-grid{grid-template-columns:repeat(5,20px);gap:6px}.stage-cell{width:20px;height:20px}.stage-source{top:calc(25% + 35px)}.stage-target{left:calc(43% + 104px);top:calc(25% + 26px)}.stage-fragment{left:calc(43% - 139px);top:calc(25% + 44px)}}
+@media(min-width:851px){.algorithm-intro{max-width:none;white-space:nowrap}}
+.stage-caption{margin-top:22px}
