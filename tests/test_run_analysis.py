@@ -770,3 +770,22 @@ def test_analyze_extra_fields_are_rejected_without_rows(client, store):
     assert response.status_code == 422
     assert "private" not in response.text
     assert store.get_job("job_extra") is None
+
+
+@pytest.mark.parametrize("model_return", [False, True])
+def test_candidate_analysis_skips_unused_visual_calls(upstream, monkeypatch, model_return):
+    original = analysis_module.extract_media_features
+    options_seen = []
+    def extract(media, options):
+        options_seen.append(options)
+        value = original(media, options)
+        return analysis_module.MediaFeatures.model_validate(value) if model_return else value
+    monkeypatch.setattr(analysis_module, 'extract_media_features', extract)
+    assessed = analysis_module._assess_candidate(_candidate(1), analysis_module.MediaFeatures.model_validate(CLIP_FEATURES), {CLIP_URL})
+    assert any("visual extraction was skipped" in warning for warning in assessed.features.warnings)
+    assert assessed.alignment.status == 'verified'
+    assert options_seen[0]['transcript_scope'] == 'full'
+    assert options_seen[0]['extract_frames'] is False
+    assert options_seen[0]['extract_visual_text'] is False
+    assert options_seen[0]['max_frames'] == 0
+    assert ingest_module.EXTRACTION_OPTIONS['extract_visual_text'] is True

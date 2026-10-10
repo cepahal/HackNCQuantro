@@ -185,3 +185,21 @@ Render has a paid Pro workspace, but no backend service is deployed yet. The
 prepared service uses one 1 CPU / 2 GB instance, private Tiger TLS configuration,
 and Exa. Service deployment and the Vercel production URL/rebuild remain gates.
 No credentials are committed.
+
+
+### Performance push reconciliation (2026-10-10)
+
+Merged teammate commits `22f469d` and `98079a8`: content/model-keyed transcript
+cache, faster input seeking, stage timings, and transcript-only candidate analysis
+with explicit visual-extraction limitations. Preserved bounded decoded audio and
+source identity checks. Fixed candidate handling for both shared MediaFeatures
+models and legacy dictionaries without mutating upstream results. Updated two
+mocked audio fixtures for the content cache. Search now receives the canonical
+Queries model, and provider exceptions remain retryable SEARCH_FAILED.
+
+Full merged suite: 913 passed, 9 skipped, 45 subtests in 31.09 seconds; skips are
+not claims of live coverage. Final affected pipeline checks: 78 passed. Mypy (22 affected source files),
+Ruff and generated frontend contracts passed. With the configured FFmpeg path,
+59 media/specialist checks passed and one Windows symlink test skipped. The two
+extra full-suite skips were from the fresh shell lacking the configured tool path. Render secrets were explicitly approved and loaded privately;
+the user also approved the separate $25/month backend compute deployment.

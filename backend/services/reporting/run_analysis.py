@@ -12,6 +12,7 @@ and a messaging failure becomes a delivery warning rather than undoing the save.
 """
 
 import logging
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, TypeVar
@@ -142,12 +143,15 @@ def deliver_summary_after_save(
 
 
 def _call(stage: Stage, function: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    started = time.monotonic()
     try:
         return function(*args, **kwargs)
     except Exception as exc:
         error = normalize_exception(stage, exc)
         logger.warning("Pipeline failure code=%s stage=%s type=%s", error.code.value, error.stage.value, type(exc).__name__)
         raise error from exc
+    finally:
+        logger.info("analysis_stage stage=%s seconds=%.3f", stage.value, time.monotonic() - started)
 
 
 def _candidate_label(candidate: dict[str, Any], index: int) -> str:
@@ -167,9 +171,11 @@ def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures, s
         Stage.EXTRACT_MEDIA_FEATURES,
         extract_media_features,
         post.media,
-        dict(EXTRACTION_OPTIONS),
+        {**EXTRACTION_OPTIONS, "extract_frames": False, "extract_visual_text": False, "max_frames": 0},
     )
     features = parse_stage_output(MediaFeatures, raw_features, Stage.EXTRACT_MEDIA_FEATURES)
+    features = features.model_copy(deep=True)
+    features.warnings.append("Candidate visual extraction was skipped; source verification uses transcript alignment only.")
     raw_alignment = _call(
         Stage.VERIFY_AND_ALIGN,
         verify_and_align,
@@ -277,12 +283,15 @@ def _analyze(
     queries = parse_stage_output(_SearchQueries, raw_queries, Stage.BUILD_SEARCH_QUERIES)
     warnings.extend(queries.warnings)
 
+    search_started = time.monotonic()
     try:
-        raw_search = _call(Stage.SEARCH_CANDIDATES, search_candidates, queries.model_dump(mode="json"), limit=SEARCH_LIMIT)
+        raw_search = search_candidates(queries, limit=SEARCH_LIMIT)
     except Exception as exc:
         raise QuantroError(
             code=ErrorCode.SEARCH_FAILED, stage=Stage.SEARCH_CANDIDATES, retryable=True
         ) from exc
+    finally:
+        logger.info("analysis_stage stage=%s seconds=%.3f", Stage.SEARCH_CANDIDATES.value, time.monotonic() - search_started)
     search = parse_stage_output(_CandidateSearch, raw_search, Stage.SEARCH_CANDIDATES)
     warnings.extend(warning for warning in search.warnings if warning not in warnings)
     submitted_identities = _post_identities(submitted_post)

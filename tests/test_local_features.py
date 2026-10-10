@@ -60,6 +60,7 @@ def test_lazy_whisper_segments_are_materialized(monkeypatch, tmp_path):
     model = SimpleNamespace(transcribe=lambda *args, **kwargs: (
         iter([SimpleNamespace(start=0.2, end=1.4, text=" Real words ")]), SimpleNamespace(language="en", duration=2.0)))
     monkeypatch.setattr(t, "_model", lambda name: model)
+    (tmp_path / "audio.wav").write_bytes(b"lazy segment audio fixture")
     result = t.transcribe(tmp_path / "audio.wav")
     assert result == {"language": "en", "sentences": [
         {"start_seconds": 0.2, "end_seconds": 1.4, "text": "Real words", "words": []}]}
@@ -72,6 +73,7 @@ def test_whisper_padding_is_bounded_by_decoded_audio(monkeypatch, tmp_path):
               SimpleNamespace(start=5.0, end=10.0, text="Padded segment", words=[])]),
         SimpleNamespace(language="en", duration=4.5)))
     monkeypatch.setattr(t, "_model", lambda name: model)
+    (tmp_path / "audio.wav").write_bytes(b"bounded padding audio fixture")
     result = t.transcribe(tmp_path / "audio.wav")
     assert len(result["sentences"]) == 1
     assert result["sentences"][0]["end_seconds"] == 4.5
