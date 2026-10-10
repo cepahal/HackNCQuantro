@@ -18,13 +18,14 @@
 .stage-grid{position:absolute;left:43%;top:25%;margin:0;z-index:1;transform:none}
 .stage-cell:first-child{background:#101116}
 .stage-cell-target-space{opacity:0}
-.stage-source{position:absolute;left:calc(43% - 76px);top:calc(25% + 54px);width:28px;height:28px;border-radius:7px;background:#e73552;z-index:3}
+.stage-source{position:absolute;left:calc(43% - 140px);top:calc(25% + 54px);width:28px;height:28px;border-radius:7px;background:#e73552;z-index:3}
 .stage-target{position:absolute;left:calc(43% + 144px);top:calc(25% + 36px);width:28px;height:28px;border-radius:7px;background:#101116;z-index:2}
+.stage-target{transform-origin:center center}
 .stage-gap{position:absolute;top:calc(65% - 5px);height:10px;background:#a5a9b4;border-radius:5px;opacity:0;z-index:3}
-.stage-fragment{position:absolute;left:calc(43% - 68px);top:calc(25% + 62px);width:12px;height:12px;border-radius:3px;background:#e73552;opacity:0;z-index:4}
-.stage-fragment-1{left:calc(43% - 54px)}
-.stage-fragment-2{left:calc(43% - 61px);top:calc(25% + 61px)}
-.stage-fragment-3{top:calc(25% + 68px)}
-.stage-fragment-4{left:calc(43% - 54px);top:calc(25% + 68px)}
+.stage-fragment{position:absolute;left:calc(43% - 139px);top:calc(25% + 63px);width:12px;height:12px;border-radius:3px;background:#e73552;opacity:0;z-index:4}
+.stage-fragment-1{left:calc(43% - 125px)}
+.stage-fragment-2{left:calc(43% - 132px);top:calc(25% + 70px)}
+.stage-fragment-3{top:calc(25% + 77px)}
+.stage-fragment-4{left:calc(43% - 125px);top:calc(25% + 77px)}
 .stage-status{position:absolute;right:8%;bottom:10%;font-size:12px;color:var(--muted);z-index:5}
-@media(max-width:600px){.stage-grid{grid-template-columns:repeat(5,20px);gap:6px}.stage-cell{width:20px;height:20px}.stage-source{top:calc(25% + 35px)}.stage-target{left:calc(43% + 104px);top:calc(25% + 26px)}.stage-fragment{left:calc(43% - 68px);top:calc(25% + 43px)}}
+@media(max-width:600px){.stage-grid{grid-template-columns:repeat(5,20px);gap:6px}.stage-cell{width:20px;height:20px}.stage-source{top:calc(25% + 35px)}.stage-target{left:calc(43% + 104px);top:calc(25% + 26px)}.stage-fragment{left:calc(43% - 139px);top:calc(25% + 44px)}}

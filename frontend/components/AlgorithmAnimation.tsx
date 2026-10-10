@@ -10,14 +10,12 @@ const captions = [
   "Matching the missing moments.",
   "Adding the missing context back.",
 ];
-const markerPositions = [27, 38, 50, 64, 76];
+const markerPositions = [39, 44, 53, 59, 62];
 const fragmentOffsets = [[0, 0], [14, 0], [7, 7], [0, 14], [14, 14]];
-const gapSegments = [
-  { left: 27, width: 11 },
-  { left: 38, width: 12 },
-  { left: 50, width: 14 },
-  { left: 64, width: 12 },
-];
+const gapSegments = markerPositions.slice(0, -1).map((position, index) => {
+  const distance = markerPositions[index + 1] - position;
+  return { left: position + distance / 4, width: distance / 2 };
+});
 
 export default function AlgorithmAnimation() {
   const [scope, animate] = useAnimate();
@@ -36,6 +34,30 @@ export default function AlgorithmAnimation() {
     const cellPitch = mobile ? 26 : 36;
     const sourceOffset = mobile ? 35 : 54;
     const rail = mobile ? { left: "14%", width: "72%" } : { left: "22%", width: "56%" };
+    const stageWidth = scope.current?.clientWidth ?? window.innerWidth;
+    const stageHeight = scope.current?.clientHeight ?? 440;
+    const targetStartX = stageWidth * 0.43 + cellPitch * 4;
+    const targetStartY = stageHeight * 0.25 + cellPitch;
+    const targetEndX = stageWidth * 0.5 - 14;
+    const targetEndY = stageHeight * 0.65 - 14;
+    const gridWidth = (mobile ? 20 : 28) * 5 + (mobile ? 6 : 8) * 4;
+    const outsideGridX = stageWidth * 0.43 + gridWidth + 22;
+    const curvePoints = [
+      [targetStartX, targetStartY],
+      [outsideGridX, targetStartY],
+      [outsideGridX, targetEndY],
+      [targetEndX, targetEndY],
+    ];
+    const curve = Array.from({ length: 17 }, (_, index) => {
+      const t = index / 16;
+      const inverse = 1 - t;
+      return curvePoints[0].map((_, axis) =>
+        inverse ** 3 * curvePoints[0][axis] +
+        3 * inverse ** 2 * t * curvePoints[1][axis] +
+        3 * inverse * t ** 2 * curvePoints[2][axis] +
+        t ** 3 * curvePoints[3][axis],
+      );
+    });
 
     const run = async () => {
       while (!cancelled) {
@@ -44,11 +66,12 @@ export default function AlgorithmAnimation() {
           animate(".stage-source", { x: 0, y: 0, scale: 1, opacity: 1 }, { duration: 0 }),
           animate(".stage-target", {
             left: `calc(43% + ${cellPitch * 4}px)`, top: `calc(25% + ${cellPitch}px)`, width: 28, height: 28,
-            borderRadius: 7, backgroundColor: "#101116", opacity: 1,
+            x: 0, y: 0, scaleX: 1, scaleY: 1, borderRadius: 7,
+            backgroundColor: "#101116", opacity: 1,
           }, { duration: 0 }),
           ...fragmentOffsets.map(([x, y], index) =>
             animate(`.stage-fragment-${index}`, {
-              left: `calc(43% - 76px + ${x}px)`, top: `calc(25% + ${sourceOffset + y}px)`,
+              left: `calc(43% - 139px + ${x}px)`, top: `calc(25% + ${sourceOffset + 1 + y}px)`,
               scale: 0, opacity: 0,
             }, { duration: 0 }),
           ),
@@ -69,8 +92,9 @@ export default function AlgorithmAnimation() {
         await pause(500);
         if (cancelled) break;
         await animate(".stage-target", {
-          left: "38%", top: "calc(65% - 14px)",
-        }, { duration: 0.9, ease: "easeInOut" });
+          x: curve.map(([x]) => x - targetStartX),
+          y: curve.map(([, y]) => y - targetStartY),
+        }, { duration: 1.45, ease: "linear" });
         await pause(350);
 
         if (cancelled) break;
@@ -78,7 +102,8 @@ export default function AlgorithmAnimation() {
         await Promise.all([
           animate(".stage-grid", { opacity: 0 }, { duration: 0.45 }),
           animate(".stage-target", {
-            ...rail, top: "calc(65% - 7px)", width: rail.width, height: 14,
+            scaleX: (stageWidth * Number.parseFloat(rail.width) / 100) / 28,
+            scaleY: 0.5,
             borderRadius: 7, backgroundColor: "#d0d3dc",
           }, { duration: 0.85, ease: "easeInOut" }),
           animate(".stage-source", { scale: 0.35, opacity: 0 }, { duration: 0.45 }),
@@ -93,7 +118,7 @@ export default function AlgorithmAnimation() {
         setStep(3);
         await Promise.all(markerPositions.map((position, index) =>
           animate(`.stage-fragment-${index}`, {
-            left: `calc(${position}% - 6px)`, top: "calc(65% - 6px)",
+            left: `calc(${position}% - 6px)`, top: "calc(65% - 20px)",
           }, { duration: 0.9, ease: "easeInOut", delay: index * 0.06 }),
         ));
         await pause(350);
@@ -114,7 +139,7 @@ export default function AlgorithmAnimation() {
       cancelled = true;
       running.current = false;
     };
-  }, [view, reduced, animate, replay]);
+  }, [view, reduced, animate, replay, scope]);
 
   return (
     <div>
