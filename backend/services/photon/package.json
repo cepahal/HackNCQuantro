@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node --use-system-ca --env-file-if-exists=../../../.env --env-file-if-exists=../../.env src/index.ts",
-    "start:imessage": "node --use-system-ca --env-file-if-exists=../../../.env --env-file-if-exists=../../.env src/index.ts --imessage",
+    "start": "node --use-system-ca --env-file-if-exists=../../../.env --env-file-if-exists=../../.env --env-file-if-exists=../../../.env.local src/index.ts",
+    "start:imessage": "node --use-system-ca --env-file-if-exists=../../../.env --env-file-if-exists=../../.env --env-file-if-exists=../../../.env.local src/index.ts --imessage",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts"
   },

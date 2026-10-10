@@ -15,12 +15,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 cd ..
 mkdir -p .secrets && chmod 700 .secrets
-cp .env .secrets/.env && chmod 600 .secrets/.env   # tracked blank template -> fill in the copy
-ln -s .secrets/.env .env.local                     # teammates' modules read .env.local
+cp .env.example .secrets/.env && chmod 600 .secrets/.env   # tracked blank template -> fill in the copy
+ln -s .secrets/.env .env.local                             # teammates' modules and the Photon sidecar read .env.local
 ```
 
-Secrets live only in the repo-root `.secrets/.env`. The folder and `.env.local` are
-git-ignored. Never fill in the tracked `.env` template. The vault needs at least:
+Secrets live only in the repo-root `.secrets/.env`. `.secrets/`, `.env` and `.env.local`
+are all git-ignored; `.env.example` is the only tracked template and stays blank. The
+vault needs at least:
 
 ```bash
 TIGER_DATABASE_URL=postgres://<user>:<password>@<host>:<port>/tsdb?sslmode=require
@@ -85,7 +86,11 @@ pytest tests/test_smoke_e2e.py -v
 cd backend && source .venv/bin/activate
 uvicorn main:app --port 8000
 
-# terminal 2: frontend
+# terminal 2: Photon bridge (iMessage replies); `start` = terminal mode, no Spectrum keys needed
+npm --prefix backend/services/photon ci --ignore-scripts   # once
+npm --prefix backend/services/photon run start:imessage    # needs SPECTRUM_PROJECT_ID/SECRET
+
+# terminal 3: frontend
 cd frontend && npm run dev
 ```
 
@@ -165,6 +170,7 @@ grep -rn --include='*.py' "/tmp/\|local_path\|api_key\|secret" backend/services/
 - [ ] `TIGERDATA_DSN` set in `.secrets/.env`, `.env.local` links to it, and the search corpus is seeded with the demo source video
 - [ ] `pytest tests/ -v` is green, including `test_smoke_e2e.py` against local Postgres
 - [ ] `uvicorn main:app --port 8000` boots with no traceback; `/docs` lists all three routes
+- [ ] Photon bridge is up (`curl http://127.0.0.1:8766/health`) and `SPECTRUM_PROJECT_ID`/`SECRET` are in the vault for real iMessage
 - [ ] `npm run dev` serves http://localhost:3000, and `/reports/[id]` exists (the link is `/reports/`, not `/report/`)
 - [ ] One full curl run of the demo URL returns `outcome: "matched"`, and the report page opens
 - [ ] `git status` shows no `.env` files staged

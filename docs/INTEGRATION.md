@@ -87,7 +87,8 @@ The tracked root `.env` is a blank template, so never fill it in.
 | `GEMINI_API_KEY` | `specialist/gemini.py` | Jason | Required for transcription (function 2) and comparison (function 8). |
 | `GEMINI_MODEL` | `specialist/gemini.py` | Jason | Default `gemini-flash-latest`. Ignore the old `gemini-1.5-pro` example. |
 | `TRANSCRIPTION_PROVIDER`, `TRANSCRIPTION_API_KEY` | nothing | Jason | Transcription goes through Gemini. |
-| `PHOTON_API_KEY`, `PHOTON_BASE_URL`, `PHOTON_SENDER_ID`, `PHOTON_BRIDGE_TOKEN`, `PHOTON_BRIDGE_PORT`, `PHOTON_DATA_DIR` | Photon bridge on unmerged branch `codex/photon-messaging` | Photon bridge: `iner54`; `send_summary` caller: Bhrigu | On `main`, `PhotonProvider` is still a stub, so sends report `delivery_status: "failed"`. |
+| `SPECTRUM_PROJECT_ID`, `SPECTRUM_PROJECT_SECRET` | Photon sidecar `backend/services/photon` (`--imessage` mode) | Photon sidecar: `iner54` | From Photon project Settings. Only needed for real iMessage; terminal mode runs without them. |
+| `PHOTON_BRIDGE_TOKEN`, `PHOTON_BRIDGE_PORT`, `PHOTON_DATA_DIR` | `external_apis/photon.py` and the sidecar | Photon sidecar: `iner54`; `send_summary` caller: Bhrigu | Token authenticates Python → loopback bridge `127.0.0.1:8766`. Delivery ledger persists in `PHOTON_DATA_DIR`. |
 | `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_REPORT_BASE_URL` | frontend (not built yet) | Grant | `http://localhost:8000` and `http://localhost:3000` locally. |
 
 ## What to check when it breaks
@@ -140,10 +141,13 @@ cd backend && python -m services.storage.tiger show <job_id> # full job, post, f
   `delivery_warning: "The summary message could not be sent."`. The report is still
   saved and opens at `report_url`.
 - **Check:**
-  - On `main` this always happens, because `PhotonProvider` is a stub until
-    `codex/photon-messaging` is merged.
-  - After the merge, confirm that `PHOTON_SENDER_ID` matches the sender registered with
-    Photon, and that `PHOTON_BASE_URL`/`PHOTON_API_KEY` belong to the same account.
+  - The sidecar is running: `curl http://127.0.0.1:8766/health`. If it isn't, sends fail
+    with `PHOTON_NOT_CONFIGURED` or a connection error.
+  - `PHOTON_BRIDGE_TOKEN` and `PHOTON_BRIDGE_PORT` are identical for the API and the
+    sidecar. Both read them from `.secrets/.env`; the sidecar reads it through `.env.local`.
+  - For real iMessage, `SPECTRUM_PROJECT_ID`/`SPECTRUM_PROJECT_SECRET` belong to the
+    Photon project whose sender line you expect. The old `PHOTON_SENDER_ID`,
+    `PHOTON_API_KEY` and `PHOTON_BASE_URL` are no longer read.
   - Re-running the job re-attempts the send. Deliveries are de-duplicated per
     `(job_id, conversation_id)` only after a successful send.
 
