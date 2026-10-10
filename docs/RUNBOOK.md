@@ -37,9 +37,11 @@ SNOWFLAKE_PASSWORD=
 SNOWFLAKE_DATABASE=
 SNOWFLAKE_SCHEMA=
 SNOWFLAKE_WAREHOUSE=
-PHOTON_API_KEY=
-PHOTON_BASE_URL=
-PHOTON_SENDER_ID=
+SPECTRUM_PROJECT_ID=
+SPECTRUM_PROJECT_SECRET=
+PHOTON_BRIDGE_TOKEN=
+PHOTON_BRIDGE_PORT=8766
+PHOTON_DATA_DIR=.data/photon
 RETRIEVAL_PROVIDER_API_KEY=
 SEARCH_PROVIDER_API_KEY=
 GEMINI_API_KEY=
@@ -50,7 +52,9 @@ NEXT_PUBLIC_REPORT_BASE_URL=http://localhost:3000
 ```
 
 `REPORT_STORE` is `memory` (default) or `snowflake` (not implemented yet). In-memory
-reports, job statuses and delivery records are lost when the backend restarts.
+reports and job statuses are lost when the backend restarts. Photon delivery records
+persist in `PHOTON_DATA_DIR`; keep that directory across transport restarts. See
+[Photon setup](../backend/services/photon/README.md) for Node 24 and the private bridge.
 
 ## 3. Verify
 

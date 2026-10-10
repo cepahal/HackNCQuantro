@@ -56,13 +56,15 @@ async function main(): Promise<void> {
     console.log(`Quantro Photon (${config.cloud ? "iMessage" : "terminal"}) ready at http://127.0.0.1:${config.port}.`);
     for await (const [space, message] of app.messages) {
       if (message.direction !== "inbound") continue;
-      conversations.set(space.id, space);
-      if (conversations.size > 1000) {
-        const oldest = conversations.keys().next().value;
-        if (oldest !== undefined) conversations.delete(oldest);
-      }
       try {
         await receive(space, message);
+        if (await hasConversation(directory, space.id)) {
+          conversations.set(space.id, space);
+          if (conversations.size > 1000) {
+            const oldest = conversations.keys().next().value;
+            if (oldest !== undefined) conversations.delete(oldest);
+          }
+        }
       } catch {
         console.error("A Photon submission could not be handled. Private details were omitted.");
       }

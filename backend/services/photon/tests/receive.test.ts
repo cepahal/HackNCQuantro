@@ -233,6 +233,24 @@ test("save failures return safe retry text and successful intake survives acknow
   assert.equal(await hasConversation(path, chat.value.id), true);
 });
 
+test("stalled acknowledgement and invalid-input sends stop blocking after twelve seconds", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const path = await directory(t);
+  const chat = space();
+  for (const text of ["https://example.com", "invalid input"]) {
+    let started: () => void = () => undefined;
+    const ready = new Promise<void>((resolve) => { started = resolve; });
+    t.mock.method(chat.value, "send", async () => { started(); return new Promise<never>(() => undefined); });
+    const pending = createReceiver({ directory: path })(chat.value, message({ type: "text", text }, chat.value, { id: text }));
+    await ready;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    t.mock.timers.tick(12_001);
+    await pending;
+  }
+  assert.equal((await records(path)).length, 1);
+  assert.equal(await hasConversation(path, chat.value.id), true);
+});
+
 test("dedup keys distinguish receiving lines and conversations", async (t) => {
   const path = await directory(t);
   const receive = createReceiver({ directory: path });

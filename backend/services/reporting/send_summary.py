@@ -1,8 +1,8 @@
 """send_summary stage of run_analysis.
 
 Sends the short verdict and report link back to the user's conversation after
-the report has been saved. A failure here is reported as a retryable
-MESSAGE_SEND_FAILED and never touches the saved report. When a job_id is given,
+the report has been saved. A failure here is reported as MESSAGE_SEND_FAILED
+with transport-specific retryability and never touches the saved report. When a job_id is given,
 each (job_id, conversation_id) pair is sent at most once; repeats return the
 original message_id instead of messaging the user again.
 """
@@ -11,6 +11,7 @@ import threading
 from dataclasses import dataclass
 from typing import Protocol
 
+from ..external_apis.photon import send_summary_request
 from .errors import ErrorCode, QuantroError, Stage
 from .types import DeliveryResult
 
@@ -27,7 +28,23 @@ class MessagingProvider(Protocol):
 
 class PhotonProvider:
     def send(self, conversation_id: str, text: str) -> SendReceipt:
-        raise NotImplementedError("TODO: send through Photon Spectrum once messaging is configured")
+        raise ValueError("Photon report delivery requires a summary, report URL, and stable job ID.")
+
+    def send_report(
+        self, conversation_id: str, summary: str, report_url: str, *, job_id: str | None
+    ) -> SendReceipt:
+        result = send_summary_request(
+            conversation_id, summary, report_url, job_id=job_id or ""
+        )
+        if "error" in result:
+            error = result["error"]
+            raise QuantroError(
+                code=ErrorCode.MESSAGE_SEND_FAILED,
+                stage=Stage.SEND_SUMMARY,
+                message=error["message"],
+                retryable=error["retryable"],
+            )
+        return SendReceipt(accepted=True, message_id=result["message_id"])
 
 
 class DeliveryTracker(Protocol):
@@ -103,6 +120,13 @@ def send_summary(
 ) -> DeliveryResult:
     provider = provider if provider is not None else get_messaging_provider()
     tracker = tracker if tracker is not None else get_delivery_tracker()
+
+    # The Photon bridge owns durable, payload-aware delivery tracking across restarts.
+    if isinstance(provider, PhotonProvider):
+        receipt = provider.send_report(conversation_id, summary, report_url, job_id=job_id)
+        return DeliveryResult(
+            conversation_id=conversation_id, message_id=receipt.message_id, status="accepted"
+        )
 
     if job_id is not None and not tracker.check_and_record(conversation_id, job_id):
         existing_id = tracker.get_message_id(conversation_id, job_id)

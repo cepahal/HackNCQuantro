@@ -38,6 +38,7 @@ interface SummarySenderOptions {
     send(text: string): Promise<{ id: string } | undefined>;
   }>;
   deliveryDirectory: string;
+  sendTimeoutMs?: number;
 }
 
 interface DeliveryRecord {
@@ -123,7 +124,25 @@ async function replaceRecord(path: string, record: DeliveryRecord): Promise<void
   }
 }
 
+async function withSendDeadline<T>(send: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      send,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(uncertainDelivery()), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 export function createSummarySender(options: SummarySenderOptions) {
+  const sendTimeoutMs = options.sendTimeoutMs ?? 12_000;
+  if (!Number.isInteger(sendTimeoutMs) || sendTimeoutMs < 1 || sendTimeoutMs > 12_000) {
+    throw new BridgeError(500, "INVALID_SEND_TIMEOUT", "The provider send deadline must be an integer from 1 to 12000 milliseconds.");
+  }
   const directory = resolve(options.deliveryDirectory);
   const inFlight = new Map<string, { fingerprint: string; promise: Promise<SummaryAccepted> }>();
 
@@ -169,7 +188,10 @@ export function createSummarySender(options: SummarySenderOptions) {
 
     let messageId: string;
     try {
-      const sent = await conversation.send(`${input.summary}\n\nFull report: ${input.report_url}`);
+      // A timeout cannot cancel provider delivery; its ledger must remain ambiguous.
+      const sent = await withSendDeadline(
+        conversation.send(`${input.summary}\n\nFull report: ${input.report_url}`), sendTimeoutMs,
+      );
       if (!validMessageId(sent?.id)) throw uncertainDelivery();
       messageId = sent.id;
     } catch {

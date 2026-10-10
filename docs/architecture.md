@@ -7,7 +7,8 @@ It receives iMessage submissions into private `.data/photon/inbox/<event-hash>/r
 records and acknowledges only saved inputs. This is an intake boundary; backend job creation
 and analysis are not implemented by the sidecar.
 
-After a report is saved, `backend/services/external_apis/photon.py:send_summary` calls the
+After a report is saved, the existing `reporting.send_summary` stage uses `PhotonProvider`
+and `external_apis.photon.send_summary_request` to call the
 new authenticated loopback-only `POST /send-summary` bridge. Its body is
 `{conversation_id, summary, report_url}` and a stable job ID is supplied in `Idempotency-Key`.
 The response is `{conversation_id, message_id, status: "accepted"}`. Delivery state is

@@ -7,6 +7,7 @@ import { imessage } from "spectrum-ts/providers/imessage";
 
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const ATTACHMENT_TIMEOUT_MS = 30_000;
+const SEND_TIMEOUT_MS = 12_000;
 const MAX_TEXT_CHARS = 16_384;
 const SUPPORTED_MEDIA = new Set([
   "image/jpeg", "image/png", "image/webp",
@@ -81,7 +82,8 @@ function submissionUrl(text: string): string {
 
 async function send(space: Space, text: string): Promise<void> {
   // A transport failure must not discard a successfully saved intake or leak SDK errors.
-  try { await space.send(text); } catch { /* A saved request remains available to the pipeline. */ }
+  try { await withinDeadline(space.send(text), Date.now() + SEND_TIMEOUT_MS); }
+  catch { /* A saved request remains available to the pipeline. */ }
 }
 
 async function withinDeadline<T>(operation: Promise<T>, deadline: number): Promise<T> {

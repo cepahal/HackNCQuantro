@@ -30,6 +30,11 @@ and save its output only in `.env`. It authenticates the Python-to-Node bridge, 
 The old `PHOTON_API_KEY`, `PHOTON_BASE_URL`, and `PHOTON_SENDER_ID` placeholders are not
 Spectrum credentials. The SDK discovers managed cloud endpoints and sending lines.
 
+For this repository, the three private values are also stored as encrypted GitHub Actions
+repository secrets with the same names. GitHub does not copy those secrets into a running
+service automatically: inject them into the server environment through your deployment
+process, or use the ignored local `.env`. Never paste them into a GitHub file or PR.
+
 The original public `.env` contained blank credential slots. It is replaced by a blank
 `.env.example`; real `.env`, media, and delivery state are ignored by Git.
 
@@ -43,7 +48,8 @@ npm.cmd --prefix backend/services/photon start
 npm.cmd --prefix backend/services/photon run start:imessage
 ```
 
-Use one transport process per project. Both commands load root `.env`, bind the summary API
+Use one transport process per project. Both commands load root `.env` and then
+`backend/.env` (if present), with backend values taking precedence. They bind the summary API
 to `127.0.0.1:8766`, and leave secrets out of startup output. Terminal mode accepts URL text;
 it does not simulate media uploads. Stop with Ctrl+C. A first terminal run may download the
 official SDK's terminal helper.
@@ -103,7 +109,7 @@ does not delete a saved request. Acknowledgements themselves do not claim exactl
 The backend must **save the report first**, then call:
 
 ```python
-from backend.services.external_apis.photon import send_summary
+from backend.services.reporting.send_summary import send_summary
 
 delivery = send_summary(
     conversation_id,
@@ -113,8 +119,10 @@ delivery = send_summary(
 )
 ```
 
-The Python process must load the same private root env through its normal configuration.
-The callable uses only the standard library and performs no automatic retries. A delivery
+The Python process must load the same private env through its normal configuration.
+The existing reporting stage delegates its `PhotonProvider` to a standard-library HTTP
+adapter, `external_apis.photon.send_summary_request`, and the bridge's durable delivery ledger.
+Custom injected providers retain the existing reporting interface. No automatic retry occurs. A delivery
 error must be stored separately from analysis status; preserve the completed report.
 
 The new private bridge endpoint is:
@@ -145,6 +153,7 @@ the cached provider ID. Changing its payload conflicts. A pending or failed prov
 may have sent a message; it must be reconciled before another send. Never bypass this by
 changing the job ID or deleting its delivery record to force a retry. Errors use
 `{error: {code, stage: "send_summary", message, retryable}}` with safe fixed messages.
+Provider sends have a 12-second deadline; a timeout remains an uncertain outcome.
 
 Persist `.data/photon` on the deployment host; keep it private and share its delivery directory
 if more than one bridge instance is used. Do not expose the bridge port publicly. The service
@@ -155,7 +164,7 @@ does not implement account linking, a public webhook, or a backend analysis endp
 ```powershell
 npm.cmd --prefix backend/services/photon run typecheck
 npm.cmd --prefix backend/services/photon test
-python -m unittest discover -s tests
+python -m pytest tests -q
 ```
 
 Offline tests use fake Spectrum spaces/attachments and temporary directories. A live acceptance

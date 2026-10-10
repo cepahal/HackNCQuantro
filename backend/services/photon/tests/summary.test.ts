@@ -315,3 +315,43 @@ test("invalid provider message IDs leave an ambiguous attempt that cannot resend
     }
   });
 });
+
+test("stalled provider sends time out and late success or rejection cannot cause a resend", async () => {
+  await withDirectory(async (deliveryDirectory) => {
+    for (const outcome of ["success", "rejection"] as const) {
+      let complete!: (message: { id: string }) => void;
+      let fail!: (error: Error) => void;
+      const providerResult = new Promise<{ id: string }>((resolve, reject) => {
+        complete = resolve;
+        fail = reject;
+      });
+      let sends = 0;
+      const options = {
+        deliveryDirectory,
+        sendTimeoutMs: 10,
+        resolveConversation: async () => ({ send: () => { sends++; return providerResult; } }),
+      };
+      await assert.rejects(createSummarySender(options)(input, `timeout-${outcome}`), hasError(502, "DELIVERY_UNCERTAIN"));
+      if (outcome === "success") complete({ id: "too-late" });
+      else fail(new Error("private late failure"));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      await assert.rejects(createSummarySender(options)(input, `timeout-${outcome}`), hasError(409, "DELIVERY_UNCERTAIN"));
+      assert.equal(sends, 1);
+      const key = createHash("sha256").update(JSON.stringify([input.conversation_id, `timeout-${outcome}`])).digest("hex");
+      assert.equal(JSON.parse(await readFile(join(deliveryDirectory, `${key}.json`), "utf8")).state, "failed");
+    }
+  });
+});
+
+test("provider send deadline configuration rejects values outside 1–12000 integer milliseconds", async () => {
+  await withDirectory(async (deliveryDirectory) => {
+    for (const sendTimeoutMs of [0, -1, 12_001, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.throws(() => createSummarySender({
+        deliveryDirectory,
+        sendTimeoutMs,
+        resolveConversation: async () => ({ send: async () => ({ id: "unused" }) }),
+      }), hasError(500, "INVALID_SEND_TIMEOUT"));
+    }
+    assert.deepEqual(await readdir(deliveryDirectory), []);
+  });
+});
