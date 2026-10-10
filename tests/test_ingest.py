@@ -62,7 +62,7 @@ def upstream(monkeypatch):
         return _post()
 
     def fake_extract(media, options):
-        calls["media"], calls["options"] = media, options
+        calls["media"], calls["options"] = media.model_dump(mode="json") if hasattr(media, "model_dump") else media, options
         return _features()
 
     monkeypatch.setattr(ingest_module, "retrieve_post", fake_retrieve)
@@ -165,19 +165,20 @@ def test_untyped_extraction_error_uses_safe_message_and_correct_retryability(cli
     assert "private" not in response.text
 
 
-def test_tiger_round_trip_keeps_internal_paths_private(client, store, upstream):
+def test_tiger_round_trip_matches_exact_contract_json(client, store, upstream):
     client.post("/ingest/job_5", json={"url": "https://www.youtube.com/watch?v=x"})
 
     response = client.get("/ingest/job_5")
 
     assert response.status_code == 200
-    job = response.json()
+    envelope = response.json()
+    assert set(envelope) == {"job", "post", "features"}
+    job = envelope["job"]
     stored = store.get_job("job_5")
     assert stored["post_json"] == _post()
     assert stored["features_json"] == _features()
-    assert "local_path" not in job["post_json"]["media"]
-    assert "image_path" not in job["features_json"]["frames"][0]
-    assert "/tmp/" not in response.text
+    assert envelope["post"] == _post()
+    assert envelope["features"] == _features()
     assert job["created_at"].endswith("Z") and job["updated_at"].endswith("Z")
 
 
@@ -217,3 +218,24 @@ def test_postgres_url_with_sslmode_require_is_accepted():
     store = TigerStore("postgres://user:pw@db.example.com:5432/tsdb?sslmode=require")
     assert store._engine.url.drivername == "postgresql+psycopg"
     store.close()
+
+
+def test_missing_primary_database_url_cannot_fall_back_at_startup(monkeypatch):
+    monkeypatch.delenv("TIGER_DATABASE_URL", raising=False)
+    monkeypatch.setenv("TIGERDATA_DSN", "postgresql://user:password@localhost/db")
+    with pytest.raises(TigerConfigError, match="TIGER_DATABASE_URL is not set"), TestClient(app):
+        pass
+
+
+@pytest.mark.parametrize("url", ["postgresql://user:password@localhost/db", "sqlite:///:memory:"])
+def test_production_requires_postgres_tls(monkeypatch, url):
+    monkeypatch.setenv("APP_ENV", "production")
+    with pytest.raises(TigerConfigError):
+        TigerStore(url)
+
+
+def test_report_save_prompt3_order_is_idempotent(store):
+    store.upsert_job("job_report", "https://youtube.com/watch?v=x", "ingested")
+    assert store.save_report("report_prompt3", "job_report", {"value": 1})
+    assert not store.save_report("report_prompt3", "job_report", {"value": 2})
+    assert store.get_report("report_prompt3") == {"value": 1}

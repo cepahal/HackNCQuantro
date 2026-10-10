@@ -98,3 +98,14 @@ SEARCH_PROVIDER=tigerdata selects the real stored corpus; no silent fallback occ
 SerpAPI credentials are configured only in the ignored local environment. Startup rejects functions
 whose implementation filename includes stub or mock. Real YouTube retrieval, local transcription/frames, public search, candidate retrieval
 and verified alignment passed; see PROMPT_2_5_NETWORK_TEST_OUTPUT.txt. No Prompt 3 or main merge.
+
+
+## Prompt 3 persistence/ingest reconciliation
+
+API startup now requires TIGER_DATABASE_URL explicitly. Production (APP_ENV or
+ENVIRONMENT=production) requires PostgreSQL with require/verify-ca/verify-full TLS,
+including loopback. save_report accepts (report_id, job_id, report_json), preserving
+legacy callers. GET /ingest/{job_id} returns {job, post, features} with exact persisted
+JSON, including internal worker paths; use sanitized /reports endpoints for public UI.
+Real job_test_001: ingested, complete transcript, 3 sentences, 12 frames; exact Tiger
+JSON round-trip passed. Missing Gemini credits and live iMessage delivery remain MVP gates.

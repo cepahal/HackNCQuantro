@@ -4,9 +4,8 @@ from fastapi import APIRouter, Depends, Path
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from backend.routes.common import get_tiger_store, not_found, quantro_error_response
+from backend.routes.common import get_tiger_store, quantro_error_response
 from backend.services.pipeline.run_ingest import run_ingest
-from backend.services.reporting.build_report import sanitize_report
 from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.storage.tiger import TigerStore
 
@@ -36,8 +35,13 @@ def get_ingest(job_id: JobId, store: TigerDependency) -> JSONResponse:
     except Exception as exc:
         raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.EXTRACT_MEDIA_FEATURES, retryable=True) from exc
     if job is None:
-        return not_found("Job not found")
+        return quantro_error_response(QuantroError(
+            ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST, "Job not found", retryable=False
+        ))
     try:
-        return JSONResponse(content=sanitize_report(job))
+        # Internal ingest inspection retains the exact persisted contract JSON.
+        post = job.pop("post_json")
+        features = job.pop("features_json")
+        return JSONResponse(content={"job": job, "post": post, "features": features})
     except QuantroError as error:
         return quantro_error_response(error)

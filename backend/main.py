@@ -68,7 +68,7 @@ from backend.routes.common import quantro_error_response
 from backend.routes.ingest import router as ingest_router
 from backend.routes.media import router as media_router
 from backend.services.shared.errors import QuantroError
-from backend.services.storage.tiger import TigerStore
+from backend.services.storage.tiger import TigerConfigError, TigerStore
 
 FRONTEND_ORIGIN = os.getenv("REPORT_BASE_URL", "http://localhost:3000").rstrip("/")
 
@@ -76,6 +76,8 @@ FRONTEND_ORIGIN = os.getenv("REPORT_BASE_URL", "http://localhost:3000").rstrip("
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_contract_functions()
+    if not os.getenv("TIGER_DATABASE_URL", "").strip():
+        raise TigerConfigError("TIGER_DATABASE_URL is not set. Configure it before API startup.")
     store = TigerStore.from_env()
     store.ensure_schema()
     app.state.tiger_store = store

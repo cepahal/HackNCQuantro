@@ -88,7 +88,7 @@ def ingest_post_and_features(job_id: str, url: str, *, store: TigerStore) -> Ing
         raise error from exc
 
     try:
-        raw_features = extract_media_features(post.media.model_dump(mode="json"), dict(EXTRACTION_OPTIONS))
+        raw_features = extract_media_features(post.media, dict(EXTRACTION_OPTIONS))
         features = parse_stage_output(MediaFeatures, raw_features, Stage.EXTRACT_MEDIA_FEATURES)
     except Exception as exc:
         error = (

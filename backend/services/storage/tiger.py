@@ -51,9 +51,12 @@ def _engine_url(database_url: str) -> URL:
     except (ArgumentError, TypeError, ValueError):
         raise TigerConfigError("TIGER_DATABASE_URL is not a valid database URL.") from None
 
+    production = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "")).lower() == "production"
+    if production and url.get_backend_name() not in {"postgres", "postgresql"}:
+        raise TigerConfigError("Production TIGER_DATABASE_URL must use PostgreSQL with TLS.")
     if url.get_backend_name() in {"postgres", "postgresql"}:
         # A loopback Postgres (local smoke tests) never crosses the network, so TLS is optional there.
-        if url.host not in _LOOPBACK_HOSTS and url.query.get("sslmode") not in _SECURE_SSL_MODES:
+        if (production or url.host not in _LOOPBACK_HOSTS) and url.query.get("sslmode") not in _SECURE_SSL_MODES:
             raise TigerConfigError(
                 "TIGER_DATABASE_URL must include sslmode=require (or verify-ca/verify-full)."
             )
@@ -207,8 +210,13 @@ class TigerStore:
             if connection.execute(statement).rowcount != 1:
                 raise LookupError(f"No job row for {job_id!r}")
 
-    def save_report(self, report_id: str, report_json: dict[str, Any], job_id: str) -> bool:
+    def save_report(self, report_id: str, job_id: str | dict[str, Any], report_json: dict[str, Any] | str) -> bool:
         """Insert a report once; returns False when report_id already exists (the first save wins)."""
+        # Preserve teammates using the earlier (report_id, report_json, job_id) order.
+        if isinstance(job_id, dict) and isinstance(report_json, str):
+            job_id, report_json = report_json, job_id
+        if not isinstance(job_id, str) or not isinstance(report_json, dict):
+            raise TypeError("save_report expects report_id, job_id, report_json.")
         statement = (
             self._insert(self.reports)
             .values(
@@ -304,7 +312,7 @@ class TigerReportStore:
 
     def put(self, report_id: str, report_json: str) -> None:
         report = json.loads(report_json)
-        self._store.save_report(report_id, report, report["job_id"])
+        self._store.save_report(report_id, report["job_id"], report)
 
     def get(self, report_id: str) -> str | None:
         report = self._store.get_report(report_id)
