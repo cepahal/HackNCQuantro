@@ -1,1 +1,8 @@
-
+fastapi
+uvicorn
+pydantic>=2,<3
+python-dotenv
+pytest
+pytest-asyncio
+pytest-mock
+httpx
