@@ -107,7 +107,6 @@ export default function AlgorithmAnimation() {
             borderRadius: 7, backgroundColor: "#d0d3dc",
           }, { duration: 0.85, ease: "easeInOut" }),
           animate(".stage-source", { scale: 0.35, opacity: 0 }, { duration: 0.45 }),
-          animate(".stage-gap", { y: 0, opacity: 1 }, { duration: 0.4 }),
           ...markerPositions.map((_, index) =>
             animate(`.stage-fragment-${index}`, { scale: 1, opacity: 1 }, { duration: 0.45, delay: 0.04 * index }),
           ),
@@ -126,11 +125,11 @@ export default function AlgorithmAnimation() {
         if (cancelled) break;
         setStep(4);
         await Promise.all(gapSegments.map((_, index) =>
-          animate(`.stage-gap-${index}`, { y: 36, opacity: 0 }, {
-            duration: 0.55, ease: "easeIn", delay: index * 0.1,
+          animate(`.stage-gap-${index}`, { y: -14, opacity: 1 }, {
+            duration: 0.55, ease: "easeOut", delay: index * 0.1,
           }),
         ));
-        await pause(1100);
+        await pause(1800);
       }
     };
 
