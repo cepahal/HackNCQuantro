@@ -1,0 +1,461 @@
+[
+  {
+    "case": "choose_clean",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "gemini",
+    "recorded_at": "2026-10-10T20:48:30.441041+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "gemini-3.5-flash-lite",
+    "api_cost_usd": null,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 1,
+    "audio_sha256": "f0c9370b5208f1f4927ae9c5fe9f8dc06713f5f506063acf946c04513e3aea2c",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the Earth. We choose to go to the moon in this decade and do the other things, not because they are easy, but because they are hard. Because that goal will serve to organize and measure the best of our energies and skills.",
+    "published_reference_difference": {
+      "reference_words": 72,
+      "edit_distance": 2,
+      "wer": 0.027777777777777776
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"We choose to go to the moon in this decade and do\""
+    ],
+    "elapsed_seconds": 3.082,
+    "request_count_note": "Inferred after this pilot from successful 60-second extraction chunks; SDK HTTP retries are not counted. Future runs instrument extraction calls."
+  },
+  {
+    "case": "choose_clean",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "whisper",
+    "recorded_at": "2026-10-10T20:48:27.474350+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "whisper-small.en",
+    "api_cost_usd": 0,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 0,
+    "audio_sha256": "f0c9370b5208f1f4927ae9c5fe9f8dc06713f5f506063acf946c04513e3aea2c",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the earth. We choose to go to the moon in this decade and do the other things not because they are easy but because they are hard. Because that goal will serve to organize and measure the best of our energies and skills.",
+    "published_reference_difference": {
+      "reference_words": 72,
+      "edit_distance": 2,
+      "wer": 0.027777777777777776
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"decade is out of landing a man on the moon and returning\""
+    ],
+    "elapsed_seconds": 2.966
+  },
+  {
+    "case": "choose_compressed",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "gemini",
+    "recorded_at": "2026-10-10T20:48:35.961479+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "gemini-3.5-flash-lite",
+    "api_cost_usd": null,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 1,
+    "audio_sha256": "59fb7cf4193e045bfe1e359aff99e28ae74f0575ef7ce6d52741e43b57070bca",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out, of landing a man on the moon and returning him safely to the earth. We choose to go to the moon in this decade and do the other things, not because they are easy, but because they are hard. Because that goal will serve to organize and measure the best of our energies and skills.",
+    "published_reference_difference": {
+      "reference_words": 72,
+      "edit_distance": 2,
+      "wer": 0.027777777777777776
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"We choose to go to the moon in this decade and do\""
+    ],
+    "elapsed_seconds": 3.11,
+    "request_count_note": "Inferred after this pilot from successful 60-second extraction chunks; SDK HTTP retries are not counted. Future runs instrument extraction calls."
+  },
+  {
+    "case": "choose_compressed",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "whisper",
+    "recorded_at": "2026-10-10T20:48:33.523997+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "whisper-small.en",
+    "api_cost_usd": 0,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 0,
+    "audio_sha256": "59fb7cf4193e045bfe1e359aff99e28ae74f0575ef7ce6d52741e43b57070bca",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the earth. We choose to go to the moon in this decade and do the other things. Not because they are easy, but because they are hard. Because that goal will serve to organize and measure the best of our energies and skills.",
+    "published_reference_difference": {
+      "reference_words": 72,
+      "edit_distance": 2,
+      "wer": 0.027777777777777776
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"We choose to go to the moon in this decade and do\""
+    ],
+    "elapsed_seconds": 2.437
+  },
+  {
+    "case": "choose_noise",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "gemini",
+    "recorded_at": "2026-10-10T20:48:42.601252+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "gemini-3.5-flash-lite",
+    "api_cost_usd": null,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 1,
+    "audio_sha256": "8c7be19a2ff9241871c772ce722c41a875e656a03a38a4fade2968f128e2aaf0",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the Earth. We choose to go to the moon in this decade and do the other things, not because they are easy, but because they are hard. Because that goal will serve to organize and measure the best of our energies and skills.",
+    "published_reference_difference": {
+      "reference_words": 72,
+      "edit_distance": 2,
+      "wer": 0.027777777777777776
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"We choose to go to the moon in this decade and do\""
+    ],
+    "elapsed_seconds": 2.813,
+    "request_count_note": "Inferred after this pilot from successful 60-second extraction chunks; SDK HTTP retries are not counted. Future runs instrument extraction calls."
+  },
+  {
+    "case": "choose_noise",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "whisper",
+    "recorded_at": "2026-10-10T20:48:39.072424+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "whisper-small.en",
+    "api_cost_usd": 0,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 0,
+    "audio_sha256": "8c7be19a2ff9241871c772ce722c41a875e656a03a38a4fade2968f128e2aaf0",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the earth. We choose to go to the moon in this decade and do the other things not because they are easy but because they are hard because that goal will serve to organize and measure the best of our energies and skills.",
+    "published_reference_difference": {
+      "reference_words": 72,
+      "edit_distance": 2,
+      "wer": 0.027777777777777776
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"decade is out of landing a man on the moon and returning\""
+    ],
+    "elapsed_seconds": 3.528
+  },
+  {
+    "case": "commit_clean",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "gemini",
+    "recorded_at": "2026-10-10T20:48:47.517088+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "gemini-3.5-flash-lite",
+    "api_cost_usd": null,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 1,
+    "audio_sha256": "53cb21f58362e3284fef2930dd798f5075c68473ccd915039ce36001f3bbb5f3",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the earth. No single space project in this period will be more impressive to mankind or more important for the long-range exploration of space.",
+    "published_reference_difference": {
+      "reference_words": 54,
+      "edit_distance": 1,
+      "wer": 0.018518518518518517
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"No single space project in this period will be more impressive to\""
+    ],
+    "elapsed_seconds": 2.479,
+    "request_count_note": "Inferred after this pilot from successful 60-second extraction chunks; SDK HTTP retries are not counted. Future runs instrument extraction calls."
+  },
+  {
+    "case": "commit_clean",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "whisper",
+    "recorded_at": "2026-10-10T20:48:45.414797+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "whisper-small.en",
+    "api_cost_usd": 0,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 0,
+    "audio_sha256": "53cb21f58362e3284fef2930dd798f5075c68473ccd915039ce36001f3bbb5f3",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the earth. No single space project in this period will be more impressive to mankind or more important for the long-range exploration of space.",
+    "published_reference_difference": {
+      "reference_words": 54,
+      "edit_distance": 1,
+      "wer": 0.018518518518518517
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"out of landing a man on the moon and returning him safely\""
+    ],
+    "elapsed_seconds": 2.102
+  },
+  {
+    "case": "commit_compressed",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "gemini",
+    "recorded_at": "2026-10-10T20:48:52.088335+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "gemini-3.5-flash-lite",
+    "api_cost_usd": null,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 1,
+    "audio_sha256": "870e00b6739aa9bf94026aca401ea909984cbd2fa69d202d8dd7e6d2d0766f4a",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the earth. No single space project in this period will be more impressive to mankind or more important for the long-range exploration of space.",
+    "published_reference_difference": {
+      "reference_words": 54,
+      "edit_distance": 1,
+      "wer": 0.018518518518518517
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"No single space project in this period will be more impressive to\""
+    ],
+    "elapsed_seconds": 2.922,
+    "request_count_note": "Inferred after this pilot from successful 60-second extraction chunks; SDK HTTP retries are not counted. Future runs instrument extraction calls."
+  },
+  {
+    "case": "commit_compressed",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "whisper",
+    "recorded_at": "2026-10-10T20:48:49.996758+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "whisper-small.en",
+    "api_cost_usd": 0,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 0,
+    "audio_sha256": "870e00b6739aa9bf94026aca401ea909984cbd2fa69d202d8dd7e6d2d0766f4a",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the earth. No single space project in this period will be more impressive to mankind or more important for the long-range exploration of space.",
+    "published_reference_difference": {
+      "reference_words": 54,
+      "edit_distance": 1,
+      "wer": 0.018518518518518517
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"out of landing a man on the moon and returning him safely\""
+    ],
+    "elapsed_seconds": 2.091
+  },
+  {
+    "case": "commit_noise",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "gemini",
+    "recorded_at": "2026-10-10T20:48:57.106983+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "gemini-3.5-flash-lite",
+    "api_cost_usd": null,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 1,
+    "audio_sha256": "a507e908469004cf27d566cf8e68dbb3576143ce6c4f892c4a7584cf2a2e7990",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the earth. No single space project in this period will be more impressive to mankind or more important for the long-range exploration of space.",
+    "published_reference_difference": {
+      "reference_words": 54,
+      "edit_distance": 1,
+      "wer": 0.018518518518518517
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"No single space project in this period will be more impressive to\""
+    ],
+    "elapsed_seconds": 2.523,
+    "request_count_note": "Inferred after this pilot from successful 60-second extraction chunks; SDK HTTP retries are not counted. Future runs instrument extraction calls."
+  },
+  {
+    "case": "commit_noise",
+    "source_group": "kennedy",
+    "split": "development",
+    "provider": "whisper",
+    "recorded_at": "2026-10-10T20:48:55.011652+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "whisper-small.en",
+    "api_cost_usd": 0,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 0,
+    "audio_sha256": "a507e908469004cf27d566cf8e68dbb3576143ce6c4f892c4a7584cf2a2e7990",
+    "status": "ok",
+    "text": "I believe that this nation should commit itself to achieving the goal before this decade is out of landing a man on the moon and returning him safely to the earth. No single space project in this period will be more impressive to mankind or more important for the long-range exploration of space.",
+    "published_reference_difference": {
+      "reference_words": 54,
+      "edit_distance": 1,
+      "wer": 0.018518518518518517
+    },
+    "queries": [
+      "\"I believe that this nation should commit itself to achieving the goal\"",
+      "\"out of landing a man on the moon and returning him safely\""
+    ],
+    "elapsed_seconds": 2.095
+  },
+  {
+    "case": "smallstep_clean",
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "provider": "gemini",
+    "recorded_at": "2026-10-10T20:49:05.201560+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "gemini-3.5-flash-lite",
+    "api_cost_usd": null,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 2,
+    "audio_sha256": "8f44f76268b7f71a4c6a055899a3d04577431806f7beacec12b26216b8ccc2bc",
+    "status": "ok",
+    "text": "Okay. I'm uh at the foot of the ladder, the limb foot beds are only uh uh depressed in the surface about uh one or two inches. although the surface appears to be uh very very fine grained as you get close to it. It's almost like a powder. Ground mass uh is very fine. I'm going to step off the limb now. That's one small step for man, one giant leap for mankind.",
+    "published_reference_difference": {
+      "reference_words": 65,
+      "edit_distance": 15,
+      "wer": 0.23076923076923078
+    },
+    "queries": [
+      "\"I'm uh at the foot of the ladder the limb foot beds\"",
+      "\"although the surface appears to be uh very very fine grained as\""
+    ],
+    "elapsed_seconds": 4.479,
+    "request_count_note": "Inferred after this pilot from successful 60-second extraction chunks; SDK HTTP retries are not counted. Future runs instrument extraction calls."
+  },
+  {
+    "case": "smallstep_clean",
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "provider": "whisper",
+    "recorded_at": "2026-10-10T20:48:59.630816+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "whisper-small.en",
+    "api_cost_usd": 0,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 0,
+    "audio_sha256": "8f44f76268b7f71a4c6a055899a3d04577431806f7beacec12b26216b8ccc2bc",
+    "status": "ok",
+    "text": "Okay. I'm at the foot of the ladder. The lamb footbeds are only depressed in the surface about one or two inches, although the surface appears to be very, very fine grained as you get close to it. It's almost like a powder The ground mass is very fine. I'm going to step off the land mount. That's one small step for man. One giant leap for mankind. You",
+    "published_reference_difference": {
+      "reference_words": 65,
+      "edit_distance": 11,
+      "wer": 0.16923076923076924
+    },
+    "queries": [
+      "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+      "\"one or two inches although the surface appears to be\""
+    ],
+    "elapsed_seconds": 5.57
+  },
+  {
+    "case": "smallstep_compressed",
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "provider": "gemini",
+    "recorded_at": "2026-10-10T20:49:14.947777+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "gemini-3.5-flash-lite",
+    "api_cost_usd": null,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 2,
+    "audio_sha256": "6a884761d0b3760ec1a0650d9e0c0662df2402bb3829deebda33f939d3ea2731",
+    "status": "ok",
+    "text": "Okay. Um uh at the foot of the ladder, the limb foot beds are only uh uh depressed in the surface about uh one or two inches. Although the surface appears to be uh very very fine grained as you get close to it, it's almost like a powder. Um this uh is very fine. I'm going to step off the lamb now. That's one small step for man, one giant leap for mankind.",
+    "published_reference_difference": {
+      "reference_words": 65,
+      "edit_distance": 16,
+      "wer": 0.24615384615384617
+    },
+    "queries": [
+      "\"Um uh at the foot of the ladder the limb foot beds\"",
+      "\"Although the surface appears to be uh very very fine grained as\""
+    ],
+    "elapsed_seconds": 5.268,
+    "request_count_note": "Inferred after this pilot from successful 60-second extraction chunks; SDK HTTP retries are not counted. Future runs instrument extraction calls."
+  },
+  {
+    "case": "smallstep_compressed",
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "provider": "whisper",
+    "recorded_at": "2026-10-10T20:49:09.681294+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "whisper-small.en",
+    "api_cost_usd": 0,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 0,
+    "audio_sha256": "6a884761d0b3760ec1a0650d9e0c0662df2402bb3829deebda33f939d3ea2731",
+    "status": "ok",
+    "text": "Okay, I'm at the foot of the ladder. The lamb footbeds are only depressed in the surface about one or two inches, although the surface appears to be very, very fine-grained as you get close to it. It's almost like a powder around there. It's very fine. That's one small step for man, one giant leap for man. got it.",
+    "published_reference_difference": {
+      "reference_words": 65,
+      "edit_distance": 17,
+      "wer": 0.26153846153846155
+    },
+    "queries": [
+      "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+      "\"That's one small step for man one giant leap for man\""
+    ],
+    "elapsed_seconds": 5.266
+  },
+  {
+    "case": "smallstep_noise",
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "provider": "gemini",
+    "recorded_at": "2026-10-10T20:49:26.009483+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "gemini-3.5-flash-lite",
+    "api_cost_usd": null,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 2,
+    "audio_sha256": "faad3b26ac50c7ff1bf88f009079941d5916ff8d51ab5a6247cd49c6703ebdd9",
+    "status": "ok",
+    "text": "Okay. Um at the foot of the ladder, the limb foot beds are only uh uh depressed in the surface about uh one or two inches. Although the surface appears to be uh very very fine grained as you get close to it, it's almost like a powder. Mound mask uh is very fine. I'm going to step off the limb now. That's one small step for man, one giant leap for mankind.",
+    "published_reference_difference": {
+      "reference_words": 65,
+      "edit_distance": 15,
+      "wer": 0.23076923076923078
+    },
+    "queries": [
+      "\"Um at the foot of the ladder the limb foot beds are\"",
+      "\"Although the surface appears to be uh very very fine grained as\""
+    ],
+    "elapsed_seconds": 4.284,
+    "request_count_note": "Inferred after this pilot from successful 60-second extraction chunks; SDK HTTP retries are not counted. Future runs instrument extraction calls."
+  },
+  {
+    "case": "smallstep_noise",
+    "source_group": "apollo11",
+    "split": "held_out_pilot",
+    "provider": "whisper",
+    "recorded_at": "2026-10-10T20:49:20.216808+00:00",
+    "reference_status": "published_transcript_not_audio_adjudicated",
+    "model": "whisper-small.en",
+    "api_cost_usd": 0,
+    "cost_note": "Local compute excluded; Gemini bill not available from extractor.",
+    "requests_attempted": 0,
+    "audio_sha256": "faad3b26ac50c7ff1bf88f009079941d5916ff8d51ab5a6247cd49c6703ebdd9",
+    "status": "ok",
+    "text": "Okay. I'm at the foot of the ladder. The lamb footbeds are only depressed in the surface about one or two inches, although the surface appears to be very, very fine-grained as you get close to but it's almost like a powder ground mass, it's very fine. Now I'm gonna step off the land mount. That's one small step for man, one giant leap for mankind. You",
+    "published_reference_difference": {
+      "reference_words": 65,
+      "edit_distance": 13,
+      "wer": 0.2
+    },
+    "queries": [
+      "\"Okay I'm at the foot of the ladder The lamb footbeds are\"",
+      "\"one or two inches although the surface appears to be very very\""
+    ],
+    "elapsed_seconds": 5.792
+  }
+]

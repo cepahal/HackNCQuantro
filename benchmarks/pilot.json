@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "choose",
+      "group": "kennedy",
+      "split": "development",
+      "media_url": "https://heasarc.gsfc.nasa.gov/Videos/historical/choose.mov",
+      "reference_url": "https://heasarc.gsfc.nasa.gov/Videos/historical/choose.txt",
+      "reference": "I believe that this nation should commit itself to achieve a goal before this decade is out of landing a man on the Moon and returning him safely to the Earth. We choose to go to the moon in this decade and do the other things, not because they are easy, but because they are hard. Because that goal will serve to organize and measure the best of our energies and skills.",
+      "reference_note": "Published text may differ from audio. smallstep transcript contains an unknown ?? span omitted here; all scores provisional.",
+      "accepted_urls": [
+        "https://heasarc.gsfc.nasa.gov/Videos/historical/choose.mov",
+        "https://heasarc.gsfc.nasa.gov/Videos/historical/choose.avi"
+      ]
+    },
+    {
+      "id": "commit",
+      "group": "kennedy",
+      "split": "development",
+      "media_url": "https://heasarc.gsfc.nasa.gov/Videos/historical/commit.mov",
+      "reference_url": "https://heasarc.gsfc.nasa.gov/Videos/historical/commit.txt",
+      "reference": "I believe that this nation should commit itself to achieving a goal before this decade is out of landing a man on the Moon and returning him safely to the Earth. No single space project in this period will be more impressive to mankind or more important for the long-range exploration of space.",
+      "reference_note": "Published text may differ from audio. smallstep transcript contains an unknown ?? span omitted here; all scores provisional.",
+      "accepted_urls": [
+        "https://heasarc.gsfc.nasa.gov/Videos/historical/commit.mov",
+        "https://heasarc.gsfc.nasa.gov/Videos/historical/commit.avi"
+      ]
+    },
+    {
+      "id": "smallstep",
+      "group": "apollo11",
+      "split": "held_out_pilot",
+      "media_url": "https://heasarc.gsfc.nasa.gov/Videos/historical/smallstep.mov",
+      "reference_url": "https://heasarc.gsfc.nasa.gov/Videos/historical/smallstep.txt",
+      "reference": "I'm at the foot of the ladder. The LEM footpads are only depressed in the surface about one or two inches. Although the surface appears to be very very fine grained as you get close to it. It's almost like a powder. It's very fine. I'm going to step off the LEM now. That's one small step for a man, one giant leap for mankind.",
+      "reference_note": "Published text may differ from audio. smallstep transcript contains an unknown ?? span omitted here; all scores provisional.",
+      "accepted_urls": [
+        "https://heasarc.gsfc.nasa.gov/Videos/historical/smallstep.mov",
+        "https://heasarc.gsfc.nasa.gov/Videos/historical/smallstep.avi"
+      ]
+    }
+  ]
+}
