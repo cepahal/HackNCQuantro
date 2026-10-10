@@ -79,4 +79,3 @@ def test_verify_and_align_real(live_features, live_candidates):
     assert alignment["status"] != "not_assessed", "Source transcription must be available."
     print("PASS verify_and_align", alignment["status"], alignment["match_quality"]["confidence"]["level"])
     print("ALL PASS")
-
