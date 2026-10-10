@@ -256,14 +256,17 @@ def _analyze(
     queries = parse_stage_output(_SearchQueries, raw_queries, Stage.BUILD_SEARCH_QUERIES)
     warnings.extend(queries.warnings)
 
+    search_started = time.monotonic()
     try:
-        raw_search = _call(Stage.SEARCH_CANDIDATES, search_candidates, queries.queries, limit=SEARCH_LIMIT)
+        raw_search = search_candidates(queries.queries, limit=SEARCH_LIMIT)
     except QuantroError:
         raise
     except Exception as exc:
         raise QuantroError(
             code=ErrorCode.SEARCH_FAILED, stage=Stage.SEARCH_CANDIDATES, retryable=True
         ) from exc
+    finally:
+        logger.info("analysis_stage stage=%s seconds=%.3f", Stage.SEARCH_CANDIDATES.value, time.monotonic() - search_started)
     search = parse_stage_output(_CandidateSearch, raw_search, Stage.SEARCH_CANDIDATES)
     warnings.extend(search.warnings)
     submitted_url = _normalized_post_url(submitted_post.post_url)
