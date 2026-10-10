@@ -14,6 +14,10 @@ SECOND = "But those numbers are not accurate, so that is not my recommendation."
 PRIVATE_RESPONSE = "MODEL_RESPONSE_MUST_NOT_BE_ECHOED"
 
 
+def _generated(data, basis="direct_transcript"):
+    return {**data, "caption_evidence_basis": basis}
+
+
 @pytest.fixture
 def comparison_case():
     sentences = [
@@ -75,7 +79,7 @@ def test_multisentence_quote_stays_rejected_by_local_validator(comparison_case):
 def test_invalid_quote_gets_one_repair_with_original_evidence(monkeypatch, comparison_case):
     clip, context, valid, invalid = comparison_case
     client = Mock()
-    generate = Mock(side_effect=[invalid, valid])
+    generate = Mock(side_effect=[_generated(invalid), _generated(valid)])
     monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (client, "test-model"))
     monkeypatch.setattr(comparison_module, "generate_json", generate)
 
@@ -83,6 +87,7 @@ def test_invalid_quote_gets_one_repair_with_original_evidence(monkeypatch, compa
 
     assert result["context_assessment"] == "material_context_missing"
     assert result["assessment_confidence"]["level"] == "moderate"
+    assert result["caption_assessment"] == "contradicted_by_context"
     assert len(result["findings"][0]["evidence"]) == 2
     assert generate.call_count == 2
     first_prompt = generate.call_args_list[0].args[2]
@@ -107,7 +112,7 @@ def test_unrepaired_evidence_fails_after_two_attempts(monkeypatch, comparison_ca
     invalid = deepcopy(valid)
     invalid["findings"][0]["evidence"][0][bad_field] = bad_value
     client = Mock()
-    generate = Mock(return_value=invalid)
+    generate = Mock(return_value=_generated(invalid))
     monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (client, "test-model"))
     monkeypatch.setattr(comparison_module, "generate_json", generate)
 
@@ -151,7 +156,7 @@ def test_generation_quote_choices_are_exact_actual_transcript_sentences(monkeypa
                             "text": "OCR_TEXT_IS_NOT_TRANSCRIPT_EVIDENCE"}]
     context["windows"].append(deepcopy(context["windows"][0]))
     client = Mock()
-    generate = Mock(return_value=valid)
+    generate = Mock(return_value=_generated(valid))
     monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (client, "test-model"))
     monkeypatch.setattr(comparison_module, "generate_json", generate)
 
@@ -171,7 +176,7 @@ def test_quote_choices_are_fresh_and_do_not_change_shared_comparison_schema(monk
     clip, context, valid, _ = comparison_case
     canonical_schema = comparison_module.Comparison.model_json_schema()
     client = Mock()
-    generate = Mock(return_value=valid)
+    generate = Mock(return_value=_generated(valid))
     monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (client, "test-model"))
     monkeypatch.setattr(comparison_module, "generate_json", generate)
     first_only = "The first request has a unique submitted sentence."
@@ -187,3 +192,87 @@ def test_quote_choices_are_fresh_and_do_not_change_shared_comparison_schema(monk
     assert second_schema["$defs"]["Evidence"]["properties"]["quote"]["enum"] == [second_only, FIRST, SECOND]
     assert comparison_module.Comparison.model_json_schema() == canonical_schema
     assert "enum" not in canonical_schema["$defs"]["Evidence"]["properties"]["quote"]
+    assert "caption_evidence_basis" not in canonical_schema["properties"]
+
+
+@pytest.mark.parametrize("basis", [
+    "absence_only", "unobserved_modality", "insufficient_evidence", None,
+    "unrecognized_basis", True, ["direct_transcript"],
+])
+def test_non_direct_or_invalid_caption_basis_fails_closed(monkeypatch, comparison_case, basis):
+    clip, context, valid, _ = comparison_case
+    client = Mock()
+    generate = Mock(return_value=_generated(valid, basis))
+    monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (client, "test-model"))
+    monkeypatch.setattr(comparison_module, "generate_json", generate)
+
+    result = comparison_module.compare_context_and_caption(clip, context, "A visual event occurred.")
+
+    assert result["caption_assessment"] == "not_assessed"
+    assert result["context_assessment"] == "not_assessed"
+    assert result["assessment_confidence"]["level"] == "not_assessed"
+    assert result["assessment_confidence"]["basis"] == []
+    assert result["findings"] == []
+    assert "contradict" not in result["summary"].lower()
+    assert set(result) == set(comparison_module.Comparison.model_fields)
+    assert "caption_evidence_basis" not in result
+    generate.assert_called_once()
+
+
+def test_missing_caption_basis_fails_closed(monkeypatch, comparison_case):
+    clip, context, valid, _ = comparison_case
+    monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (Mock(), "test-model"))
+    monkeypatch.setattr(comparison_module, "generate_json", Mock(return_value=valid))
+
+    result = comparison_module.compare_context_and_caption(clip, context, "A visual event occurred.")
+
+    assert result["caption_assessment"] == "not_assessed"
+    assert result["findings"] == []
+
+
+def test_null_caption_preserves_spoken_context_assessment(monkeypatch, comparison_case):
+    clip, context, valid, _ = comparison_case
+    monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (Mock(), "test-model"))
+    monkeypatch.setattr(comparison_module, "generate_json", Mock(return_value=_generated(valid, "insufficient_evidence")))
+
+    result = comparison_module.compare_context_and_caption(clip, context, None)
+
+    assert result["caption_assessment"] == "not_provided"
+    assert result["context_assessment"] == "material_context_missing"
+    assert result["assessment_confidence"]["level"] == "moderate"
+    assert result["findings"]
+
+
+def test_audience_gesture_caption_cannot_be_contradicted_by_missing_transcript_detail(monkeypatch, comparison_case):
+    clip, context, valid, _ = comparison_case
+    first = "Obviously, I didn't know Charlie Kirk. I was generally aware of some of his ideas."
+    second = "I think those ideas were wrong. But that doesn't negate the fact that what happened was a tragedy and that I mourned for him and his family."
+    clip["duration_seconds"] = 10.0
+    clip["transcript"]["processed_ranges"][0]["end_seconds"] = 10.0
+    clip["transcript"]["sentences"][0].update(text=first, start_seconds=0.0, end_seconds=10.0)
+    context["windows"][0]["requested_end_seconds"] = 22.0
+    for sentence, text, start, end in zip(context["windows"][0]["sentences"], (first, second), (0.0, 10.0), (10.0, 22.0), strict=True):
+        sentence.update(text=text, start_seconds=start, end_seconds=end)
+    evidence = valid["findings"][0]["evidence"]
+    for item, sentence in zip(evidence, context["windows"][0]["sentences"], strict=True):
+        item.update(quote=sentence["text"], start_seconds=sentence["start_seconds"], end_seconds=sentence["end_seconds"])
+    valid["context_assessment"] = "no_material_difference_found"
+    valid["caption_assessment"] = "contradicted_by_context"
+    valid["findings"][0]["explanation"] = "The caption claims a stop gesture and applause, but the transcript contains no information about physical actions."
+    valid["limitations"] = ["The caption's non-verbal claims cannot be verified or refuted by the transcript alone."]
+    generate = Mock(return_value=_generated(valid, "unobserved_modality"))
+    monkeypatch.setattr(comparison_module, "client_and_model", lambda stage: (Mock(), "test-model"))
+    monkeypatch.setattr(comparison_module, "generate_json", generate)
+
+    result = comparison_module.compare_context_and_caption(clip, context, "The audience applauded and the speaker made a stop gesture.")
+
+    assert result["caption_assessment"] == "not_assessed"
+    assert result["assessment_confidence"]["level"] == "not_assessed"
+    assert result["findings"] == []
+    prompt = generate.call_args.args[2]
+    assert "A transcript not mentioning an event is not evidence that the event did not happen." in prompt
+    schema = generate.call_args.args[3]
+    assert "caption_evidence_basis" in schema["required"]
+    assert schema["properties"]["caption_evidence_basis"]["enum"] == [
+        "direct_transcript", "absence_only", "unobserved_modality", "insufficient_evidence",
+    ]

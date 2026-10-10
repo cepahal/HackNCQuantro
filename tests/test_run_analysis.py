@@ -1,4 +1,5 @@
 import json
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -333,6 +334,176 @@ def test_submitted_post_is_never_its_own_source(client, store, upstream):
     report = client.get("/reports/report_job_self").json()
     assert report["source"] is None
     assert upstream["compare_calls"] == []
+
+
+@pytest.mark.parametrize("submitted,candidate", [
+    ("https://www.instagram.com/reel/DOtmnryAC-R/?psln=tracking", "https://www.instagram.com/reel/DOtmnryAC-R/"),
+    ("https://instagram.com/reel/DOtmnryAC-R/?igsh=tracking", "https://www.instagram.com/p/DOtmnryAC-R/?utm_source=search"),
+    ("https://m.instagram.com/p/DOtmnryAC-R/", "https://instagram.com/tv/DOtmnryAC-R/#shared"),
+    ("https://instagram.com/reels/DOtmnryAC-R/", "https://www.instagram.com/reel/DOtmnryAC-R"),
+    ("https://www.youtube.com/watch?v=jNQXAC9IVRw&si=tracking", "https://youtu.be/jNQXAC9IVRw?t=1"),
+    ("https://m.youtube.com/watch?v=jNQXAC9IVRw", "https://youtube.com/shorts/jNQXAC9IVRw?feature=share"),
+    ("https://music.youtube.com/watch?v=jNQXAC9IVRw&list=playlist", "https://www.youtube.com/embed/jNQXAC9IVRw"),
+    ("https://youtu.be/jNQXAC9IVRw", "https://www.youtube.com/live/jNQXAC9IVRw?si=tracking"),
+])
+def test_same_platform_post_aliases_are_excluded_before_download(client, store, upstream, monkeypatch, submitted, candidate):
+    upstream["candidates"] = [{**_candidate(1), "url": candidate}]
+    retrieve = Mock(wraps=analysis_module.retrieve_candidate_media)
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", retrieve)
+
+    response = client.post("/analyze/job_same_post_alias/run", json={"url": submitted})
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "no_verified_match"
+    assert "excluded from its own" in response.json()["warnings"][0]
+    retrieve.assert_not_called()
+    assert upstream["compare_calls"] == []
+    assert store.get_report("report_job_same_post_alias")["source"] is None
+
+
+@pytest.mark.parametrize("submitted,candidate", [
+    ("https://www.instagram.com/reel/DOtmnryAC-R/?psln=tracking", "https://instagram.com/reel/OtherPost/"),
+    ("https://www.youtube.com/watch?v=jNQXAC9IVRw&si=tracking", "https://youtu.be/OtherVideo"),
+])
+def test_different_platform_post_ids_remain_eligible(client, store, upstream, submitted, candidate):
+    upstream["candidates"] = [{**_candidate(1), "url": candidate}]
+
+    response = client.post("/analyze/job_distinct_post/run", json={"url": submitted})
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "matched"
+    assert store.get_report("report_job_distinct_post")["source"]["post"]["post_url"] == candidate
+
+
+def test_candidate_resolving_to_submitted_post_is_excluded_before_extraction(client, store, upstream, monkeypatch):
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", lambda candidate: _post(
+        "src_media_1", "https://youtu.be/clip?si=tracking", candidate_id=candidate["candidate_id"],
+    ))
+    extract = Mock(wraps=analysis_module.extract_media_features)
+    align = Mock(wraps=analysis_module.verify_and_align)
+    monkeypatch.setattr(analysis_module, "extract_media_features", extract)
+    monkeypatch.setattr(analysis_module, "verify_and_align", align)
+
+    response = _run(client, "job_redirect_self", conversation_id=None)
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "no_verified_match"
+    assert any("submitted post cannot be its own source" in warning for warning in response.json()["warnings"])
+    extract.assert_not_called()
+    align.assert_not_called()
+    assert upstream["compare_calls"] == []
+    assert store.get_report("report_job_redirect_self")["source"] is None
+
+
+@pytest.mark.parametrize("submitted_url,candidate_url,canonical", [
+    ("https://www.instagram.com/share/reel/submitted/", "https://www.instagram.com/share/reel/candidate/",
+     "https://www.instagram.com/reel/DOtmnryAC-R/"),
+    ("https://vm.tiktok.com/submitted/", "https://vt.tiktok.com/candidate/",
+     "https://www.tiktok.com/@someone/video/1234567890"),
+])
+def test_resolved_metadata_post_identity_blocks_different_share_link_aliases(
+    client, store, upstream, monkeypatch, submitted_url, candidate_url, canonical,
+):
+    upstream["candidates"] = [{**_candidate(1), "url": candidate_url}]
+
+    def submitted(url):
+        post = _post("clip_media", url)
+        post["retrieval"]["metadata_source_urls"].append(canonical + "?tracking=submitted")
+        return post
+
+    def candidate(item):
+        post = _post("src_media_1", item["url"], candidate_id=item["candidate_id"])
+        post["retrieval"]["metadata_source_urls"].append(canonical + "?tracking=candidate")
+        return post
+
+    monkeypatch.setattr(ingest_module, "retrieve_post", submitted)
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", candidate)
+    extract = Mock(wraps=analysis_module.extract_media_features)
+    monkeypatch.setattr(analysis_module, "extract_media_features", extract)
+
+    response = client.post("/analyze/job_resolved_share_alias/run", json={"url": submitted_url})
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "no_verified_match"
+    assert any("submitted post cannot be its own source" in warning for warning in response.json()["warnings"])
+    extract.assert_not_called()
+    assert store.get_report("report_job_resolved_share_alias")["source"] is None
+
+
+def test_profile_or_malformed_metadata_does_not_make_distinct_posts_the_same(client, store, upstream, monkeypatch):
+    original = analysis_module.retrieve_candidate_media
+
+    def candidate(item):
+        post = original(item)
+        post["retrieval"]["metadata_source_urls"].extend(["https://www.youtube.com/@shared_author", "instagram://[bad"])
+        return post
+
+    def submitted(url):
+        post = _post("clip_media", url)
+        post["retrieval"]["metadata_source_urls"].extend(["https://www.youtube.com/@shared_author", "instagram://[bad"])
+        return post
+
+    monkeypatch.setattr(ingest_module, "retrieve_post", submitted)
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", candidate)
+
+    response = _run(client, "job_shared_profile", conversation_id=None)
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "matched"
+    assert store.get_report("report_job_shared_profile")["source"]["post"]["post_url"] == _candidate(1)["url"]
+
+
+def test_submitted_resolved_metadata_identity_excludes_canonical_search_candidate_before_download(
+    client, store, upstream, monkeypatch,
+):
+    canonical = "https://www.instagram.com/reel/DOtmnryAC-R/"
+    upstream["candidates"] = [{**_candidate(1), "url": canonical}]
+
+    def submitted(url):
+        post = _post("clip_media", url)
+        post["retrieval"]["metadata_source_urls"].append(canonical)
+        return post
+
+    monkeypatch.setattr(ingest_module, "retrieve_post", submitted)
+    retrieve = Mock(wraps=analysis_module.retrieve_candidate_media)
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", retrieve)
+
+    response = client.post("/analyze/job_submitted_canonical/run", json={"url": "https://www.instagram.com/share/reel/original/"})
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "no_verified_match"
+    retrieve.assert_not_called()
+    assert store.get_report("report_job_submitted_canonical")["source"] is None
+
+
+def test_platform_identity_does_not_loosen_job_url_or_generic_media_query_identity():
+    tracked = "https://www.instagram.com/reel/DOtmnryAC-R/?psln=tracking"
+    clean = "https://www.instagram.com/reel/DOtmnryAC-R/"
+    assert analysis_module._post_identity(tracked) == analysis_module._post_identity(clean)
+    assert analysis_module._normalized_post_url(tracked) != analysis_module._normalized_post_url(clean)
+    assert analysis_module._post_identity("https://cdn.example/video.mp4?clip=1") != analysis_module._post_identity("https://cdn.example/video.mp4?clip=2")
+    assert analysis_module._post_identity("https://instagram.com.evil.example/reel/DOtmnryAC-R/") != analysis_module._post_identity(clean)
+    assert analysis_module._post_identity("https://www.instagram.com:8080/reel/DOtmnryAC-R/") != analysis_module._post_identity(clean)
+
+
+def test_cached_self_match_is_rejected_without_mutating_saved_evidence_or_sending(client, store, upstream):
+    assert _run(client, "job_valid_seed", conversation_id=None).status_code == 200
+    prior = store.get_report("report_job_valid_seed")
+    prior["job_id"] = "job_prior_self_match"
+    prior["source"]["post"]["post_url"] = "https://youtu.be/clip?si=tracking"
+    store.upsert_job("job_prior_self_match", CLIP_URL, "completed")
+    store.save_report("report_job_prior_self_match", "job_prior_self_match", prior)
+
+    response = _run(client, "job_prior_self_match")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "PROCESSING_FAILED"
+    assert response.json()["error"]["stage"] == "build_report"
+    assert "own source" in response.json()["error"]["message"]
+    assert store.get_report("report_job_prior_self_match") == prior
+    assert store.get_job("job_prior_self_match")["status"] == "completed"
+    assert upstream["provider"].sent == []
+    assert len(upstream["compare_calls"]) == 1
 
 
 def test_nested_confidence_limitations_reach_report(client, upstream, monkeypatch):

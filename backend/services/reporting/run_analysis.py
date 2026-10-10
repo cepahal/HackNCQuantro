@@ -12,6 +12,7 @@ and a messaging failure becomes a delivery warning rather than undoing the save.
 """
 
 import logging
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, TypeVar
@@ -36,6 +37,7 @@ from ..shared.types import (
     JobCompletionResult,
     MediaFeatures,
     Post,
+    PublicPost,
     ReportV2,
     parse_stage_output,
 )
@@ -152,9 +154,59 @@ def _normalized_post_url(value: str) -> str:
         return value
 
 
-def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures) -> _AssessedSource:
+def _post_identity(value: str) -> str:
+    """Identify known platform posts independently of share links and tracking."""
+    normalized = _normalized_post_url(value)
+    try:
+        url = urlsplit(value)
+        host = (url.hostname or "").lower().rstrip(".")
+        if (url.scheme not in {"http", "https"} or url.username is not None or url.password is not None
+                or (url.port is not None and (url.scheme, url.port) not in {("http", 80), ("https", 443)})):
+            return normalized
+        if host in {"instagram.com", "www.instagram.com", "m.instagram.com"}:
+            match = re.fullmatch(r"/(?:reel|reels|p|tv)/([A-Za-z0-9_-]+)/?", url.path)
+            if match:
+                return f"instagram:{match[1]}"
+        if host in {"youtu.be", "www.youtu.be"}:
+            match = re.fullmatch(r"/([A-Za-z0-9_-]+)/?", url.path)
+            if match:
+                return f"youtube:{match[1]}"
+        if host in {"tiktok.com", "www.tiktok.com", "m.tiktok.com"}:
+            match = re.fullmatch(r"/@[^/]+/video/(\d+)/?", url.path)
+            if match:
+                return f"tiktok:{match[1]}"
+        if host in {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}:
+            if url.path.rstrip("/") == "/watch":
+                videos = [item for key, item in parse_qsl(url.query) if key == "v"]
+                if len(videos) == 1 and re.fullmatch(r"[A-Za-z0-9_-]+", videos[0]):
+                    return f"youtube:{videos[0]}"
+            match = re.fullmatch(r"/(?:shorts|embed|live)/([A-Za-z0-9_-]+)/?", url.path)
+            if match:
+                return f"youtube:{match[1]}"
+    except (TypeError, ValueError):
+        pass
+    return normalized
+
+
+def _post_identities(post: PublicPost) -> set[str]:
+    identities = {_post_identity(post.post_url)}
+    # Retrieval retains the original share URL in post_url; its provider-resolved
+    # webpage URL is provenance. Only concrete platform post IDs count here.
+    for source in post.retrieval.metadata_source_urls:
+        identity = _post_identity(source)
+        if identity.startswith(("instagram:", "youtube:", "tiktok:")) and source.lower().startswith(("http://", "https://")):
+            identities.add(identity)
+    return identities
+
+
+def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures, submitted_identities: set[str]) -> _AssessedSource:
     raw_post = _call(Stage.RETRIEVE_CANDIDATE_MEDIA, retrieve_candidate_media, candidate)
     post = parse_stage_output(Post, raw_post, Stage.RETRIEVE_CANDIDATE_MEDIA)
+    if _post_identities(post) & submitted_identities:
+        raise QuantroError(
+            ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_CANDIDATE_MEDIA,
+            "The submitted post cannot be its own source.",
+        )
     raw_features = _call(
         Stage.EXTRACT_MEDIA_FEATURES,
         extract_media_features,
@@ -218,6 +270,11 @@ def run_analysis(
             if existing_report is None:
                 raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
             report = parse_stage_output(ReportV2, existing_report, Stage.BUILD_REPORT)
+            if report.source is not None and _post_identities(report.submitted.post) & _post_identities(report.source.post):
+                raise QuantroError(
+                    ErrorCode.PROCESSING_FAILED, Stage.BUILD_REPORT,
+                    "The saved report identifies the submitted post as its own source. Run a new analysis job.",
+                )
             return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, []), _ContractStage.RUN_ANALYSIS, json_native=False)
 
         _call(Stage.RETRIEVE_POST, run_ingest, job_id, url, store=store)
@@ -266,11 +323,11 @@ def _analyze(
         ) from exc
     search = parse_stage_output(_CandidateSearch, raw_search, Stage.SEARCH_CANDIDATES)
     warnings.extend(warning for warning in search.warnings if warning not in warnings)
-    submitted_url = _normalized_post_url(submitted_post.post_url)
+    submitted_identities = _post_identities(submitted_post)
     candidate_rows = [candidate.model_dump(mode="json") for candidate in search.candidates]
     eligible_candidates = [
         candidate for candidate in candidate_rows
-        if _normalized_post_url(candidate.get("url", "")) != submitted_url
+        if _post_identity(candidate.get("url", "")) not in submitted_identities
     ]
     candidates = eligible_candidates[:SEARCH_LIMIT]
     if len(eligible_candidates) < len(candidate_rows):
@@ -280,7 +337,7 @@ def _analyze(
     skipped = 0
     for index, candidate in enumerate(candidates, start=1):
         try:
-            assessed = _assess_candidate(candidate, submitted_features)
+            assessed = _assess_candidate(candidate, submitted_features, submitted_identities)
         except QuantroError as error:
             skipped += 1
             warnings.append(f"Candidate {_candidate_label(candidate, index)} was skipped: {error.message}")
