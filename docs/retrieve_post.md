@@ -161,7 +161,7 @@ No live Snowflake save is claimed until credentials and schema are configured.
 
 ## Change log
 
-- 2026-10-10, Codex: added the retrieval callable, shared v2 types, isolated downloader,
+- 2026-10-10: added the retrieval callable, shared v2 types, isolated downloader,
   Snowflake stage/metadata helper and setup SQL, requirements/environment examples,
   tests and handoff documentation. Verified 209 tests, Ruff lint/format, strict mypy
   and dependency consistency. A live public MP4 downloaded 5,510,872 bytes; a mock
