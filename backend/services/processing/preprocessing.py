@@ -109,6 +109,9 @@ TEXT_SCHEMA = {
 }
 
 
+END_OVERSHOOT_TOLERANCE_SECONDS = 0.75
+
+
 def _sentences(data, start, end, media_id, first_index):
     language = data["language"]
     if language is not None and not isinstance(language, str):
@@ -116,10 +119,14 @@ def _sentences(data, start, end, media_id, first_index):
     if not isinstance(data["sentences"], list):
         raise ValueError("Invalid sentences")
     sentences = []
+    segment = end - start
     for item in data["sentences"]:
         left = _number(item["start_seconds"])
         right = _number(item["end_seconds"])
-        if not 0 <= left < right <= end - start:
+        # Model timestamps are estimates; clamp sub-second overshoot of the segment end only.
+        if left < segment < right <= segment + END_OVERSHOOT_TOLERANCE_SECONDS:
+            right = segment
+        if not 0 <= left < right <= segment:
             raise ValueError("Transcript timestamps fall outside the audio segment.")
         if not isinstance(item["text"], str) or not item["text"].strip():
             raise ValueError("Invalid transcript text")

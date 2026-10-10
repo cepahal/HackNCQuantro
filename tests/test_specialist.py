@@ -197,6 +197,14 @@ def test_invalid_model_timestamps_rejected():
         p._sentences({'language': 'en', 'sentences': [{'start_seconds': 0, 'end_seconds': 61, 'text': 'bad'}]}, 0, 60, 'source', 1)
 
 
+def test_sub_second_end_overshoot_is_clamped_to_segment():
+    data = {'language': 'en', 'sentences': [{'start_seconds': 9.42, 'end_seconds': 10.5, 'text': 'La la'}]}
+    sentence = p._sentences(data, 0, 10.0, 'clip', 1)[0]
+    assert (sentence['start_seconds'], sentence['end_seconds']) == (9.42, 10.0)
+    with pytest.raises(ValueError):
+        p._sentences({'language': 'en', 'sentences': [{'start_seconds': 10.2, 'end_seconds': 10.5, 'text': 'x'}]}, 0, 10.0, 'clip', 1)
+
+
 @pytest.fixture
 def fake_media(tmp_path, monkeypatch):
     path = tmp_path / 'recording.mp4'
