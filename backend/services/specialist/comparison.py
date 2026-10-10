@@ -120,6 +120,26 @@ def _validate_result(data, clip, context, caption):
     return result
 
 
+def _validation_hint(exc):
+    # Fixed diagnostics only: provider response values must never become error text.
+    if isinstance(exc, KeyError):
+        return 'Copy media IDs and sentence IDs exactly from the supplied evidence.'
+    return {
+        'Evidence quote is not verbatim in a cited sentence':
+            'Each quote must be copied from one cited sentence. Never join sentences; use separate evidence entries.',
+        'Evidence timestamps do not match cited sentences':
+            'Copy timestamps exactly, without rounding, from the cited sentences.',
+        'Findings require source context evidence':
+            'Every finding must cite at least one sentence from the source context.',
+        'Repeated evidence sentence':
+            'Do not repeat sentence IDs within an evidence entry.',
+        'Duplicate finding ID':
+            'Use a distinct finding ID for every finding.',
+        'Caption was supplied':
+            'A caption was supplied; do not use not_provided for its assessment.',
+    }.get(str(exc), 'Use the exact response schema and only the supplied evidence.')
+
+
 def compare_context_and_caption(clip_features, context, caption):
     # aligned with shared/types.py on 2026-10-10
     try:
@@ -149,6 +169,8 @@ def compare_context_and_caption(clip_features, context, caption):
             'Report material omitted qualifications, changed meaning, or no material difference only when supported. '
             'For every finding cite source sentence IDs, an exact quote contained in one cited sentence, '
             'and timestamps equal to the earliest start and latest end of the cited sentences. '
+            'Never combine multiple sentences into one quote. Use separate evidence entries for separate sentences. '
+            'Copy media IDs, sentence IDs, and timestamps exactly; never round timestamps. '
             'Include evidence-backed findings even for supported captions or no material difference. '
             'Use uncertain when ambiguous, not_provided for a null caption. '
             'Confidence is at most moderate because the evidence is transcript-only. '
@@ -157,11 +179,16 @@ def compare_context_and_caption(clip_features, context, caption):
         )
         client, model = client_and_model(stage)
         try:
-            data = generate_json(client, model, prompt, Comparison.model_json_schema(), stage)
-            try:
-                return validate_contract_result(_ReturnModel, _validate_result(data, clip_features, context, caption), _ContractStage.COMPARE_CONTEXT_AND_CAPTION, json_native=True)
-            except (ValueError, KeyError, TypeError):
-                raise QuantroError('PROCESSING_FAILED', stage, 'Gemini comparison contained invalid or unsupported evidence.') from None
+            request_prompt = prompt
+            for attempt in range(2):
+                data = generate_json(client, model, request_prompt, Comparison.model_json_schema(), stage)
+                try:
+                    return validate_contract_result(_ReturnModel, _validate_result(data, clip_features, context, caption), _ContractStage.COMPARE_CONTEXT_AND_CAPTION, json_native=True)
+                except (ValueError, KeyError, TypeError) as exc:
+                    hint = _validation_hint(exc)
+                    if attempt == 1:
+                        raise QuantroError('PROCESSING_FAILED', stage, 'Gemini comparison failed evidence validation. ' + hint) from None
+                    request_prompt = prompt + '\nThe previous response failed local validation. ' + hint
         finally:
             client.close()
     except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.

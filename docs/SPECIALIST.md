@@ -31,6 +31,18 @@ SDK construction and request failures are normalized to safe stage errors.
 Network timeouts and transient provider errors are retryable; HTTP 402 billing
 failures require an account fix and are not marked retryable.
 
+2026-10-10 live recovery: the configured `gemini-flash-latest` alias returned
+HTTP 504 for structured JSON requests. `gemini-3.1-flash-lite` passed the same
+Comparison schema request with the same key; the ignored local environment now
+explicitly selects that model. Set `GEMINI_MODEL=gemini-3.1-flash-lite` privately
+to reproduce this working configuration. There is no silent model fallback.
+Requests have a 45-second timeout and at most three transient-error attempts,
+with 2/4-second backoff and SDK retries disabled. Errors expose safe categories,
+HTTP status or an allowlisted finish reason, never provider response bodies.
+Comparison permits one re-ask after rejected evidence, using the original input
+and fixed correction instructions. All citations still pass the same strict
+local checks for verbatim single-sentence quotes, IDs, and exact timestamps.
+
 2026-10-10 configuration handoff: added private local environment loading and
 verified system TLS. The configured SDK authenticated successfully using model
 listing; 393 tests passed with 2 skips. No API key is committed. Generation and

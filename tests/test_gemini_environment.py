@@ -12,6 +12,11 @@ from backend.services.reporting.errors import QuantroError, Stage
 from backend.services.specialist import gemini
 
 
+@pytest.fixture(autouse=True)
+def no_retry_delay(monkeypatch):
+    monkeypatch.setattr(gemini.time, "sleep", Mock())
+
+
 def test_private_local_key_overrides_placeholders(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -30,6 +35,8 @@ def test_private_local_key_overrides_placeholders(
     assert model == "test-model"
     context = client["http_options"]["client_args"]["verify"]
     assert context.verify_mode == ssl.CERT_REQUIRED and context.check_hostname
+    assert client["http_options"]["retry_options"]["attempts"] == 1
+    assert client["http_options"]["timeout"] == 45000
 
 
 class ProviderFailure(Exception):
