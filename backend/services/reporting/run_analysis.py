@@ -20,7 +20,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from ..external_apis.build_search_queries import build_search_queries
 from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
 from ..external_apis.search_candidates import search_candidates
-from ..pipeline.run_ingest import EXTRACTION_OPTIONS, ingest_post_and_features
+from ..pipeline.run_ingest import EXTRACTION_OPTIONS, run_ingest
 from ..processing.preprocessing import extract_media_features
 from ..shared.contracts import validate_contract_result
 from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
@@ -33,6 +33,7 @@ from ..shared.types import (
     ConfidenceLevel,
     Context,
     DeliveryResult,
+    JobCompletionResult,
     MediaFeatures,
     Post,
     ReportV2,
@@ -97,8 +98,7 @@ def select_source(
         return None, []
 
     ordered = sorted(verified, key=lambda entry: _rank(entry[1], entry[2]), reverse=True)
-    tied = len(ordered) > 1 and _rank(*ordered[0][1:]) == _rank(*ordered[1][1:])
-    return ordered[0][0], [MULTIPLE_PLAUSIBLE_SOURCES] if tied else []
+    return ordered[0][0], [MULTIPLE_PLAUSIBLE_SOURCES] if len(ordered) > 1 else []
 
 
 def deliver_summary_after_save(
@@ -118,7 +118,8 @@ def deliver_summary_after_save(
     if not conversation_id:
         return None, None
     try:
-        delivery = send_summary(
+        delivery = _call(
+            Stage.SEND_SUMMARY, send_summary,
             conversation_id, summary, report_url, job_id=job_id, provider=provider, tracker=tracker
         )
     except QuantroError as error:
@@ -157,7 +158,7 @@ def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures) -
     raw_features = _call(
         Stage.EXTRACT_MEDIA_FEATURES,
         extract_media_features,
-        post.media.model_dump(mode="json"),
+        post.media,
         dict(EXTRACTION_OPTIONS),
     )
     features = parse_stage_output(MediaFeatures, raw_features, Stage.EXTRACT_MEDIA_FEATURES)
@@ -219,9 +220,17 @@ def run_analysis(
             report = parse_stage_output(ReportV2, existing_report, Stage.BUILD_REPORT)
             return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, []), _ContractStage.RUN_ANALYSIS, json_native=False)
 
-        ingested = ingest_post_and_features(job_id, url, store=store)
+        _call(Stage.RETRIEVE_POST, run_ingest, job_id, url, store=store)
         try:
-            return validate_contract_result(_ReturnModel, _analyze(job_id, ingested.post, ingested.features, conversation_id, store, provider, tracker), _ContractStage.RUN_ANALYSIS, json_native=False)
+            ingested = store.get_job(job_id)
+            if ingested is None:
+                raise LookupError("Ingest job is missing.")
+        except Exception as exc:
+            raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.EXTRACT_MEDIA_FEATURES, retryable=True) from exc
+        try:
+            post = parse_stage_output(Post, ingested["post_json"], Stage.RETRIEVE_POST)
+            features = parse_stage_output(MediaFeatures, ingested["features_json"], Stage.EXTRACT_MEDIA_FEATURES)
+            return validate_contract_result(_ReturnModel, _analyze(job_id, post, features, conversation_id, store, provider, tracker), _ContractStage.RUN_ANALYSIS, json_native=False)
         except QuantroError as error:
             _mark_failed(store, job_id, error)
             raise
@@ -250,15 +259,13 @@ def _analyze(
     warnings.extend(queries.warnings)
 
     try:
-        raw_search = search_candidates(queries.queries, limit=SEARCH_LIMIT)
-    except QuantroError:
-        raise
+        raw_search = _call(Stage.SEARCH_CANDIDATES, search_candidates, queries.model_dump(mode="json"), limit=SEARCH_LIMIT)
     except Exception as exc:
         raise QuantroError(
             code=ErrorCode.SEARCH_FAILED, stage=Stage.SEARCH_CANDIDATES, retryable=True
         ) from exc
     search = parse_stage_output(_CandidateSearch, raw_search, Stage.SEARCH_CANDIDATES)
-    warnings.extend(search.warnings)
+    warnings.extend(warning for warning in search.warnings if warning not in warnings)
     submitted_url = _normalized_post_url(submitted_post.post_url)
     candidate_rows = [candidate.model_dump(mode="json") for candidate in search.candidates]
     eligible_candidates = [
@@ -321,7 +328,7 @@ def _analyze(
             compare_context_and_caption,
             submitted_features.model_dump(mode="json"),
             context.model_dump(mode="json"),
-            submitted_post.caption,
+            chosen.post.caption,
         )
         comparison = parse_stage_output(Comparison, raw_comparison, Stage.COMPARE_CONTEXT_AND_CAPTION)
 
@@ -350,9 +357,11 @@ def _complete_and_deliver(
     tracker: DeliveryTracker | None,
     warnings: list[str],
 ) -> AnalysisResult:
-    saved = save_report_and_complete_job(
+    saved = _call(
+        Stage.SAVE_REPORT_AND_COMPLETE_JOB, save_report_and_complete_job,
         job_id, report, report_store=TigerReportStore(store), job_store=TigerJobStore(store)
     )
+    saved = parse_stage_output(JobCompletionResult, saved, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
     try:
         saved_report = store.get_report(saved.report_id)
     except Exception as exc:
@@ -383,5 +392,5 @@ def _complete_and_deliver(
         report_url=saved.report_url,
         delivery_status=delivery_status,
         delivery_warning=delivery_warning,
-        warnings=warnings,
+        warnings=warnings + ([delivery_warning] if delivery_warning else []),
     )

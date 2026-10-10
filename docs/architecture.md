@@ -109,3 +109,15 @@ legacy callers. GET /ingest/{job_id} returns {job, post, features} with exact pe
 JSON, including internal worker paths; use sanitized /reports endpoints for public UI.
 Real job_test_001: ingested, complete transcript, 3 sentences, 12 frames; exact Tiger
 JSON round-trip passed. Missing Gemini credits and live iMessage delivery remain MVP gates.
+
+
+## Prompt 4 orchestration reconciliation
+
+run_analysis calls public run_ingest and reloads its exact stored Post/MediaFeatures.
+Search exceptions always become retryable SEARCH_FAILED; all viable alternatives
+are disclosed, ordered by confidence then coverage. Comparison receives the selected
+source caption as Prompt 4 specifies. All teammate failures are normalized by stage.
+Production report storage is Tiger only; in-memory stores require explicit test injection.
+Delivery occurs after durable report save; even untyped delivery failures retain reports
+and return a safe warning. See PROMPT_4_VERIFICATION.md for real no-match/save/GET proof.
+Live matched comparison still needs funded Gemini; real Photon acceptance remains unverified.

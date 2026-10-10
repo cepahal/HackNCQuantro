@@ -125,6 +125,7 @@ def upstream(monkeypatch):
         return _post("clip_media", url, followers=state.get("clip_followers"), caption="The bridge is closed forever.")
 
     def fake_extract(media, options):
+        media = media.model_dump(mode="json") if hasattr(media, "model_dump") else media
         if media["media_id"] == "clip_media":
             return CLIP_FEATURES
         return _source_features(media["media_id"])
@@ -132,14 +133,14 @@ def upstream(monkeypatch):
     def fake_search(queries, limit):
         if state["search_error"]:
             raise state["search_error"]
-        return {"candidates": state["candidates"], "warnings": []}
+        return {"candidates": state["candidates"], "warnings": state.get("search_warnings", [])}
 
     def fake_retrieve_candidate(candidate):
         if candidate["candidate_id"] in state["failing_candidates"]:
             raise ConnectionError("candidate download timed out")
         n = candidate["candidate_id"].split("_")[1]
         return _post(f"src_media_{n}", candidate["url"], candidate_id=candidate["candidate_id"],
-                     followers=state["source_followers"])
+                     followers=state["source_followers"], caption=state.get("source_caption"))
 
     def fake_compare(clip_features, context, caption):
         state["compare_calls"].append(caption)
@@ -181,7 +182,7 @@ def test_matched_end_to_end(client, store, upstream):
     assert report["context"]["windows"][0]["sentences"][-1]["text"].startswith("The repairs")
     assert report["summary"] == "The clip omits that the closure is temporary."
     assert store.get_job("job_match")["status"] == "completed"
-    assert upstream["compare_calls"] == ["The bridge is closed forever."]
+    assert upstream["compare_calls"] == [None]
     assert upstream["provider"].sent == [
         ("conv_1", ("The clip omits that the closure is temporary. "
                    "View the evidence: https://quantro.test/reports/report_job_match"))
@@ -394,12 +395,14 @@ def test_report_get_storage_failure_has_safe_error_envelope(client, store, monke
 
 
 @pytest.mark.parametrize("retryable", [False, True])
-def test_search_preserves_typed_error_retryability(client, store, upstream, retryable):
+def test_search_provider_failure_is_always_retryable(client, store, upstream, retryable):
     original = QuantroError("SEARCH_FAILED", "search_candidates", retryable=retryable)
     upstream["search_error"] = original
     response = _run(client, "job_typed_search")
     assert response.status_code == 500
-    assert response.json() == {"error": original.to_dict()}
+    assert response.json()["error"]["code"] == "SEARCH_FAILED"
+    assert response.json()["error"]["stage"] == "search_candidates"
+    assert response.json()["error"]["retryable"] is True
     assert store.get_job("job_typed_search")["status"] == "failed"
     assert store.get_report("report_job_typed_search") is None
 
@@ -421,3 +424,31 @@ def test_first_saved_report_controls_delivery_and_result(client, store, upstream
         f"{canonical['summary']} View the evidence: {result.report_url}",
     )]
     assert store.get_report("report_job_first_save") == canonical
+
+
+def test_comparison_uses_selected_source_caption(client, upstream):
+    upstream["source_caption"] = "Actual source caption."
+    assert _run(client, "job_source_caption", conversation_id=None).status_code == 200
+    assert upstream["compare_calls"] == ["Actual source caption."]
+
+
+def test_untyped_delivery_failure_after_save_is_normalized(client, store, upstream, monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("private provider detail")
+    monkeypatch.setattr(analysis_module, "send_summary", fail)
+    response = _run(client, "job_untyped_delivery")
+    assert response.status_code == 200
+    assert response.json()["delivery_status"] == "failed"
+    assert "private" not in response.text
+    assert client.get("/reports/report_job_untyped_delivery").status_code == 200
+    assert store.get_job("job_untyped_delivery")["status"] == "completed"
+
+
+def test_query_warnings_forwarded_by_search_are_not_duplicated(client, upstream, monkeypatch):
+    warning = "Available evidence is incomplete."
+    monkeypatch.setattr(analysis_module, "build_search_queries",
+                        lambda features, post: {"queries": [SHARED], "warnings": [warning]})
+    upstream["search_warnings"] = [warning]
+    response = _run(client, "job_dedup_warnings", conversation_id=None)
+    assert response.status_code == 200
+    assert response.json()["warnings"].count(warning) == 1

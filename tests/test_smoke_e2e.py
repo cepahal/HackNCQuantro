@@ -178,6 +178,7 @@ def upstream(monkeypatch, store):
     features_by_media = {"media_smoke_clip": CLIP_FEATURES, "media_smoke_source": SOURCE_FEATURES}
 
     def extract(media, options=None):
+        media = media.model_dump(mode="json") if hasattr(media, "model_dump") else media
         return copy.deepcopy(features_by_media[media["media_id"]])
 
     fakes = {
