@@ -109,9 +109,20 @@ README describes planned Cortex Search. This module adds the required media save
 helper using the official Python connector. Snowflake's SQL REST API does not support
 file `PUT`; the connector performs the actual stage upload.
 
-Copy Snowflake values from `.env.example` into the ignored root `.env` and fill in
-account, user and programmatic access token, plus the warehouse/database/schema
-context appropriate to the team's account. Never paste tokens into code or chat.
+Merge Snowflake values from `.env.example` into the existing ignored root `.env`.
+Set `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, and either `SNOWFLAKE_PASSWORD` or
+`SNOWFLAKE_TOKEN`, plus the warehouse/database/schema context for the team's account.
+The token is optional. A nonblank token takes precedence when both credentials are
+present and uses programmatic access token authentication; otherwise the connector
+receives the password unchanged. Authentication errors are returned without retrying
+with the other credential. The account's authentication policy may require MFA or
+another supported authentication method instead of password access; see the
+[official connector authentication guide](https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-connect).
+
+Keep existing HTTP/report, Photon, AI and other teammate settings in the same `.env`.
+This helper reads its Snowflake settings without changing those values or the process
+environment. Never put credentials in code, Git or chat.
+
 Run `backend/services/external_apis/snowflake_schema.sql` once in the chosen schema.
 Custom stage/table names are supported through the example variables; create those
 objects in the schema explicitly if changing the names. This module runs no DDL.
@@ -134,7 +145,8 @@ YouTube, Vimeo and Reddit. Also direct public `.mp4`, `.jpg` and `.jpeg` URLs
 private/deleted/login-required/DRM/live/playlist posts and unsupported formats return
 errors. Social-platform photo galleries are not supported; submit the direct JPG
 URL for an image. Compatibility depends on the upstream extractor and platform
-access policies. No retrieval API key or browser cookie is used.
+access policies. The current downloader uses no browser cookie and does not require
+`RETRIEVAL_PROVIDER_API_KEY`; it uses yt-dlp for video and direct HTTP for JPEG.
 
 The download subprocess deadline defaults to 120 seconds (`timeout_seconds=`).
 Snowflake has separate login/network/query timeouts. The retrieval byte cap defaults
@@ -166,5 +178,10 @@ No live Snowflake save is claimed until credentials and schema are configured.
   tests and handoff documentation. Verified 209 tests, Ruff lint/format, strict mypy
   and dependency consistency. A live public MP4 downloaded 5,510,872 bytes; a mock
   Snowflake connector verified the actual file stream, full Post metadata and commit.
-  Live Snowflake upload remains unverified because no token is configured. Supported
-  formats and platform restrictions are listed above.
+  At that verification, live Snowflake upload was unverified because no token was
+  configured. Supported formats and platform restrictions are listed above.
+- 2026-10-10: added compatibility with the team's `SNOWFLAKE_PASSWORD` setting while
+  retaining optional PAT authentication and token precedence. Existing root `.env`
+  settings remain intact. Verified 225 tests, Ruff lint/format, strict mypy and
+  dependency consistency after the authentication change. Live authentication and
+  persistence remain unverified because no credentials have been provided.

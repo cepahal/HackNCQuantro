@@ -100,11 +100,22 @@ class SnowflakePostStore:
     def from_env(cls) -> SnowflakePostStore:
         """Lazily import/connect using root .env plus overriding process environment."""
         values = _environment()
-        required = ("SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_TOKEN")
-        if any(not values.get(name, "").strip() for name in required):
+        required = ("SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER")
+        token = values.get("SNOWFLAKE_TOKEN", "").strip()
+        password = values.get("SNOWFLAKE_PASSWORD", "")
+        if any(not values.get(name, "").strip() for name in required) or not (
+            token or password.strip()
+        ):
             raise StorageError(
-                "Set SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER and SNOWFLAKE_TOKEN before retrieving posts."
+                "Set SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER and either SNOWFLAKE_PASSWORD "
+                "or SNOWFLAKE_TOKEN before retrieving posts."
             )
+        # Keep existing PAT configuration authoritative; never retry with another credential.
+        authentication = (
+            {"authenticator": "PROGRAMMATIC_ACCESS_TOKEN", "token": token}
+            if token
+            else {"authenticator": "snowflake", "password": password}
+        )
         store = cls(
             stage=values.get("SNOWFLAKE_MEDIA_STAGE", "QUANTRO_MEDIA"),
             table=values.get("SNOWFLAKE_POSTS_TABLE", "QUANTRO_POSTS"),
@@ -130,11 +141,10 @@ class SnowflakePostStore:
                 connector.connect(
                     account=account,
                     user=user,
-                    authenticator="PROGRAMMATIC_ACCESS_TOKEN",
-                    token=values["SNOWFLAKE_TOKEN"].strip(),
                     autocommit=False,
                     login_timeout=30,
                     network_timeout=120,
+                    **authentication,
                     **context,
                 ),
             )

@@ -397,3 +397,161 @@ def test_cursor_close_failure_preserves_committed_save_without_exposing_diagnost
     assert connection.commits == 1 and connection.rollbacks == 0
     assert "secret-token" not in caplog.text
     assert "signed-storage-url" not in caplog.text
+
+
+def install_auth_connector(
+    monkeypatch: pytest.MonkeyPatch,
+    values: dict[str, str],
+    *,
+    failure: Exception | None = None,
+) -> tuple[FakeConnection, list[dict[str, object]]]:
+    connection = FakeConnection()
+    calls: list[dict[str, object]] = []
+    connector = ModuleType("snowflake.connector")
+
+    def connect(**kwargs: object) -> FakeConnection:
+        calls.append(kwargs)
+        if failure is not None:
+            raise failure
+        return connection
+
+    monkeypatch.setattr(connector, "connect", connect, raising=False)
+    monkeypatch.setitem(sys.modules, "snowflake.connector", connector)
+    monkeypatch.setattr(
+        "backend.services.external_apis.snowflake_storage._environment",
+        lambda: dict(values),
+    )
+    return connection, calls
+
+
+@pytest.mark.parametrize("token", [None, "", " \t "])
+def test_password_auth_preserves_password_and_accepts_missing_or_blank_token(
+    monkeypatch: pytest.MonkeyPatch, token: str | None
+) -> None:
+    password = "  example password with spaces  "
+    values = {
+        "SNOWFLAKE_ACCOUNT": "  org-account  ",
+        "SNOWFLAKE_USER": "  example-user  ",
+        "SNOWFLAKE_PASSWORD": password,
+    }
+    if token is not None:
+        values["SNOWFLAKE_TOKEN"] = token
+    connection, calls = install_auth_connector(monkeypatch, values)
+
+    store = SnowflakePostStore.from_env()
+
+    assert len(calls) == 1
+    assert calls[0]["account"] == "org-account"
+    assert calls[0]["user"] == "example-user"
+    assert calls[0]["authenticator"] == "snowflake"
+    assert calls[0]["password"] == password
+    assert "token" not in calls[0]
+    assert calls[0]["autocommit"] is False
+    assert calls[0]["login_timeout"] == 30
+    assert calls[0]["network_timeout"] == 120
+    store.close()
+    assert connection.closes == 1
+
+
+@pytest.mark.parametrize("password", [None, "", "   ", "example-password"])
+def test_pat_auth_has_priority_and_trims_token_without_sending_password(
+    monkeypatch: pytest.MonkeyPatch, password: str | None
+) -> None:
+    values = {
+        "SNOWFLAKE_ACCOUNT": "org-account",
+        "SNOWFLAKE_USER": "example-user",
+        "SNOWFLAKE_TOKEN": "  example-token  ",
+    }
+    if password is not None:
+        values["SNOWFLAKE_PASSWORD"] = password
+    connection, calls = install_auth_connector(monkeypatch, values)
+
+    store = SnowflakePostStore.from_env()
+
+    assert len(calls) == 1
+    assert calls[0]["authenticator"] == "PROGRAMMATIC_ACCESS_TOKEN"
+    assert calls[0]["token"] == "example-token"
+    assert "password" not in calls[0]
+    store.close()
+    assert connection.closes == 1
+
+
+@pytest.mark.parametrize(
+    ("token", "password"),
+    [(None, None), ("", ""), (" \t ", "   "), (None, "   "), ("   ", None)],
+)
+def test_missing_or_blank_auth_credentials_reject_before_connection(
+    monkeypatch: pytest.MonkeyPatch, token: str | None, password: str | None
+) -> None:
+    values = {"SNOWFLAKE_ACCOUNT": "org-account", "SNOWFLAKE_USER": "example-user"}
+    if token is not None:
+        values["SNOWFLAKE_TOKEN"] = token
+    if password is not None:
+        values["SNOWFLAKE_PASSWORD"] = password
+    _, calls = install_auth_connector(monkeypatch, values)
+
+    with pytest.raises(StorageError) as caught:
+        SnowflakePostStore.from_env()
+
+    assert "SNOWFLAKE_PASSWORD" in str(caught.value)
+    assert "SNOWFLAKE_TOKEN" in str(caught.value)
+    assert calls == []
+
+
+@pytest.mark.parametrize("missing", ["SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER"])
+def test_password_does_not_bypass_required_account_and_user(
+    monkeypatch: pytest.MonkeyPatch, missing: str
+) -> None:
+    values = {
+        "SNOWFLAKE_ACCOUNT": "org-account",
+        "SNOWFLAKE_USER": "example-user",
+        "SNOWFLAKE_PASSWORD": "example-password",
+    }
+    values[missing] = "   "
+    _, calls = install_auth_connector(monkeypatch, values)
+
+    with pytest.raises(StorageError):
+        SnowflakePostStore.from_env()
+
+    assert calls == []
+
+
+@pytest.mark.parametrize("use_pat", [False, True])
+def test_auth_connection_failure_is_redacted_and_never_retries_another_auth_method(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    use_pat: bool,
+) -> None:
+    password = "private-example-password"
+    token = "private-example-token"
+    diagnostic = "private connector diagnostic: " + password + " " + token
+    values = {
+        "SNOWFLAKE_ACCOUNT": "org-account",
+        "SNOWFLAKE_USER": "example-user",
+        "SNOWFLAKE_PASSWORD": password,
+    }
+    if use_pat:
+        values["SNOWFLAKE_TOKEN"] = token
+    _, calls = install_auth_connector(
+        monkeypatch, values, failure=RuntimeError(diagnostic)
+    )
+
+    with pytest.raises(StorageError) as caught:
+        SnowflakePostStore.from_env()
+
+    assert len(calls) == 1
+    assert calls[0]["authenticator"] == (
+        "PROGRAMMATIC_ACCESS_TOKEN" if use_pat else "snowflake"
+    )
+    if use_pat:
+        assert calls[0]["token"] == token
+        assert "password" not in calls[0]
+    else:
+        assert calls[0]["password"] == password
+        assert "token" not in calls[0]
+    assert caught.value.code == "STORAGE_FAILED"
+    assert caught.value.__suppress_context__
+    visible = str(caught.value) + caplog.text
+    assert password not in visible
+    assert token not in visible
+    assert diagnostic not in visible
