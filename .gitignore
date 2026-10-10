@@ -16,3 +16,4 @@ venv/
 .DS_Store
 .next/
 .venv312/
+.vercel
