@@ -13,13 +13,14 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-mkdir -p ../.secrets && chmod 700 ../.secrets
-cp .env.example ../.secrets/.env && chmod 600 ../.secrets/.env   # fill in values there
+cd ..
+mkdir -p .secrets && chmod 700 .secrets
+cp .env .secrets/.env && chmod 600 .secrets/.env   # tracked blank template -> fill in the copy
+ln -s .secrets/.env .env.local                     # teammates' modules read .env.local
 ```
 
-Secrets live in the repo-root `.secrets/.env`. The folder is git-ignored and is loaded
-first by the API and the Tiger CLI; `backend/.env` is only a fallback. Never put real
-keys in a tracked file. It needs at least:
+Secrets live only in the repo-root `.secrets/.env`. The folder and `.env.local` are
+git-ignored. Never fill in the tracked `.env` template. The vault needs at least:
 
 ```bash
 TIGER_DATABASE_URL=postgres://<user>:<password>@<host>:<port>/tsdb?sslmode=require
@@ -30,12 +31,13 @@ GEMINI_API_KEY=<key>
 GEMINI_MODEL=gemini-flash-latest
 ```
 
-Retrieval and search also need `TIGERDATA_DSN` in the root `.env.local`. See
-[retrieve_post.md](retrieve_post.md) and `docs/source_search.md`.
+Retrieval and search also need `TIGERDATA_DSN` (the same Tiger URL) and
+`TIGERDATA_SSL_ROOT_CERT=system`. See [retrieve_post.md](retrieve_post.md) and
+[source_search.md](source_search.md).
 
 ### Verify the Tiger Data connection
 
-The URL is read from `.env` so it never lands in shell history:
+The URL is read from the vault so it never lands in shell history:
 
 ```bash
 cd backend
@@ -70,7 +72,7 @@ createdb quantro_smoke      # once
 TIGER_DATABASE_URL=postgresql://localhost:5432/quantro_smoke pytest tests/test_smoke_e2e.py -v
 ```
 
-Against Tiger Data, using `backend/.env`:
+Against Tiger Data, using `.secrets/.env`:
 
 ```bash
 pytest tests/test_smoke_e2e.py -v
@@ -157,11 +159,10 @@ grep -rn --include='*.py' "/tmp/\|local_path\|api_key\|secret" backend/services/
 
 ## 5. Pre-demo checklist
 
-- [ ] `backend/.env` has a valid `TIGER_DATABASE_URL` (one line, `sslmode=require`) and a rotated password
+- [ ] `.secrets/.env` has a valid `TIGER_DATABASE_URL` (one line, `sslmode=require`) and a rotated password
 - [ ] `psql … -c 'select 1'` and `python -m services.storage.tiger list` both succeed
 - [ ] `GEMINI_API_KEY` set; `which ffmpeg ffprobe` finds both
-- [ ] `TIGERDATA_DSN` set in root `.env.local`, and the search corpus is seeded with the demo source video
-- [ ] `run_analysis.py` imports Abdullah's real search functions, not `_stubs` (see INTEGRATION.md)
+- [ ] `TIGERDATA_DSN` set in `.secrets/.env`, `.env.local` links to it, and the search corpus is seeded with the demo source video
 - [ ] `pytest tests/ -v` is green, including `test_smoke_e2e.py` against local Postgres
 - [ ] `uvicorn main:app --port 8000` boots with no traceback; `/docs` lists all three routes
 - [ ] `npm run dev` serves http://localhost:3000, and `/reports/[id]` exists (the link is `/reports/`, not `/report/`)

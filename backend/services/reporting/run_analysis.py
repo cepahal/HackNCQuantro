@@ -18,13 +18,15 @@ from typing import Any, Literal, TypeVar
 
 from pydantic import BaseModel
 
+from ..external_apis.build_search_queries import build_search_queries
+from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
+from ..external_apis.search_candidates import search_candidates
 from ..pipeline.run_ingest import EXTRACTION_OPTIONS, ingest_post_and_features
 from ..processing.preprocessing import extract_media_features
 from ..specialist.alignment import verify_and_align
 from ..specialist.comparison import compare_context_and_caption
 from ..specialist.context import select_surrounding_context
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
-from . import _stubs as candidate_search
 from .build_report import build_report
 from .errors import ErrorCode, QuantroError, Stage, normalize_exception
 from .save_report import save_report_and_complete_job
@@ -40,10 +42,6 @@ from .types import (
     Post,
     parse_stage_output,
 )
-
-build_search_queries = candidate_search.build_search_queries
-search_candidates = candidate_search.search_candidates
-retrieve_candidate_media = candidate_search.retrieve_candidate_media
 
 logger = logging.getLogger(__name__)
 

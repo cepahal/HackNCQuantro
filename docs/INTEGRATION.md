@@ -61,26 +61,18 @@ retryable}`, and the job row records `error_code` and `error_stage`.
 | 7 | `select_surrounding_context(alignment, candidate_features, options)` | `backend.services.specialist.context` | Jason |
 | 8 | `compare_context_and_caption(clip_features, context, caption)` | `backend.services.specialist.comparison` | Jason |
 
-Functions 3–5 arrived on `origin/main` in commit `b586148`. Until that is merged
-locally, `run_analysis.py` binds them from `backend/services/reporting/_stubs.py`,
-which raises, so a real run stops at `SEARCH_FAILED`. To switch over, replace
-`from . import _stubs as candidate_search` and the three aliases under it with:
-
-```python
-from ..external_apis.build_search_queries import build_search_queries
-from ..external_apis.search_candidates import search_candidates
-from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
-```
-
-Their outputs (`{queries, warnings}`, `{candidates, warnings}`, and a Post) already
-match what `run_analysis` validates.
+`run_analysis.py` imports all eight directly. Their outputs (`{queries, warnings}`,
+`{candidates, warnings}`, Post, MediaFeatures, Alignment, Context, Comparison) are
+validated against `backend/services/reporting/types.py` at the reporting boundary.
+Search covers Abdullah's Tiger Data post corpus (`quantro_retrieval.posts`), not the
+public web: seed it with `retrieve_post(source_url)` for each demo source.
 
 ## Environment variables
 
-The API and the Tiger CLI load the git-ignored repo-root `.secrets/.env` first, then
-`backend/.env` as a fallback (an already-set key is never overridden). Abdullah's
-storage also reads the root `.env` and `.env.local`. Keep real values only in
-`.secrets/.env`.
+Real values live only in the git-ignored repo-root `.secrets/.env`. Root `.env.local`
+(also git-ignored) is a symlink to it, because Abdullah's storage and Jason's Gemini
+adapter read `.env.local`; the API and the Tiger CLI load `.secrets/.env` directly.
+The tracked root `.env` is a blank template, so never fill it in.
 
 | Variable | Read by | Owner | Notes |
 |---|---|---|---|
@@ -88,7 +80,7 @@ storage also reads the root `.env` and `.env.local`. Keep real values only in
 | `TIGER_TABLE_PREFIX` | `storage/tiger.py` | Bhrigu | Default `quantro_`. Lowercase letters, digits, `_`. |
 | `REPORT_STORE` | `save_report.get_report_store()` | Bhrigu | `tiger` (default), `memory` (tests), `snowflake` (stub). The API routes always use the Tiger store. |
 | `REPORT_BASE_URL` | `save_report.py`, CORS in `main.py` | Bhrigu | Frontend origin; report links are `{REPORT_BASE_URL}/reports/{report_id}`. |
-| `TIGERDATA_DSN` (fallback `DATABASE_URL`) | `external_apis/tigerdata_storage.py` | Abdullah | Retrieval media store and the search corpus. Separate from `TIGER_DATABASE_URL`. |
+| `TIGERDATA_DSN` (fallback `DATABASE_URL`) | `external_apis/tigerdata_storage.py` | Abdullah | Retrieval media store and the search corpus (`quantro_retrieval.posts`). Same Tiger service as `TIGER_DATABASE_URL`; the code enforces `verify-full` TLS. |
 | `TIGERDATA_SSL_ROOT_CERT` | `external_apis/tigerdata_storage.py` | Abdullah | Default `system`. |
 | `SNOWFLAKE_ACCOUNT`, `_USER`, `_PASSWORD`/`_TOKEN`, `_DATABASE`, `_SCHEMA`, `_WAREHOUSE`, `_MEDIA_STAGE`, `_POSTS_TABLE` | `external_apis/snowflake_storage.py` | Abdullah | Optional Snowflake track. |
 | `RETRIEVAL_PROVIDER_API_KEY`, `SEARCH_PROVIDER`, `SEARCH_PROVIDER_API_KEY` | nothing yet | Abdullah | Present in env templates. Search currently uses the Tiger Data corpus and needs no key. |
@@ -113,12 +105,12 @@ cd backend && python -m services.storage.tiger show <job_id> # full job, post, f
   `must include sslmode=require`. Or the CLI says `could not connect to Tiger Data`.
   Or requests fail with `STORAGE_FAILED` (HTTP 500).
 - **Check:**
-  - The variable is a single line in `backend/.env`: `postgres://user:pass@host:port/db?sslmode=require`.
+  - The variable is a single line in `.secrets/.env`: `postgres://user:pass@host:port/db?sslmode=require`.
   - Run `psql "<that URL>" -c 'select 1'`.
   - The password was rotated after the old one leaked to git.
   - Your network can reach the Tiger service.
 - **Note:** retrieval uses a different variable, `TIGERDATA_DSN`. A working API with
-  failing retrieval usually means that one is missing from the root `.env.local`.
+  failing retrieval usually means that one is missing from `.secrets/.env`.
 
 ### 2. Transcription key missing
 
