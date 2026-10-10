@@ -187,3 +187,19 @@ grep -rn --include='*.py' "/tmp/\|local_path\|api_key\|secret" backend/services/
 - [ ] One full curl run of the demo URL returns `outcome: "matched"`, and the report page opens
 - [ ] `git status` shows no `.env` files staged
 - [ ] Screenshot the report page and save the curl output as a fallback
+
+## 6. Deploy
+
+Frontend on Vercel, API on Render, both from this repo. Set values in each dashboard; never commit them.
+
+- **API (Render):** New > Blueprint, pick this repo. `render.yaml` builds `backend/Dockerfile.vercel`
+  with `backend/` as the context and prompts for: `REPORT_BASE_URL` (the Vercel URL; it is also the
+  only CORS origin), `TIGER_DATABASE_URL`, `TIGERDATA_DSN`, `TIGER_TABLE_PREFIX`, `GEMINI_API_KEY`,
+  `GEMINI_MODEL`, `PHOTON_API_KEY`, `PHOTON_BASE_URL`, `PHOTON_SENDER_ID`. Startup needs a reachable
+  Tiger database; the health check is `/openapi.json`.
+- **Frontend (Vercel):** `vercel.json` routes everything to the `frontend/` service. Set
+  `NEXT_PUBLIC_API_BASE_URL` (the Render URL, no `/api` suffix), `NEXT_PUBLIC_REPORT_BASE_URL`
+  (the Vercel URL) and `NEXT_PUBLIC_PHOTON_NUMBER`; they are inlined at build time, so redeploy after
+  changing them.
+- The Photon Node bridge (`backend/services/photon`) is a long-running local process and is not part
+  of either deploy.

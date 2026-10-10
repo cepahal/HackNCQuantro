@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: quantro-api
+    runtime: docker
+    branch: main
+    plan: free
+    dockerfilePath: ./backend/Dockerfile.vercel
+    dockerContext: ./backend
+    # Served only after startup has connected to Tiger; no database query per probe.
+    healthCheckPath: /openapi.json
+    envVars:
+      - key: REPORT_STORE
+        value: tiger
+      - key: TRANSCRIPTION_PROVIDER
+        value: gemini
+      - key: TIGERDATA_SSL_ROOT_CERT
+        value: /etc/ssl/certs/ca-certificates.crt
+      - key: REPORT_BASE_URL
+        sync: false
+      - key: TIGER_DATABASE_URL
+        sync: false
+      - key: TIGERDATA_DSN
+        sync: false
+      - key: TIGER_TABLE_PREFIX
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      - key: PHOTON_API_KEY
+        sync: false
+      - key: PHOTON_BASE_URL
+        sync: false
+      - key: PHOTON_SENDER_ID
+        sync: false

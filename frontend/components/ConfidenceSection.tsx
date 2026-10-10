@@ -1,4 +1,4 @@
-import type { AssessmentBlock, ClipCoverageBlock, DisplayModel } from "../lib/displayModel";
+import type { AssessmentBlock, ClipCoverageBlock, DisplayModel } from "../lib/api-types";
 
 type ConfidenceSectionProps = Pick<
   DisplayModel,
@@ -26,7 +26,7 @@ function ListOrNothing({ title, items }: { title: string; items: string[] }) {
 
 function AssessmentCard({ block, note }: { block: AssessmentBlock; note?: string | null }) {
   return (
-    <article aria-label={block.label}>
+    <article className="card" aria-label={block.label}>
       <h3>{block.label}</h3>
       <p>{block.value}</p>
       {note ? <p role="note">{note}</p> : null}
@@ -38,7 +38,7 @@ function AssessmentCard({ block, note }: { block: AssessmentBlock; note?: string
 
 function ClipCoverageCard({ block }: { block: ClipCoverageBlock }) {
   return (
-    <article aria-label={block.label}>
+    <article className="card" aria-label={block.label}>
       <h3>{block.label}</h3>
       <p>{block.value}</p>
       <p>{block.description}</p>
@@ -57,12 +57,14 @@ export default function ConfidenceSection({
   return (
     <section aria-label="Confidence">
       {no_source_message ? <p role="status">{no_source_message}</p> : null}
-      {source_match ? <AssessmentCard block={source_match} /> : null}
-      {clip_coverage ? <ClipCoverageCard block={clip_coverage} /> : null}
-      {context_assessment ? (
-        <AssessmentCard block={context_assessment} note={context_unavailable_message} />
-      ) : null}
-      <p>{confidence_note}</p>
+      <div className="cards">
+        {source_match ? <AssessmentCard block={source_match} /> : null}
+        {clip_coverage ? <ClipCoverageCard block={clip_coverage} /> : null}
+        {context_assessment ? (
+          <AssessmentCard block={context_assessment} note={context_unavailable_message} />
+        ) : null}
+      </div>
+      <p><small>{confidence_note}</small></p>
     </section>
   );
 }

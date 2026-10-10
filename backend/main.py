@@ -62,6 +62,7 @@ from backend.routes.analyze import router as analyze_router
 from backend.routes.common import quantro_error_response
 from backend.routes.ingest import router as ingest_router
 from backend.routes.media import router as media_router
+from backend.routes.photon_webhook import router as photon_webhook_router
 from backend.services.shared.errors import QuantroError
 from backend.services.storage.tiger import TigerStore
 
@@ -97,3 +98,4 @@ app.add_middleware(
 app.include_router(analyze_router)
 app.include_router(ingest_router)
 app.include_router(media_router)
+app.include_router(photon_webhook_router)

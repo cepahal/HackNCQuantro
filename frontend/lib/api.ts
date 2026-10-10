@@ -1,73 +1,64 @@
-export interface AnalysisResult {
-  job_id: string;
-  outcome: "matched" | "no_verified_match";
-  report_id: string;
-  report_url: string;
-  delivery_status: "accepted" | "failed" | "skipped";
-  delivery_warning: string | null;
-  warnings: string[];
-}
+import type {
+  AnalysisResult, ErrorCode, IngestResult, Outcome, PublicMediaAsset, ReportV2, Stage, TranscriptStatus,
+} from "./api-types";
 
-export interface TranscriptSentence {
-  sentence_id: string;
-  start_seconds: number;
-  end_seconds: number;
-  text: string;
-}
+const IDENTIFIER = /^[A-Za-z0-9_-]{1,128}$/;
+const REPORT_ID = /^report_[A-Za-z0-9_-]{1,128}$/;
 
-export interface ReportMedia {
-  post: {
-    post_url: string;
-    title: string | null;
-    caption: string | null;
-    published_at: string | null;
-    author: {
-      handle: string | null; display_name: string | null;
-      followers_count: number | null; following_count: number | null; posts_count: number | null;
-    };
-    media: { media_id: string; mime_type: string | null; playback_url: string | null };
-  };
-  transcript: { status: string; sentences: TranscriptSentence[] };
-}
+// Records keyed by the unions so the compiler flags any value added to the backend enums.
+const ERROR_CODES: Record<ErrorCode, true> = {
+  INVALID_URL: true, UNSUPPORTED_PLATFORM: true, MEDIA_UNAVAILABLE: true, TRANSCRIPTION_FAILED: true,
+  SEARCH_FAILED: true, PROCESSING_FAILED: true, STORAGE_FAILED: true, MESSAGE_SEND_FAILED: true,
+};
+const STAGES: Record<Stage, true> = {
+  retrieve_post: true, extract_media_features: true, build_search_queries: true, search_candidates: true,
+  retrieve_candidate_media: true, verify_and_align: true, select_surrounding_context: true,
+  compare_context_and_caption: true, build_report: true, save_report_and_complete_job: true,
+  display_report: true, send_summary: true, run_analysis: true,
+};
+const OUTCOMES: Record<Outcome, true> = { matched: true, no_verified_match: true };
+const DELIVERY_STATUSES: Record<AnalysisResult["delivery_status"], true> = { accepted: true, failed: true, skipped: true };
+const TRANSCRIPT_STATUSES: Record<TranscriptStatus, true> = { complete: true, partial: true, unavailable: true };
 
-export interface Confidence {
-  level: "high" | "moderate" | "low" | "not_assessed";
-  basis: string[];
-  limitations: string[];
-}
+/** An HTTP error from the API. `code` and `stage` are null when the body is not a QuantroError envelope. */
+export class QuantroApiError extends Error {
+  readonly status: number;
+  readonly code: ErrorCode | null;
+  readonly stage: Stage | null;
+  readonly retryable: boolean;
 
-export interface ReportV2 {
-  schema_version: "2.1";
-  job_id: string;
-  outcome: "matched" | "no_verified_match";
-  submitted: ReportMedia;
-  source: ReportMedia | null;
-  alignment: {
-    status: string;
-    matches: Array<{ match_id: string; clip_start_seconds: number; clip_end_seconds: number; source_start_seconds: number; source_end_seconds: number }>;
-    match_quality: { confidence: Confidence; clip_coverage_ratio: number | null };
-    edit_analysis: {
-      status: "assessed" | "not_assessed";
-      scope: string;
-      counts: Record<string, number | null>;
-      source_gaps: Array<{ start_seconds: number; end_seconds: number }>;
-      unmatched_clip_ranges: Array<{ start_seconds: number; end_seconds: number }>;
-    };
-  } | null;
-  context: { windows: Array<{ context_id: string; coverage: string; requested_start_seconds: number; requested_end_seconds: number; sentences: TranscriptSentence[] }> } | null;
-  comparison: {
-    context_assessment: string;
-    caption_assessment: string;
-    assessment_confidence: Confidence;
-    summary: string;
-    findings: Array<{ finding_id: string; type: string; explanation: string; evidence: Array<{ quote: string; start_seconds: number; end_seconds: number }> }>;
-  } | null;
-  summary: string | null;
-  limitations: string[];
+  constructor(message: string, status: number, code: ErrorCode | null, stage: Stage | null, retryable: boolean) {
+    super(message);
+    this.name = "QuantroApiError";
+    this.status = status;
+    this.code = code;
+    this.stage = stage;
+    this.retryable = retryable;
+  }
 }
 
 function apiBase(): string {
   return (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isMember<T extends string>(members: Record<T, true>, value: unknown): value is T {
+  return typeof value === "string" && Object.hasOwn(members, value);
+}
+
+function toApiError(status: number, data: unknown): QuantroApiError {
+  const body = isRecord(data) && isRecord(data.error) ? data.error : {};
+  const message = typeof body.message === "string" ? body.message : `The request failed (${status}).`;
+  return new QuantroApiError(
+    message,
+    status,
+    isMember(ERROR_CODES, body.code) ? body.code : null,
+    isMember(STAGES, body.stage) ? body.stage : null,
+    body.retryable === true,
+  );
 }
 
 async function request(path: string, options?: RequestInit): Promise<unknown> {
@@ -78,35 +69,63 @@ async function request(path: string, options?: RequestInit): Promise<unknown> {
     throw new Error("Could not reach the analysis service. Check that the backend is running.");
   }
   const data: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = data as { error?: { message?: unknown }; detail?: unknown } | null;
-    const message = error?.error?.message;
-    throw new Error(typeof message === "string" ? message : `The request failed (${response.status}).`);
-  }
+  if (!response.ok) throw toApiError(response.status, data);
   return data;
 }
 
-export async function startAnalysis(url: string, jobId: string): Promise<AnalysisResult> {
-  const data = await request(`/analyze/${encodeURIComponent(jobId)}/run`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }),
-  });
-  const result = data as AnalysisResult | null;
-  if (!result || result.job_id !== jobId || !/^report_[A-Za-z0-9_-]{1,128}$/.test(result.report_id)
-      || !["matched", "no_verified_match"].includes(result.outcome) || !Array.isArray(result.warnings)) {
+function postJson(path: string, body: unknown): Promise<unknown> {
+  return request(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+}
+
+function assertAnalysisResult(data: unknown, jobId: string): AnalysisResult {
+  if (!isRecord(data) || data.job_id !== jobId || typeof data.report_id !== "string" || !REPORT_ID.test(data.report_id)
+      || typeof data.report_url !== "string" || !isMember(OUTCOMES, data.outcome)
+      || !isMember(DELIVERY_STATUSES, data.delivery_status)
+      || !(data.delivery_warning === null || typeof data.delivery_warning === "string") || !Array.isArray(data.warnings)) {
     throw new Error("The analysis service returned an invalid result.");
   }
-  return result;
+  return data as unknown as AnalysisResult;
+}
+
+function isRecordOrNull(value: unknown): boolean {
+  return value === null || isRecord(value);
+}
+
+function assertReport(data: unknown): ReportV2 {
+  if (!isRecord(data) || data.schema_version !== "2.1" || typeof data.job_id !== "string" || !isMember(OUTCOMES, data.outcome)
+      || !isRecord(data.submitted) || !isRecord(data.submitted.post) || !isRecord(data.submitted.transcript)
+      || !isRecordOrNull(data.source) || !isRecordOrNull(data.alignment) || !isRecordOrNull(data.context)
+      || !isRecordOrNull(data.comparison) || !(data.summary === null || typeof data.summary === "string")
+      || !Array.isArray(data.limitations)) {
+    throw new Error("The analysis service returned an invalid report.");
+  }
+  return data as unknown as ReportV2;
+}
+
+function assertIngestResult(data: unknown, jobId: string): IngestResult {
+  if (!isRecord(data) || data.job_id !== jobId || typeof data.url !== "string" || typeof data.post_id !== "string"
+      || typeof data.media_id !== "string" || !isMember(TRANSCRIPT_STATUSES, data.transcript_status)
+      || typeof data.sentence_count !== "number" || typeof data.frames_count !== "number"
+      || typeof data.persisted_at !== "string") {
+    throw new Error("The ingest service returned an invalid result.");
+  }
+  return data as unknown as IngestResult;
+}
+
+export async function runAnalysis(url: string, conversationId?: string): Promise<AnalysisResult> {
+  const jobId = `job_${crypto.randomUUID()}`;
+  const body = conversationId === undefined ? { url } : { url, conversation_id: conversationId };
+  return assertAnalysisResult(await postJson(`/analyze/${encodeURIComponent(jobId)}/run`, body), jobId);
 }
 
 export async function getReport(reportId: string): Promise<ReportV2> {
-  if (!/^report_[A-Za-z0-9_-]{1,128}$/.test(reportId)) throw new Error("The report identifier is invalid.");
-  const data = await request(`/reports/${encodeURIComponent(reportId)}`);
-  const report = data as ReportV2 | null;
-  if (!report || report.schema_version !== "2.1" || !report.submitted || !Array.isArray(report.limitations)
-      || !["matched", "no_verified_match"].includes(report.outcome)) {
-    throw new Error("The analysis service returned an invalid report.");
-  }
-  return report;
+  if (!REPORT_ID.test(reportId)) throw new Error("The report identifier is invalid.");
+  return assertReport(await request(`/reports/${encodeURIComponent(reportId)}`));
+}
+
+export async function ingest(jobId: string, url: string): Promise<IngestResult> {
+  if (!IDENTIFIER.test(jobId)) throw new Error("The job identifier is invalid.");
+  return assertIngestResult(await postJson(`/ingest/${encodeURIComponent(jobId)}`, { url }), jobId);
 }
 
 export function publicUrl(value: string | null | undefined): string | null {
@@ -117,7 +136,7 @@ export function publicUrl(value: string | null | undefined): string | null {
   } catch { return null; }
 }
 
-export function mediaUrl(media: ReportMedia["post"]["media"]): string | null {
-  return publicUrl(media.playback_url) || (/^[A-Za-z0-9_-]{1,128}$/.test(media.media_id)
+export function mediaUrl(media: Pick<PublicMediaAsset, "media_id" | "playback_url">): string | null {
+  return publicUrl(media.playback_url) || (IDENTIFIER.test(media.media_id)
     ? `${apiBase()}/media/${encodeURIComponent(media.media_id)}` : null);
 }

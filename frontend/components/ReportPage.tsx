@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getReport, type ReportV2 } from "../lib/api";
+import { getReport, QuantroApiError } from "../lib/api";
+import type { ReportV2 } from "../lib/api-types";
 import LoadingState from "./LoadingState";
 import ResultCard from "./ResultCard";
 
@@ -11,7 +12,9 @@ export default function ReportPage({ reportId }: { reportId: string }) {
   useEffect(() => {
     let active = true;
     void getReport(reportId).then((data) => { if (active) setReport(data); }).catch((failure: unknown) => {
-      if (active) setError(failure instanceof Error ? failure.message : "Could not load the report.");
+      if (!active) return;
+      const message = failure instanceof Error ? failure.message : "Could not load the report.";
+      setError(failure instanceof QuantroApiError && failure.code ? `${message} (${failure.code})` : message);
     });
     return () => { active = false; };
   }, [reportId]);

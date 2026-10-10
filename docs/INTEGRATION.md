@@ -93,6 +93,7 @@ blank template; keep credentials out of tracked files.
 | `TRANSCRIPTION_PROVIDER`, `TRANSCRIPTION_API_KEY` | nothing | Jason | Transcription goes through Gemini. |
 | `SPECTRUM_PROJECT_ID`, `SPECTRUM_PROJECT_SECRET` | Photon sidecar `backend/services/photon` (`--imessage` mode) | Photon sidecar: `iner54` | From Photon project Settings. Only needed for real iMessage; terminal mode runs without them. |
 | `PHOTON_BRIDGE_TOKEN`, `PHOTON_BRIDGE_PORT`, `PHOTON_DATA_DIR` | `external_apis/photon.py` and the sidecar | Photon sidecar: `iner54`; `send_summary` caller: Bhrigu | Token authenticates Python → loopback bridge `127.0.0.1:8766`. Delivery ledger persists in `PHOTON_DATA_DIR`. |
+| `PHOTON_API_KEY`, `PHOTON_BASE_URL`, `PHOTON_SENDER_ID` | `services/messaging/photon.py` (`POST /webhooks/photon`) | Bhrigu | Alternative HTTP webhook path. Assumed contract: `POST {base}/messages` with bearer key; inbound `X-Photon-Signature` = hex HMAC-SHA256 of the raw body keyed with `PHOTON_API_KEY`. Confirm with Photon. |
 | `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_REPORT_BASE_URL` | frontend (not built yet) | Grant | `http://localhost:8000` and `http://localhost:3000` locally. |
 
 ## What to check when it breaks
@@ -152,8 +153,9 @@ cd backend && python -m services.storage.tiger show <job_id> # full job, post, f
   - `PHOTON_BRIDGE_TOKEN` and `PHOTON_BRIDGE_PORT` are identical for the API and the
     sidecar. Both read them from `.secrets/.env`; the sidecar reads it through `.env.local`.
   - For real iMessage, `SPECTRUM_PROJECT_ID`/`SPECTRUM_PROJECT_SECRET` belong to the
-    Photon project whose sender line you expect. The old `PHOTON_SENDER_ID`,
-    `PHOTON_API_KEY` and `PHOTON_BASE_URL` are no longer read.
+    Photon project whose sender line you expect. `PHOTON_SENDER_ID`, `PHOTON_API_KEY`
+    and `PHOTON_BASE_URL` are read only by the separate HTTP webhook path
+    (`POST /webhooks/photon`, `services/messaging/`), not by the sidecar.
   - Re-running a completed job reuses its saved report and re-attempts delivery.
     The Photon bridge durably tracks the payload and confirmed or uncertain
     delivery state per `(job_id, conversation_id)`; an uncertain outcome is never
