@@ -571,6 +571,15 @@ def test_bounded_provider_prefix_includes_ocr_and_title(features, post):
     features["transcript"]["sentences"] = [{"text": f"Distinctive spoken passage number {n} about bridges"} for n in range(5)]
     features["visual_text"] = [{"text": "City Council Meeting"}]
     queries = build_search_queries(features, post)["queries"]
-    assert '"City Council Meeting"' in queries[:4]
+    assert any('"City Council Meeting"' in query for query in queries[:3])
     assert '"Example Interview"' in queries[:4]
     assert sum("Distinctive spoken" in query for query in queries[:4]) == 2
+
+
+def test_recording_query_combines_title_with_one_spoken_utterance(features, post):
+    post['title'] = 'Barack Obama motivational speech | Barack Obama Inspirational speech | Barack Obama Quotes'
+    features['transcript']['sentences'] = [{'text': "extraordinary things when they're given an opportunity. We sometimes think that our leaders"}]
+    queries = build_search_queries(features, post)['queries']
+    assert queries[0] == "Barack Obama \"extraordinary things when they're given an opportunity\""
+    assert queries[1] == "\"extraordinary things when they're given an opportunity\""
+    assert 'motivational' not in queries[0]

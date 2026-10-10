@@ -6,6 +6,7 @@ removed by job cleanup after reporting. No database credentials are needed.
 
 import json
 import math
+import re
 import shutil
 import subprocess
 import tempfile
@@ -119,7 +120,7 @@ TEXT_SCHEMA = {
 END_OVERSHOOT_TOLERANCE_SECONDS = 0.75
 
 
-def _sentences(data, start, end, media_id, first_index):
+def _sentences(data, start, end, media_id, first_index, warnings=None):
     language = data["language"]
     if language is not None and not isinstance(language, str):
         raise ValueError("Invalid language")
@@ -145,16 +146,31 @@ def _sentences(data, start, end, media_id, first_index):
             "speaker_id": None,
         })
         if item.get('words'):
-            words = []
-            for word in item['words']:
-                wleft, wright = _number(word['start_seconds']), _number(word['end_seconds'])
-                if left <= wleft < right < wright <= right + END_OVERSHOOT_TOLERANCE_SECONDS:
-                    wright = right
-                if not left <= wleft < wright <= right or not isinstance(word['text'], str):
-                    raise ValueError('Invalid word timing')
-                words.append({'text': word['text'], 'start_seconds': start + wleft,
-                              'end_seconds': start + wright})
-            sentences[-1]['words'] = words
+            try:
+                words = []
+                previous = left
+                pieces = []
+                for word in item['words']:
+                    wleft, wright = _number(word['start_seconds']), _number(word['end_seconds'])
+                    if left <= wleft < right < wright <= right + END_OVERSHOOT_TOLERANCE_SECONDS:
+                        wright = right
+                    if not left <= wleft < wright <= right or wleft < previous:
+                        raise ValueError('Invalid word timing')
+                    if not isinstance(word['text'], str) or not word['text'].strip():
+                        raise ValueError('Invalid word text')
+                    previous = wright
+                    pieces.extend(re.findall(r"\w+(?:['’]\w+)?", word['text'].casefold()))
+                    words.append({'text': word['text'], 'start_seconds': start + wleft,
+                                  'end_seconds': start + wright})
+                if pieces != re.findall(r"\w+(?:['’]\w+)?", item['text'].casefold()):
+                    raise ValueError('Word timings do not cover the transcript text')
+                sentences[-1]['words'] = words
+            except (ValueError, TypeError, KeyError):
+                # Word timing is optional. Preserve validated sentence text and
+                # bounds without inventing or stretching any word timestamps.
+                warning = 'Some word timings were discarded because they were inconsistent with their sentence; those passages use approximate sentence-level alignment.'
+                if warnings is not None and warning not in warnings:
+                    warnings.append(warning)
     return sentences
 
 
@@ -310,7 +326,7 @@ def _extract_media_features(media, options=None):
                                     raise ExtractionError("TRANSCRIPTION_FAILED", "Local Whisper failed; check the optional Whisper installation and model availability.") from None
                             else:
                                 data = _ask(client, model, audio_path, "audio/wav", prompt, TRANSCRIPT_SCHEMA)
-                            sentences = _sentences(data, start, end, media["media_id"], len(transcript["sentences"]) + 1)
+                            sentences = _sentences(data, start, end, media["media_id"], len(transcript["sentences"]) + 1, warnings=warnings)
                         except (QuantroError, ValueError, KeyError, TypeError) as exc:
                             raise ExtractionError("TRANSCRIPTION_FAILED", "Audio transcription failed validation or the provider request failed.", getattr(exc, "retryable", False)) from None
                         transcript["sentences"].extend(sentences)

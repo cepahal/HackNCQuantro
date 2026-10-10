@@ -461,6 +461,8 @@ def _retrieve_split_media(url: str, workspace: Path, max_bytes: int, deadline: f
         cwd=Path(__file__).resolve().parents[3], capture_output=True, text=True,
         encoding="utf-8", errors="replace", timeout=remaining(), check=False,
     )
+    if result.returncode == 4:
+        raise RetrievalError("MEDIA_TOO_LARGE", "No available video and audio combination fits the download limit.", status_code=413)
     if result.returncode:
         raise RetrievalError("MEDIA_UNAVAILABLE", "The separate video and audio streams could not be retrieved.")
     streams = [workspace / "video.mp4", workspace / "audio.m4a"]

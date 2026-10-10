@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import math
 import os
 import runpy
 import socket
@@ -223,6 +224,45 @@ def _direct_image_main(arguments: list[str]) -> None:
     )
 
 
+class SplitMediaTooLargeError(ValueError):
+    """No available stream pair fits the shared download budget."""
+
+
+def _budgeted_streams(info, max_bytes):
+    """Prefer the best known-size safe pair that fits, including audio."""
+    def size(stream):
+        for key in ("filesize", "filesize_approx"):
+            value = stream.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0:
+                return value
+        return None
+
+    formats = info.get("formats") or info.get("requested_formats", [])
+    safe = [f for f in formats if f.get("protocol") == "https"
+            and urlsplit(f.get("url", "")).scheme == "https" and not f.get("has_drm")]
+    videos = [f for f in safe if f.get("ext") == "mp4"
+              and str(f.get("vcodec", "")).startswith("avc1")
+              and 0 < (f.get("height") or 0) <= 720 and f.get("acodec") in (None, "none")]
+    audios = [f for f in safe if f.get("ext") == "m4a" and f.get("vcodec") in (None, "none")]
+    pairs = [(v, a) for v in videos for a in audios if size(v) and size(a)
+             and size(v) + size(a) <= max_bytes * 0.98]
+    if not pairs:
+        # Metadata cannot rule out unknown-size alternatives. Keep their
+        # downloads subject to the same progress and actual-size byte caps.
+        pairs = [(v, a) for v in videos for a in audios
+                 if (size(v) is None or size(a) is None)
+                 and sum(value for value in (size(v), size(a)) if value is not None)
+                 <= max_bytes * 0.98]
+    if pairs:
+        return list(max(pairs, key=lambda pair: (pair[0].get("height") or 0,
+                    pair[0].get("tbr") or 0, pair[1].get("abr") or pair[1].get("tbr") or 0)))
+    selected = info.get("requested_formats", [])
+    if len(selected) == 2 and all(size(f) for f in selected) and sum(size(f) for f in selected) > max_bytes * 0.98:
+        raise SplitMediaTooLargeError("Available streams exceed download limit")
+    # Unknown sizes remain subject to the existing streaming byte limit.
+    return selected
+
+
 def _split_media_main(arguments: list[str]) -> None:
     """Download two direct MP4-family streams; never invoke a merger in this worker."""
     from yt_dlp import YoutubeDL
@@ -253,7 +293,7 @@ def _split_media_main(arguments: list[str]) -> None:
         info = downloader.extract_info(args.split_media, download=False)
         if not isinstance(info, dict) or "entries" in info or info.get("is_live") or info.get("live_status") in {"is_live", "is_upcoming", "post_live"}:
             raise ValueError("Only single finished videos are supported")
-        streams = info.get("requested_formats", [])
+        streams = _budgeted_streams(info, args.max_bytes)
         if len(streams) != 2:
             raise ValueError("Expected one video and one audio stream")
         for stream, name, extension in zip(streams, ("video.mp4", "audio.m4a"), ("mp4", "m4a")):
@@ -273,7 +313,8 @@ def _split_media_main(arguments: list[str]) -> None:
             completed_bytes += path.stat().st_size
             if completed_bytes > args.max_bytes:
                 raise ValueError("Combined media exceeds download limit")
-        info.update(ext="mp4", vcodec=streams[0].get("vcodec"), acodec=streams[1].get("acodec"))
+        info.update(ext="mp4", vcodec=streams[0].get("vcodec"), acodec=streams[1].get("acodec"),
+                    width=streams[0].get("width"), height=streams[0].get("height"))
         print(json.dumps(downloader.sanitize_info(info)))
 
 
@@ -287,7 +328,11 @@ def main() -> None:
         _direct_image_main(sys.argv[1:])
         return
     if sys.argv[1:2] == ["--split-media"]:
-        _split_media_main(sys.argv[1:])
+        try:
+            _split_media_main(sys.argv[1:])
+        except SplitMediaTooLargeError:
+            print("Available streams exceed download limit", file=sys.stderr)
+            raise SystemExit(4) from None
         return
     runpy.run_module("yt_dlp", run_name="__main__")
 

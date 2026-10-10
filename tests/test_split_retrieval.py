@@ -96,3 +96,60 @@ def test_worker_downloads_fixed_paths_with_shared_budget(tmp_path,monkeypatch,ca
         assert json.loads(capsys.readouterr().out)['acodec']=='aac'
     else:
         with pytest.raises(ValueError):worker._split_media_main(args)
+
+
+def test_stream_selection_downshifts_to_fit_audio_and_video_budget():
+    def video(height, size):
+        return dict(url='https://video.example/file', protocol='https', ext='mp4',
+                    vcodec='avc1', acodec='none', height=height, filesize=size)
+    large, small = video(720, 203), video(360, 65)
+    audio = dict(url='https://audio.example/file', protocol='https', ext='m4a',
+                 vcodec='none', acodec='aac', filesize=25)
+    info = dict(formats=[large, small, audio], requested_formats=[large, audio])
+    assert worker._budgeted_streams(info, 100) == [small, audio]
+    small['has_drm'] = True
+    with pytest.raises(worker.SplitMediaTooLargeError):
+        worker._budgeted_streams(info, 100)
+    small['has_drm'] = False
+    audio['filesize'] = 40
+    with pytest.raises(worker.SplitMediaTooLargeError):
+        worker._budgeted_streams(info, 100)
+
+
+def test_unknown_size_alternative_keeps_streaming_budget_fallback():
+    large = dict(url='https://video.example/large', protocol='https', ext='mp4',
+                 vcodec='avc1', acodec='none', height=720, filesize=203)
+    unknown = {**large, 'url': 'https://video.example/unknown',
+               'height': 360, 'filesize': None}
+    audio = dict(url='https://audio.example/file', protocol='https', ext='m4a',
+                 vcodec='none', acodec='aac', filesize=25)
+    info = dict(formats=[large, unknown, audio], requested_formats=[large, audio])
+    assert worker._budgeted_streams(info, 100) == [unknown, audio]
+
+    # An unknown component cannot rescue a pair whose known component is too big.
+    audio['filesize'] = 125
+    with pytest.raises(worker.SplitMediaTooLargeError):
+        worker._budgeted_streams(info, 100)
+
+
+def test_known_fitting_pair_is_preferred_over_unknown_higher_resolution():
+    known = dict(url='https://video.example/known', protocol='https', ext='mp4',
+                 vcodec='avc1', acodec='none', height=360, filesize=65)
+    unknown = {**known, 'url': 'https://video.example/unknown',
+               'height': 720, 'filesize': None}
+    audio = dict(url='https://audio.example/file', protocol='https', ext='m4a',
+                 vcodec='none', acodec='aac', filesize=25)
+    info = dict(formats=[unknown, known, audio], requested_formats=[unknown, audio])
+    assert worker._budgeted_streams(info, 100) == [known, audio]
+
+
+def test_oversize_worker_result_is_reported_without_private_output(tmp_path, monkeypatch):
+    monkeypatch.setattr(retrieval.subprocess, 'run', lambda *a, **k:
+                        subprocess.CompletedProcess(a[0], 4, '', 'private details'))
+    with pytest.raises(retrieval.RetrievalError) as caught:
+        retrieval._retrieve_split_media('https://youtube.com/watch?v=test', tmp_path,
+                                       100, time.monotonic() + 30)
+    assert caught.value.code == 'MEDIA_UNAVAILABLE'
+    assert caught.value.status_code == 413
+    assert 'download limit' in str(caught.value)
+    assert 'private' not in str(caught.value)

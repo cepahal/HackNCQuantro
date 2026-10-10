@@ -78,3 +78,24 @@ def test_local_word_timing_preserved_or_discarded(monkeypatch, word_end, expecte
     assert len(words) == expected_count
     if words:
         assert words == [{'text': 'Hello.', 'start_seconds': 1.2, 'end_seconds': 2.0}]
+
+
+@pytest.mark.parametrize('words', [
+    [{'text':'Keep it.', 'start_seconds':0.73, 'end_seconds':2.0}],
+    [{'text':'Keep', 'start_seconds':1.0, 'end_seconds':1.6}, {'text':'it.', 'start_seconds':1.5, 'end_seconds':2.0}],
+    [{'text':'Keep', 'start_seconds':1.0, 'end_seconds':1.6}],
+    [{'text':'invented', 'start_seconds':1.0, 'end_seconds':2.0}],
+    [{'text':'Keep it.', 'start_seconds':float('nan'), 'end_seconds':2.0}],
+    [{'text':'Keep it.', 'start_seconds':2.0, 'end_seconds':2.0}],
+])
+def test_unreliable_optional_words_preserve_sentence_and_disclose_fallback(words):
+    warnings=[]
+    data={'language':'en','sentences':[{'text':'Keep it.', 'start_seconds':1.0, 'end_seconds':2.0,'words':words}]}
+    result=p._sentences(data,60,120,'source',1,warnings=warnings)
+    assert result == [{'sentence_id':'source_sentence_0001','start_seconds':61.0,'end_seconds':62.0,'text':'Keep it.','speaker_id':None}]
+    assert len(warnings)==1 and 'word timings were discarded' in warnings[0]
+
+
+def test_invalid_sentence_is_still_rejected():
+    data={'language':'en','sentences':[{'text':'Keep it.', 'start_seconds':-1, 'end_seconds':2,'words':[]}]}
+    with pytest.raises(ValueError):p._sentences(data,0,60,'source',1,warnings=[])
