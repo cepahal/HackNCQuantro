@@ -421,3 +421,21 @@ def test_first_saved_report_controls_delivery_and_result(client, store, upstream
         f"{canonical['summary']} View the evidence: {result.report_url}",
     )]
     assert store.get_report("report_job_first_save") == canonical
+
+
+def test_status_reconnects_to_completed_report(client, store, upstream):
+    assert _run(client, "job_reconnect").status_code == 200
+    response = client.get("/analyze/job_reconnect/status")
+    assert response.json() == {"job_id": "job_reconnect", "status": "completed",
+                               "report_id": "report_job_reconnect", "error": None}
+
+
+def test_status_only_returns_safe_job_fields(client, store):
+    store.upsert_job("job_running", CLIP_URL, "running")
+    assert client.get("/analyze/job_running/status").json() == {
+        "job_id": "job_running", "status": "running", "report_id": None, "error": None}
+    store.set_job_status("job_running", "failed", "SEARCH_FAILED", "search_candidates")
+    response = client.get("/analyze/job_running/status")
+    assert response.json()["error"]["code"] == "SEARCH_FAILED"
+    assert "url" not in response.json()
+    assert client.get("/analyze/job_missing/status").status_code == 404

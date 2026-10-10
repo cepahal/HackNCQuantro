@@ -65,7 +65,8 @@ async function request(path: string, options?: RequestInit): Promise<unknown> {
   let response: Response;
   try {
     response = await fetch(`${apiBase()}${path}`, { ...options, cache: "no-store" });
-  } catch {
+  } catch (error) {
+    if (options?.signal?.aborted) throw error;
     throw new Error("Could not reach the analysis service. Check that the backend is running.");
   }
   const data: unknown = await response.json().catch(() => null);
@@ -162,4 +163,36 @@ export function publicUrl(value: string | null | undefined): string | null {
 export function mediaUrl(media: Pick<PublicMediaAsset, "media_id" | "playback_url">): string | null {
   return publicUrl(media.playback_url) || (IDENTIFIER.test(media.media_id)
     ? `${apiBase()}/media/${encodeURIComponent(media.media_id)}` : null);
+}
+
+
+/** Reconnect to persisted job state without starting another analysis. */
+export async function waitForReport(jobId: string, signal?: AbortSignal): Promise<string> {
+  if (!IDENTIFIER.test(jobId)) throw new Error("The job identifier is invalid.");
+  const pause = () => new Promise<void>((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); reject(new DOMException("Cancelled", "AbortError")); };
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, 2000);
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+  });
+  for (let attempt = 0; attempt < 450; attempt++) {
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+    let data: unknown;
+    try {
+      data = await request(`/analyze/${encodeURIComponent(jobId)}/status`, { signal });
+    } catch (error) {
+      // The initial POST may still be registering its job when the page opens.
+      if (error instanceof QuantroApiError && error.status === 404 && attempt < 5) { await pause(); continue; }
+      throw error;
+    }
+    if (!isRecord(data) || data.job_id !== jobId) throw new Error("The service returned an invalid job status.");
+    if (data.status === "completed") {
+      if (typeof data.report_id !== "string" || !REPORT_ID.test(data.report_id)) throw new Error("The service returned an invalid report identifier.");
+      return data.report_id;
+    }
+    if (data.status === "failed") throw toApiError(500, { error: data.error });
+    if (!["pending", "running", "ingested"].includes(String(data.status))) throw new Error("The service returned an unknown job status.");
+    await pause();
+  }
+  throw new Error("This analysis is taking longer than expected. Refresh to check its saved status again.");
 }

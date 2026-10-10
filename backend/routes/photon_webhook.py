@@ -54,10 +54,16 @@ def analyze_and_reply(
     store: TigerStore | None,
     provider: PhotonProvider,
     tracker: DeliveryTracker,
+    inbound_tracker: DeliveryTracker | None = None,
 ) -> None:
     try:
-        run_analysis(job_id, url, conversation_id, store=store, provider=provider, tracker=tracker)
+        result = run_analysis(job_id, url, conversation_id, store=store, provider=provider, tracker=tracker)
+        if getattr(result, "delivery_status", None) == "failed" and inbound_tracker is not None:
+            # Reuse the saved report on retry; do not repeat a successful delivery.
+            inbound_tracker.release(conversation_id, job_id)
     except QuantroError as error:
+        if inbound_tracker is not None:
+            inbound_tracker.release(conversation_id, job_id)
         logger.warning("Photon analysis %s failed at %s: %s", job_id, error.stage.value, error.code.value)
         _reply(provider, conversation_id, f"Sorry, I couldn't check that post. {error.message}")
 
@@ -96,6 +102,6 @@ async def photon_webhook(
     job_id = job_id_for(conversation_id, url)
     if not tracker.check_and_record(conversation_id, job_id):
         return JSONResponse(content={"status": "duplicate", "job_id": job_id})
-    background_tasks.add_task(analyze_and_reply, job_id, url, conversation_id, store, provider, summary_tracker)
+    background_tasks.add_task(analyze_and_reply, job_id, url, conversation_id, store, provider, summary_tracker, tracker)
     await run_in_threadpool(_reply, provider, conversation_id, ACK_REPLY)
     return JSONResponse(content={"status": "accepted", "job_id": job_id})

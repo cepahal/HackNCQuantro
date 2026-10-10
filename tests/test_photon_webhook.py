@@ -208,3 +208,22 @@ def test_parse_inbound_and_extract_url():
     assert canned_reply({"text": "hi", "media_urls": []}) == NO_URL_REPLY
     with pytest.raises(ValueError):
         parse_inbound({"text": POST_URL})
+
+
+def test_failed_analysis_can_be_retried_with_same_url(harness, monkeypatch):
+    attempts = []
+    def fail_once(*args, **kwargs):
+        attempts.append(args)
+        if len(attempts) == 1:
+            raise QuantroError(ErrorCode.SEARCH_FAILED, Stage.SEARCH_CANDIDATES, retryable=True)
+    monkeypatch.setattr(photon_webhook, "run_analysis", fail_once)
+    assert post(message(POST_URL)).json()["status"] == "accepted"
+    assert post(message(POST_URL)).json()["status"] == "accepted"
+    assert post(message(POST_URL)).json()["status"] == "duplicate"
+    assert len(attempts) == 2
+
+
+def test_failed_delivery_retries_saved_analysis(harness, monkeypatch):
+    monkeypatch.setattr(photon_webhook, "run_analysis", lambda *a, **kw: Mock(delivery_status="failed"))
+    assert post(message(POST_URL)).json()["status"] == "accepted"
+    assert post(message(POST_URL)).json()["status"] == "accepted"

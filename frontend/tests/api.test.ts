@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  analysisInFlight, getReport, ingest, mediaUrl, publicUrl, QuantroApiError, runAnalysis, startAnalysis,
+  analysisInFlight, getReport, ingest, mediaUrl, publicUrl, QuantroApiError, runAnalysis, startAnalysis, waitForReport,
 } from "../lib/api.ts";
 import type { ReportV2 } from "../lib/api-types.ts";
 import { reportFixture } from "./fixtures/report_v2.ts";
@@ -30,13 +30,15 @@ test("a 400 error envelope throws QuantroApiError with its code and stage", asyn
 });
 
 test("a report without schema_version is rejected", async (t) => {
-  const { schema_version: _omitted, ...withoutVersion } = reportFixture;
+  const withoutVersion: Partial<ReportV2> = { ...reportFixture };
+  delete withoutVersion.schema_version;
   t.mock.method(globalThis, "fetch", async () => Response.json(withoutVersion));
   await assert.rejects(getReport("report_job_1"), /invalid report/);
 });
 
 test("a report missing a nullable top-level key is rejected", async (t) => {
-  const { source: _omitted, ...withoutSource } = reportFixture;
+  const withoutSource: Partial<ReportV2> = { ...reportFixture };
+  delete withoutSource.source;
   t.mock.method(globalThis, "fetch", async () => Response.json(withoutSource));
   await assert.rejects(getReport("report_job_1"), /invalid report/);
 });
@@ -128,4 +130,37 @@ test("media links use the byte-serving API and reject non-HTTP schemes", () => {
   assert.equal(publicUrl("file:///private"), null);
   assert.equal(publicUrl("https://name:secret@example.com"), null);
   assert.equal(mediaUrl({ media_id: "../private", playback_url: null }), null);
+});
+
+
+test("refresh recovery reads a completed job without posting another analysis", async (t) => {
+  const fetch = t.mock.method(globalThis, "fetch", async () => Response.json({
+    job_id: "job_saved", status: "completed", report_id: "report_job_saved", error: null,
+  }));
+  assert.equal(await waitForReport("job_saved"), "report_job_saved");
+  assert.match(String(fetch.mock.calls[0]?.arguments[0]), /analyze\/job_saved\/status$/);
+  assert.equal(fetch.mock.calls[0]?.arguments[1]?.method, undefined);
+});
+test("refresh recovery exposes the persisted safe failure", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({job_id: "job_saved", status: "failed", report_id: null,
+    error: {code: "SEARCH_FAILED", stage: "search_candidates", message: "The source search failed.", retryable: false}}));
+  await assert.rejects(waitForReport("job_saved"), (error: unknown) => error instanceof QuantroApiError && error.code === "SEARCH_FAILED");
+});
+test("refresh recovery cancels without fetching or restarting a job", async (t) => {
+  const fetch = t.mock.method(globalThis, "fetch");
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(waitForReport("job_saved", controller.signal), {name: "AbortError"});
+  assert.equal(fetch.mock.callCount(), 0);
+});
+
+
+test("refresh recovery polls running jobs until the saved report exists", async (t) => {
+  const original = globalThis.setTimeout;
+  t.mock.method(globalThis, "setTimeout", ((callback: () => void) => original(callback, 0)) as typeof setTimeout);
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => Response.json(++calls === 1
+    ? {job_id: "job_saved", status: "running", report_id: null, error: null}
+    : {job_id: "job_saved", status: "completed", report_id: "report_job_saved", error: null}));
+  assert.equal(await waitForReport("job_saved"), "report_job_saved");
+  assert.equal(calls, 2);
 });
