@@ -8,28 +8,34 @@ import httpx
 import pytest
 from google import genai
 
+from backend.services.shared.config import load_environment
 from backend.services.shared.errors import QuantroError, Stage
 from backend.services.specialist import gemini
 
 
-def test_private_local_key_overrides_placeholders(
+@pytest.fixture(autouse=True)
+def no_retry_delay(monkeypatch):
+    monkeypatch.setattr(gemini.time, "sleep", Mock())
+
+
+def test_explicit_process_key_is_not_overridden_by_local_files(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     (tmp_path / "backend").mkdir()
     (tmp_path / ".env").write_text("GEMINI_API_KEY=tracked-placeholder\n")
     (tmp_path / "backend" / ".env").write_text("GEMINI_API_KEY=backend-placeholder\n")
     (tmp_path / ".env.local").write_text("GEMINI_API_KEY=private-test-key\n")
-    monkeypatch.setattr(
-        gemini, "__file__", str(tmp_path / "backend/services/specialist/gemini.py")
-    )
+    monkeypatch.setattr(gemini, "load_settings", lambda: load_environment(tmp_path))
     monkeypatch.setenv("GEMINI_API_KEY", "loaded-placeholder")
     monkeypatch.setenv("GEMINI_MODEL", "test-model")
     monkeypatch.setattr(genai, "Client", lambda **kwargs: kwargs)
     client, model = gemini.client_and_model(Stage.EXTRACT_MEDIA_FEATURES)
-    assert client["api_key"] == "private-test-key"
+    assert client["api_key"] == "loaded-placeholder"
     assert model == "test-model"
     context = client["http_options"]["client_args"]["verify"]
     assert context.verify_mode == ssl.CERT_REQUIRED and context.check_hostname
+    assert client["http_options"]["retry_options"]["attempts"] == 1
+    assert client["http_options"]["timeout"] == 45000
 
 
 class ProviderFailure(Exception):
@@ -48,7 +54,7 @@ class ProviderFailure(Exception):
 def test_constructor_failures_are_safe_stage_errors(monkeypatch, tmp_path, failure, retryable):
     (tmp_path / ".env.local").write_text("GEMINI_API_KEY=private-test-key\n")
     monkeypatch.setenv("GEMINI_API_KEY", "loaded-test-key")
-    monkeypatch.setattr(gemini, "__file__", str(tmp_path / "backend/services/specialist/gemini.py"))
+    monkeypatch.setattr(gemini, "load_settings", lambda: load_environment(tmp_path))
     monkeypatch.setattr(genai, "Client", Mock(side_effect=failure))
 
     with pytest.raises(QuantroError) as error:

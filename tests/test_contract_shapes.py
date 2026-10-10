@@ -143,3 +143,19 @@ def test_startup_unimportable_function_names_the_expected_import(monkeypatch):
     monkeypatch.setattr(main, "import_module", unavailable)
     with pytest.raises(RuntimeError, match=r"retrieve_post.*backend\.services\.external_apis\.retrieve_post\.retrieve_post"):
         main.validate_contract_functions()
+
+
+def test_startup_rejects_stub_implementation(monkeypatch):
+    from backend import main
+
+    monkeypatch.setattr(main.inspect, "getsourcefile", lambda function: "/tmp/_stubs.py")
+    with pytest.raises(RuntimeError, match="retrieve_post: stub/mock implementation"):
+        main.validate_contract_functions()
+
+
+def test_frontend_wire_types_are_generated_from_canonical_models():
+    from pathlib import Path
+    from backend.services.shared.export_frontend_types import generate
+
+    target = Path(__file__).resolve().parents[1] / "frontend" / "lib" / "api-types.ts"
+    assert target.read_text(encoding="utf-8") == generate()

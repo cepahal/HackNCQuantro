@@ -136,11 +136,13 @@ def test_report_store_selection_from_env(monkeypatch, tmp_path):
     save_report_module._shared_tiger_store.cache_clear()
 
     monkeypatch.setenv("REPORT_STORE", "memory")
-    assert isinstance(get_report_store(), InMemoryReportStore)
-    assert isinstance(get_job_store(), InMemoryJobStore)
+    with pytest.raises(ValueError, match="inject an in-memory store"):
+        get_report_store()
+    with pytest.raises(ValueError):
+        get_job_store()
 
     monkeypatch.setenv("REPORT_STORE", "snowflake")
-    with pytest.raises(ValueError, match="'tiger' or 'memory'"):
+    with pytest.raises(ValueError, match="must be 'tiger'"):
         get_report_store()
 
     monkeypatch.setenv("REPORT_STORE", "postgres")

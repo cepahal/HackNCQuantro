@@ -101,3 +101,41 @@ An analysis or summary-delivery failure releases the reservation for a later ret
 a retry of a completed analysis reuses its report. Successful replies remain deduplicated
 in the process-local tracker. Cross-process/restart deduplication still requires durable
 inbound tracking; the Spectrum sidecar retains its separate persistent queue.
+
+## Reconciled reliability guards
+
+Shared source identity checks reject self-matches during selection, report creation,
+cache reuse, serving, display, and final delivery. Definitive caption verdicts
+require a separate transcript grounding check; unassessable evidence abstains.
+The Spectrum listener has bounded GET-only restart reconciliation with explicit
+operator opt-in for provably never-started saved requests. Runtime exercises
+FFmpeg and ffprobe before API startup. Offline push/PR regression checks run
+without provider secrets. See [../temporary-fixes.md](../temporary-fixes.md) and
+[RUNBOOK.md](RUNBOOK.md) for tested behavior, remaining limits, and operator steps.
+
+
+### Audit reconciliation (2026-10-10)
+
+The API now atomically reserves public ingest IDs and rejects reused IDs with 409.
+All job URLs are immutable through analysis, including failed/running jobs.
+Job error messages and retryability persist through two additive nullable columns;
+startup upgrades existing job tables without deleting data. Status checks expire
+inactive running/ingested jobs after ANALYSIS_STALE_SECONDS (default900), using an
+atomic timestamp predicate; analysis stages refresh the timestamp.
+
+All dotenv users share one cached loader; explicit process values always win.
+Selected search configuration is validated before accepting work. API validation,
+HTTP and unexpected errors use the same four-field envelope. Input byte/depth
+limits run before parsing, and request models reject extra keys. Invalid/private/
+unsupported submitted URLs are rejected before any job write. This intentionally
+supersedes the old Test7 expectation of a failed row for syntactically invalid URLs.
+
+Media playback uses a lifespan-owned three-connection TLS pool, metadata-only
+queries and bound PostgreSQL substring reads of at most1MiB. HTTP HEAD, byte ranges,
+conditional ETags, CORS playback headers and disconnect cleanup are covered.
+
+The optional HTTP Photon adapter stores hashed inbound/summary reservations in
+{TIGER_TABLE_PREFIX}message_deliveries, preventing duplicate sends across restarts.
+Signed AdvancedKit v0 requests use a dedicated secret and a300second freshness
+window. This ledger provides deduplication, not a durable background-job queue:
+a crash after reservation requires operator review. Spectrum remains primary.

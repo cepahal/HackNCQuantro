@@ -1,6 +1,7 @@
 import type {
-  AnalysisResult, ErrorCode, IngestResult, Outcome, PublicMediaAsset, ReportV2, Stage, TranscriptStatus,
+  AnalysisResult, DisplayModel, ErrorCode, IngestResult, Outcome, PublicMediaAsset, ReportV2, Stage, TranscriptStatus,
 } from "./api-types";
+export type { AnalysisResult, ReportMedia, ReportV2 } from "./api-types";
 
 const IDENTIFIER = /^[A-Za-z0-9_-]{1,128}$/;
 const REPORT_ID = /^report_[A-Za-z0-9_-]{1,128}$/;
@@ -38,7 +39,18 @@ export class QuantroApiError extends Error {
 }
 
 function apiBase(): string {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+  // Next.js substitutes this direct property access at build time.
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window !== "undefined" && !["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) {
+    throw new Error("This deployment is missing its backend URL. Set NEXT_PUBLIC_API_BASE_URL and redeploy.");
+  }
+  return "http://localhost:8000";
+}
+
+function reportApiBase(): string {
+  if (typeof window !== "undefined" && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) return apiBase();
+  return process.env.NEXT_PUBLIC_REPORT_API_BASE_URL?.trim().replace(/\/$/, "") || apiBase();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -61,10 +73,10 @@ function toApiError(status: number, data: unknown): QuantroApiError {
   );
 }
 
-async function request(path: string, options?: RequestInit): Promise<unknown> {
+async function request(path: string, options?: RequestInit, base = apiBase()): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(`${apiBase()}${path}`, { ...options, cache: "no-store" });
+    response = await fetch(`${base}${path}`, { ...options, cache: "no-store" });
   } catch (error) {
     if (options?.signal?.aborted) throw error;
     throw new Error("Could not reach the analysis service. Check that the backend is running.");
@@ -144,7 +156,18 @@ export function analysisInFlight(jobId: string): AnalysisInFlight | undefined {
 
 export async function getReport(reportId: string): Promise<ReportV2> {
   if (!REPORT_ID.test(reportId)) throw new Error("The report identifier is invalid.");
-  return assertReport(await request(`/reports/${encodeURIComponent(reportId)}`));
+  return assertReport(await request(`/reports/${encodeURIComponent(reportId)}`, undefined, reportApiBase()));
+}
+
+export async function getDisplayModel(reportId: string): Promise<DisplayModel> {
+  if (!REPORT_ID.test(reportId)) throw new Error("The report identifier is invalid.");
+  const data = await request(`/reports/${encodeURIComponent(reportId)}/display`, undefined, reportApiBase());
+  if (!isRecord(data) || typeof data.confidence_note !== "string" || !isRecord(data.submitted_panel)
+      || !Array.isArray(data.limitations) || !isRecordOrNull(data.source_match)
+      || !isRecordOrNull(data.clip_coverage) || !isRecordOrNull(data.context_assessment)) {
+    throw new Error("The analysis service returned an invalid display model.");
+  }
+  return data as unknown as DisplayModel;
 }
 
 export async function ingest(jobId: string, url: string): Promise<IngestResult> {
@@ -155,14 +178,15 @@ export async function ingest(jobId: string, url: string): Promise<IngestResult> 
 export function publicUrl(value: string | null | undefined): string | null {
   if (!value) return null;
   try {
-    const url = new URL(value, apiBase());
+    const base = new URL(reportApiBase(), typeof window !== "undefined" ? window.location.origin : undefined);
+    const url = new URL(value, base);
     return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password ? url.href : null;
   } catch { return null; }
 }
 
 export function mediaUrl(media: Pick<PublicMediaAsset, "media_id" | "playback_url">): string | null {
   return publicUrl(media.playback_url) || (IDENTIFIER.test(media.media_id)
-    ? `${apiBase()}/media/${encodeURIComponent(media.media_id)}` : null);
+    ? `${reportApiBase()}/media/${encodeURIComponent(media.media_id)}` : null);
 }
 
 
@@ -191,7 +215,7 @@ export async function waitForReport(jobId: string, signal?: AbortSignal): Promis
       return data.report_id;
     }
     if (data.status === "failed") throw toApiError(500, { error: data.error });
-    if (!["pending", "running", "ingested"].includes(String(data.status))) throw new Error("The service returned an unknown job status.");
+    if (typeof data.status !== "string" || !["pending", "running", "ingested"].includes(data.status)) throw new Error("The service returned an unknown job status.");
     await pause();
   }
   throw new Error("This analysis is taking longer than expected. Refresh to check its saved status again.");

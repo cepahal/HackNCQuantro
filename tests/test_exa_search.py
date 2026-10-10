@@ -2,8 +2,8 @@ import httpx
 import pytest
 
 from backend.services.external_apis.exa_search import ExaSearch
-from backend.services.external_apis.search_candidates import search_candidates
 from backend.services.external_apis.retrieve_post import _validate_url
+from backend.services.external_apis.search_candidates import search_candidates
 from backend.services.shared.errors import QuantroError
 
 
@@ -84,7 +84,7 @@ def test_candidate_retrieval_enables_guarded_page_extraction(monkeypatch):
     def retrieve(url,**kwargs):
         seen.update(kwargs)
         raise module.RetrievalError('MEDIA_UNAVAILABLE','No accessible video')
-    monkeypatch.setattr(module,'retrieve_post',retrieve)
+    monkeypatch.setattr(module,'_download_and_probe',retrieve)
     with pytest.raises(QuantroError) as error:
         module.retrieve_candidate_media({'candidate_id':'c','url':'https://nasa.gov/speech',
             'title':None,'publisher':None,'published_at':None,'snippet':None,'discovered_by_queries':['q']})

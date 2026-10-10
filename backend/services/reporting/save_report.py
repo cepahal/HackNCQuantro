@@ -60,7 +60,7 @@ class JobStore(Protocol):
 
 
 class InMemoryJobStore:
-    """Process-local job status until the operational database is wired in."""
+    """Explicitly injected test job store; production persistence uses Tiger Data."""
 
     def __init__(self) -> None:
         self._statuses: dict[str, str] = {}
@@ -72,10 +72,6 @@ class InMemoryJobStore:
         return self._statuses.get(job_id)
 
 
-_memory_report_store = InMemoryReportStore()
-_memory_job_store = InMemoryJobStore()
-
-
 @cache
 def _shared_tiger_store() -> TigerStore:
     store = TigerStore.from_env()
@@ -85,22 +81,19 @@ def _shared_tiger_store() -> TigerStore:
 
 def _store_backend() -> str:
     backend = os.getenv("REPORT_STORE", "tiger").strip().lower() or "tiger"
-    if backend not in {"tiger", "memory"}:
-        raise ValueError("REPORT_STORE must be 'tiger' or 'memory'.")
+    if backend != "tiger":
+        raise ValueError("REPORT_STORE must be 'tiger'; inject an in-memory store explicitly in tests.")
     return backend
 
 
 def get_report_store() -> ReportStore:
-    backend = _store_backend()
-    if backend == "tiger":
-        return TigerReportStore(_shared_tiger_store())
-    return _memory_report_store
+    _store_backend()
+    return TigerReportStore(_shared_tiger_store())
 
 
 def get_job_store() -> JobStore:
-    if _store_backend() == "tiger":
-        return TigerJobStore(_shared_tiger_store())
-    return _memory_job_store
+    _store_backend()
+    return TigerJobStore(_shared_tiger_store())
 
 
 def report_id_for_job(job_id: str) -> str:

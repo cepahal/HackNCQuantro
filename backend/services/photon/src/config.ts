@@ -1,13 +1,15 @@
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repository = fileURLToPath(new URL("../../../../", import.meta.url));
 
 export function readConfig(env: NodeJS.ProcessEnv, args: string[]) {
-  if (args.some((arg) => arg !== "--imessage")) {
+  if (args.some((arg) => arg !== "--imessage" && arg !== "--resume-saved")) {
     throw new Error("Use npm start for terminal mode or npm run start:imessage for managed iMessage.");
   }
   const cloud = args.includes("--imessage");
+  const resumeSaved = args.includes("--resume-saved");
+  if (resumeSaved && !cloud) throw new Error("--resume-saved requires managed iMessage mode.");
   const token = env.PHOTON_BRIDGE_TOKEN?.trim() ?? "";
   if (!/^[A-Za-z0-9_-]{32,128}$/.test(token)) {
     throw new Error("Set a private PHOTON_BRIDGE_TOKEN of 32-128 letters, numbers, underscores or hyphens.");
@@ -27,8 +29,18 @@ export function readConfig(env: NodeJS.ProcessEnv, args: string[]) {
   if (!/^\d+$/.test(backendPortText) || !Number.isInteger(backendPort) || backendPort < 1024 || backendPort > 65535) {
     throw new Error("PHOTON_BACKEND_PORT must be a local backend port from 1024 to 65535.");
   }
+  const directory = resolve(repository, env.PHOTON_DATA_DIR?.trim() || ".data/photon");
+  const publicReportsText = env.PHOTON_PUBLIC_REPORTS_FILE?.trim();
+  const publicReportsFile = publicReportsText ? resolve(repository, publicReportsText) : undefined;
+  if (publicReportsFile) {
+    const path = relative(directory, publicReportsFile);
+    if (!path || path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path)) {
+      throw new Error("PHOTON_PUBLIC_REPORTS_FILE must be a file inside PHOTON_DATA_DIR.");
+    }
+    if (!env.REPORT_BASE_URL?.trim()) throw new Error("Public report sharing requires REPORT_BASE_URL.");
+  }
   return {
-    cloud, token, projectId, projectSecret, port, backendPort,
-    directory: resolve(repository, env.PHOTON_DATA_DIR?.trim() || ".data/photon"),
+    cloud, resumeSaved, token, projectId, projectSecret, port, backendPort,
+    directory, publicReportsFile, reportBaseUrl: env.REPORT_BASE_URL?.trim() ?? "",
   };
 }

@@ -4,15 +4,15 @@ from unittest.mock import Mock
 import pytest
 
 from backend.services.processing import preprocessing as p
-from backend.services.specialist import transcription as t
 from backend.services.shared.errors import QuantroError
 from backend.services.shared.types import MediaFeatures
+from backend.services.specialist import transcription as t
 
 
 def test_provider_defaults_and_rejects_unknown(monkeypatch):
     monkeypatch.setattr(t, 'load_settings', lambda: None)
     monkeypatch.setenv('TRANSCRIPTION_PROVIDER', '')
-    assert t.provider() == 'gemini'
+    assert t.provider() == 'whisper'
     monkeypatch.setenv('TRANSCRIPTION_PROVIDER', 'whisper')
     assert t.provider() == 'whisper'
     monkeypatch.setenv('TRANSCRIPTION_PROVIDER', 'unknown')

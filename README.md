@@ -489,3 +489,31 @@ Demonstrate how the result remains available in investigation history.
 
 10. How all eight tasks connect
 This is the architecture I would actually implement. Each box is a component your teammates can build and test independently.
+
+## System dependencies
+
+Python 3.11+ and FFmpeg/ffprobe are required. Local transcription downloads the
+faster-whisper base model on first use; subsequent calls reuse the cached model.
+Local OCR requires Tesseract and its language data.
+
+- macOS: `brew install ffmpeg tesseract yt-dlp`
+- Debian/Ubuntu: `sudo apt-get install -y ffmpeg tesseract-ocr yt-dlp`
+- Windows: `winget install --id Gyan.FFmpeg.Essentials --exact` and
+  `winget install --id UB-Mannheim.TesseractOCR --exact`; reopen the terminal.
+- Verify: `ffmpeg -version`, `ffprobe -version`, `tesseract --version`,
+  `python -m yt_dlp --version`.
+
+Install Python dependencies with `python -m pip install -r backend/requirements.txt`.
+Gemini uses the supported google-genai SDK; google-generativeai is not used.
+Gemini comparison still requires a funded private key.
+
+Public-web search requires SEARCH_PROVIDER=brave, serpapi, or google_cse and
+SEARCH_PROVIDER_API_KEY in ignored .env.local. Google CSE also requires
+SEARCH_GOOGLE_CSE_ID. SEARCH_PROVIDER=tigerdata explicitly selects the existing
+stored corpus, which does not search the public web. Missing config raises
+SEARCH_FAILED. Bing Search API was retired; use a supported provider.
+
+Live video checks: set NETWORK=1 and run
+`python -m pytest tests/test_real_pipeline.py -v -s`. Accessible YouTube media,
+Whisper model download, Tesseract, Tiger Data, and search credentials are required.
+A blocked download/provider is a failed gate.

@@ -46,7 +46,7 @@ def test_message_failure_after_save_keeps_report_retrievable():
     )
 
     assert delivery is None
-    assert warning == "The summary message could not be sent."
+    assert warning == "Summary delivery could not be confirmed. Verify its outcome before another send."
     assert json.loads(report_store.get(saved.report_id))["job_id"] == "job_1"
     assert job_store.get_status("job_1") == "completed"
 
@@ -72,14 +72,14 @@ def test_select_source_prefers_highest_level_not_first():
     chosen, limitations = select_source([("cand_a", "low", 1.0), ("cand_b", "high", 0.4)])
 
     assert chosen == "cand_b"
-    assert limitations == []
+    assert limitations == [MULTIPLE_PLAUSIBLE_SOURCES]
 
 
 def test_select_source_breaks_level_ties_by_clip_coverage():
     chosen, limitations = select_source([("cand_a", "moderate", 0.5), ("cand_b", "moderate", 0.9)])
 
     assert chosen == "cand_b"
-    assert limitations == []
+    assert limitations == [MULTIPLE_PLAUSIBLE_SOURCES]
 
 
 def test_select_source_discloses_unresolved_tie():

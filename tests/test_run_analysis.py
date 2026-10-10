@@ -1,4 +1,5 @@
 import json
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,8 +10,8 @@ import backend.services.reporting.send_summary as send_summary_module
 from backend.main import app
 from backend.routes.common import get_tiger_store
 from backend.services.reporting.display_report import display_report
-from backend.services.shared.errors import QuantroError
 from backend.services.reporting.send_summary import InMemoryDeliveryTracker, SendReceipt
+from backend.services.shared.errors import QuantroError
 from backend.services.storage.tiger import TigerStore
 
 SHARED = "Officials confirmed the bridge closure will last through next spring season."
@@ -125,6 +126,7 @@ def upstream(monkeypatch):
         return _post("clip_media", url, followers=state.get("clip_followers"), caption="The bridge is closed forever.")
 
     def fake_extract(media, options):
+        media = media.model_dump(mode="json") if hasattr(media, "model_dump") else media
         if media["media_id"] == "clip_media":
             return CLIP_FEATURES
         return _source_features(media["media_id"])
@@ -132,14 +134,14 @@ def upstream(monkeypatch):
     def fake_search(queries, limit):
         if state["search_error"]:
             raise state["search_error"]
-        return {"candidates": state["candidates"], "warnings": []}
+        return {"candidates": state["candidates"], "warnings": state.get("search_warnings", [])}
 
     def fake_retrieve_candidate(candidate):
         if candidate["candidate_id"] in state["failing_candidates"]:
             raise ConnectionError("candidate download timed out")
         n = candidate["candidate_id"].split("_")[1]
         return _post(f"src_media_{n}", candidate["url"], candidate_id=candidate["candidate_id"],
-                     followers=state["source_followers"])
+                     followers=state["source_followers"], caption=state.get("source_caption"))
 
     def fake_compare(clip_features, context, caption):
         state["compare_calls"].append(caption)
@@ -181,7 +183,7 @@ def test_matched_end_to_end(client, store, upstream):
     assert report["context"]["windows"][0]["sentences"][-1]["text"].startswith("The repairs")
     assert report["summary"] == "The clip omits that the closure is temporary."
     assert store.get_job("job_match")["status"] == "completed"
-    assert upstream["compare_calls"] == ["The bridge is closed forever."]
+    assert upstream["compare_calls"] == [None]
     assert upstream["provider"].sent == [
         ("conv_1", ("The clip omits that the closure is temporary. "
                    "View the evidence: https://quantro.test/reports/report_job_match"))
@@ -240,7 +242,7 @@ def test_delivery_failure_keeps_the_saved_report(client, store, upstream):
     body = response.json()
     assert response.status_code == 200
     assert body["delivery_status"] == "failed"
-    assert body["delivery_warning"] == "The summary message could not be sent."
+    assert body["delivery_warning"] == "Summary delivery could not be confirmed. Verify its outcome before another send."
     assert store.get_job("job_deliver")["status"] == "completed"
     stored = client.get("/reports/report_job_deliver")
     assert stored.status_code == 200
@@ -334,6 +336,245 @@ def test_submitted_post_is_never_its_own_source(client, store, upstream):
     assert upstream["compare_calls"] == []
 
 
+@pytest.mark.parametrize("submitted,candidate", [
+    ("https://www.instagram.com/reel/DOtmnryAC-R/?psln=tracking", "https://www.instagram.com/reel/DOtmnryAC-R/"),
+    ("https://instagram.com/reel/DOtmnryAC-R/?igsh=tracking", "https://www.instagram.com/p/DOtmnryAC-R/?utm_source=search"),
+    ("https://m.instagram.com/p/DOtmnryAC-R/", "https://instagram.com/tv/DOtmnryAC-R/#shared"),
+    ("https://instagram.com/reels/DOtmnryAC-R/", "https://www.instagram.com/reel/DOtmnryAC-R"),
+    ("https://www.youtube.com/watch?v=jNQXAC9IVRw&si=tracking", "https://youtu.be/jNQXAC9IVRw?t=1"),
+    ("https://m.youtube.com/watch?v=jNQXAC9IVRw", "https://youtube.com/shorts/jNQXAC9IVRw?feature=share"),
+    ("https://music.youtube.com/watch?v=jNQXAC9IVRw&list=playlist", "https://www.youtube.com/embed/jNQXAC9IVRw"),
+    ("https://youtu.be/jNQXAC9IVRw", "https://www.youtube.com/live/jNQXAC9IVRw?si=tracking"),
+])
+def test_same_platform_post_aliases_are_excluded_before_download(client, store, upstream, monkeypatch, submitted, candidate):
+    upstream["candidates"] = [{**_candidate(1), "url": candidate}]
+    retrieve = Mock(wraps=analysis_module.retrieve_candidate_media)
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", retrieve)
+
+    response = client.post("/analyze/job_same_post_alias/run", json={"url": submitted})
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "no_verified_match"
+    assert "excluded from its own" in response.json()["warnings"][0]
+    retrieve.assert_not_called()
+    assert upstream["compare_calls"] == []
+    assert store.get_report("report_job_same_post_alias")["source"] is None
+
+
+@pytest.mark.parametrize("submitted,candidate", [
+    ("https://www.instagram.com/reel/DOtmnryAC-R/?psln=tracking", "https://instagram.com/reel/OtherPost/"),
+    ("https://www.youtube.com/watch?v=jNQXAC9IVRw&si=tracking", "https://youtu.be/OtherVideo"),
+])
+def test_different_platform_post_ids_remain_eligible(client, store, upstream, submitted, candidate):
+    upstream["candidates"] = [{**_candidate(1), "url": candidate}]
+
+    response = client.post("/analyze/job_distinct_post/run", json={"url": submitted})
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "matched"
+    assert store.get_report("report_job_distinct_post")["source"]["post"]["post_url"] == candidate
+
+
+def test_candidate_resolving_to_submitted_post_is_excluded_before_extraction(client, store, upstream, monkeypatch):
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", lambda candidate: _post(
+        "src_media_1", "https://youtu.be/clip?si=tracking", candidate_id=candidate["candidate_id"],
+    ))
+    extract = Mock(wraps=analysis_module.extract_media_features)
+    align = Mock(wraps=analysis_module.verify_and_align)
+    monkeypatch.setattr(analysis_module, "extract_media_features", extract)
+    monkeypatch.setattr(analysis_module, "verify_and_align", align)
+
+    response = _run(client, "job_redirect_self", conversation_id=None)
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "no_verified_match"
+    assert any("submitted post cannot be its own source" in warning for warning in response.json()["warnings"])
+    extract.assert_not_called()
+    align.assert_not_called()
+    assert upstream["compare_calls"] == []
+    assert store.get_report("report_job_redirect_self")["source"] is None
+
+
+@pytest.mark.parametrize("submitted_url,candidate_url,canonical", [
+    ("https://www.instagram.com/share/reel/submitted/", "https://www.instagram.com/share/reel/candidate/",
+     "https://www.instagram.com/reel/DOtmnryAC-R/"),
+    ("https://vm.tiktok.com/submitted/", "https://vt.tiktok.com/candidate/",
+     "https://www.tiktok.com/@someone/video/1234567890"),
+])
+def test_resolved_metadata_post_identity_blocks_different_share_link_aliases(
+    client, store, upstream, monkeypatch, submitted_url, candidate_url, canonical,
+):
+    upstream["candidates"] = [{**_candidate(1), "url": candidate_url}]
+
+    def submitted(url):
+        post = _post("clip_media", url)
+        post["retrieval"]["metadata_source_urls"].append(canonical + "?tracking=submitted")
+        return post
+
+    def candidate(item):
+        post = _post("src_media_1", item["url"], candidate_id=item["candidate_id"])
+        post["retrieval"]["metadata_source_urls"].append(canonical + "?tracking=candidate")
+        return post
+
+    monkeypatch.setattr(ingest_module, "retrieve_post", submitted)
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", candidate)
+    extract = Mock(wraps=analysis_module.extract_media_features)
+    monkeypatch.setattr(analysis_module, "extract_media_features", extract)
+
+    response = client.post("/analyze/job_resolved_share_alias/run", json={"url": submitted_url})
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "no_verified_match"
+    assert any("submitted post cannot be its own source" in warning for warning in response.json()["warnings"])
+    extract.assert_not_called()
+    assert store.get_report("report_job_resolved_share_alias")["source"] is None
+
+
+def test_profile_or_malformed_metadata_does_not_make_distinct_posts_the_same(client, store, upstream, monkeypatch):
+    original = analysis_module.retrieve_candidate_media
+
+    def candidate(item):
+        post = original(item)
+        post["retrieval"]["metadata_source_urls"].extend(["https://www.youtube.com/@shared_author", "instagram://[bad"])
+        return post
+
+    def submitted(url):
+        post = _post("clip_media", url)
+        post["retrieval"]["metadata_source_urls"].extend(["https://www.youtube.com/@shared_author", "instagram://[bad"])
+        return post
+
+    monkeypatch.setattr(ingest_module, "retrieve_post", submitted)
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", candidate)
+
+    response = _run(client, "job_shared_profile", conversation_id=None)
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "matched"
+    assert store.get_report("report_job_shared_profile")["source"]["post"]["post_url"] == _candidate(1)["url"]
+
+
+def test_submitted_resolved_metadata_identity_excludes_canonical_search_candidate_before_download(
+    client, store, upstream, monkeypatch,
+):
+    canonical = "https://www.instagram.com/reel/DOtmnryAC-R/"
+    upstream["candidates"] = [{**_candidate(1), "url": canonical}]
+
+    def submitted(url):
+        post = _post("clip_media", url)
+        post["retrieval"]["metadata_source_urls"].append(canonical)
+        return post
+
+    monkeypatch.setattr(ingest_module, "retrieve_post", submitted)
+    retrieve = Mock(wraps=analysis_module.retrieve_candidate_media)
+    monkeypatch.setattr(analysis_module, "retrieve_candidate_media", retrieve)
+
+    response = client.post("/analyze/job_submitted_canonical/run", json={"url": "https://www.instagram.com/share/reel/original/"})
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "no_verified_match"
+    retrieve.assert_not_called()
+    assert store.get_report("report_job_submitted_canonical")["source"] is None
+
+
+def test_platform_identity_does_not_loosen_job_url_or_generic_media_query_identity():
+    tracked = "https://www.instagram.com/reel/DOtmnryAC-R/?psln=tracking"
+    clean = "https://www.instagram.com/reel/DOtmnryAC-R/"
+    assert analysis_module._post_identity(tracked) == analysis_module._post_identity(clean)
+    assert analysis_module._normalized_post_url(tracked) != analysis_module._normalized_post_url(clean)
+    assert analysis_module._post_identity("https://cdn.example/video.mp4?clip=1") != analysis_module._post_identity("https://cdn.example/video.mp4?clip=2")
+    assert analysis_module._post_identity("https://instagram.com.evil.example/reel/DOtmnryAC-R/") != analysis_module._post_identity(clean)
+    assert analysis_module._post_identity("https://www.instagram.com:8080/reel/DOtmnryAC-R/") != analysis_module._post_identity(clean)
+
+
+def test_cached_self_match_is_rejected_without_mutating_saved_evidence_or_sending(client, store, upstream):
+    assert _run(client, "job_valid_seed", conversation_id=None).status_code == 200
+    prior = store.get_report("report_job_valid_seed")
+    prior["job_id"] = "job_prior_self_match"
+    prior["source"]["post"]["post_url"] = "https://youtu.be/clip?si=tracking"
+    store.upsert_job("job_prior_self_match", CLIP_URL, "completed")
+    store.save_report("report_job_prior_self_match", "job_prior_self_match", prior)
+
+    response = _run(client, "job_prior_self_match")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "PROCESSING_FAILED"
+    assert response.json()["error"]["stage"] == "build_report"
+    assert "own source" in response.json()["error"]["message"]
+    assert store.get_report("report_job_prior_self_match") == prior
+    assert store.get_job("job_prior_self_match")["status"] == "completed"
+    assert upstream["provider"].sent == []
+    assert len(upstream["compare_calls"]) == 1
+
+
+@pytest.mark.parametrize("submitted_url,source_url,canonical", [
+    ("https://www.instagram.com/reel/DOtmnryAC-R/?psln=tracking", "https://instagram.com/p/DOtmnryAC-R/", None),
+    ("https://www.youtube.com/watch?v=clip&si=tracking", "https://youtu.be/clip?t=1", None),
+    ("https://vm.tiktok.com/submitted/", "https://vt.tiktok.com/candidate/",
+     "https://www.tiktok.com/@someone/video/1234567890"),
+])
+def test_report_boundaries_reject_self_matches_without_rewriting_saved_evidence(
+    client, store, upstream, submitted_url, source_url, canonical,
+):
+    from backend.services.reporting.build_report import build_report
+    from backend.services.shared.types import ReportV2
+
+    assert _run(client, "job_boundary_seed", conversation_id=None).status_code == 200
+    prior = store.get_report("report_job_boundary_seed")
+    submitted = _post("clip_media", submitted_url)
+    source = _post("src_media_1", source_url, candidate_id="cand_1")
+    if canonical:
+        submitted["retrieval"]["metadata_source_urls"].append(canonical + "?tracking=submitted")
+        source["retrieval"]["metadata_source_urls"].append(canonical + "?tracking=candidate")
+
+    with pytest.raises(QuantroError) as caught:
+        build_report(
+            "job_boundary_build", submitted, CLIP_FEATURES, source, _source_features("src_media_1"),
+            prior["alignment"], prior["context"], prior["comparison"],
+        )
+    assert caught.value.code.value == "PROCESSING_FAILED"
+    assert caught.value.stage.value == "build_report"
+    assert store.get_report("report_job_boundary_build") is None
+
+    prior["job_id"] = "job_boundary_legacy"
+    for panel, post in (("submitted", submitted), ("source", source)):
+        prior[panel]["post"]["post_url"] = post["post_url"]
+        prior[panel]["post"]["retrieval"] = post["retrieval"]
+    store.upsert_job("job_boundary_legacy", submitted_url, "completed")
+    store.save_report("report_job_boundary_legacy", "job_boundary_legacy", prior)
+
+    for endpoint in ("/reports/report_job_boundary_legacy", "/reports/report_job_boundary_legacy/display"):
+        response = client.get(endpoint)
+        assert response.status_code == 500
+        assert response.json()["error"]["code"] == "PROCESSING_FAILED"
+        assert response.json()["error"]["stage"] == "display_report"
+        assert "own source" in response.json()["error"]["message"]
+        assert source_url not in response.text
+    for value in (prior, ReportV2.model_validate(prior)):
+        with pytest.raises(QuantroError) as caught:
+            display_report(value)
+        assert caught.value.stage.value == "display_report"
+    assert store.get_report("report_job_boundary_legacy") == prior
+    assert store.get_job("job_boundary_legacy")["status"] == "completed"
+    assert upstream["provider"].sent == []
+
+
+def test_first_saved_self_match_is_not_delivered_after_new_valid_analysis(client, store, upstream):
+    assert _run(client, "job_reread_seed", conversation_id=None).status_code == 200
+    prior = store.get_report("report_job_reread_seed")
+    prior["job_id"] = "job_reread_legacy"
+    prior["source"]["post"]["post_url"] = "https://youtu.be/clip?si=tracking"
+    store.upsert_job("job_reread_legacy", CLIP_URL, "running")
+    store.save_report("report_job_reread_legacy", "job_reread_legacy", prior)
+
+    response = _run(client, "job_reread_legacy")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "PROCESSING_FAILED"
+    assert response.json()["error"]["stage"] == "save_report_and_complete_job"
+    assert store.get_report("report_job_reread_legacy") == prior
+    assert upstream["provider"].sent == []
+
+
 def test_nested_confidence_limitations_reach_report(client, upstream, monkeypatch):
     original = analysis_module.compare_context_and_caption
 
@@ -377,7 +618,7 @@ def test_completed_job_reuses_saved_report_without_new_analysis(client, store, u
 def test_completed_job_cannot_be_reused_for_a_different_url(client, store, upstream):
     assert _run(client, "job_url_identity").status_code == 200
     response = client.post("/analyze/job_url_identity/run", json={"url": "https://example.com/another.mp4"})
-    assert response.status_code == 500
+    assert response.status_code == 409
     assert response.json()["error"]["code"] == "PROCESSING_FAILED"
     assert store.get_job("job_url_identity")["status"] == "completed"
 
@@ -394,12 +635,14 @@ def test_report_get_storage_failure_has_safe_error_envelope(client, store, monke
 
 
 @pytest.mark.parametrize("retryable", [False, True])
-def test_search_preserves_typed_error_retryability(client, store, upstream, retryable):
+def test_search_provider_failure_is_always_retryable(client, store, upstream, retryable):
     original = QuantroError("SEARCH_FAILED", "search_candidates", retryable=retryable)
     upstream["search_error"] = original
     response = _run(client, "job_typed_search")
     assert response.status_code == 500
-    assert response.json() == {"error": original.to_dict()}
+    assert response.json()["error"]["code"] == "SEARCH_FAILED"
+    assert response.json()["error"]["stage"] == "search_candidates"
+    assert response.json()["error"]["retryable"] is True
     assert store.get_job("job_typed_search")["status"] == "failed"
     assert store.get_report("report_job_typed_search") is None
 
@@ -439,3 +682,91 @@ def test_status_only_returns_safe_job_fields(client, store):
     assert response.json()["error"]["code"] == "SEARCH_FAILED"
     assert "url" not in response.json()
     assert client.get("/analyze/job_missing/status").status_code == 404
+def test_comparison_uses_selected_source_caption(client, upstream):
+    upstream["source_caption"] = "Actual source caption."
+    assert _run(client, "job_source_caption", conversation_id=None).status_code == 200
+    assert upstream["compare_calls"] == ["Actual source caption."]
+
+
+def test_untyped_delivery_failure_after_save_is_normalized(client, store, upstream, monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("private provider detail")
+    monkeypatch.setattr(analysis_module, "send_summary", fail)
+    response = _run(client, "job_untyped_delivery")
+    assert response.status_code == 200
+    assert response.json()["delivery_status"] == "failed"
+    assert "private" not in response.text
+    assert client.get("/reports/report_job_untyped_delivery").status_code == 200
+    assert store.get_job("job_untyped_delivery")["status"] == "completed"
+
+
+def test_query_warnings_forwarded_by_search_are_not_duplicated(client, upstream, monkeypatch):
+    warning = "Available evidence is incomplete."
+    monkeypatch.setattr(analysis_module, "build_search_queries",
+                        lambda features, post: {"queries": [SHARED], "warnings": [warning]})
+    upstream["search_warnings"] = [warning]
+    response = _run(client, "job_dedup_warnings", conversation_id=None)
+    assert response.status_code == 200
+    assert response.json()["warnings"].count(warning) == 1
+
+
+def test_display_endpoint_uses_canonical_backend_display_model(client, upstream):
+    assert _run(client, "job_display_api", conversation_id=None).status_code == 200
+    report = client.get("/reports/report_job_display_api").json()
+    response = client.get("/reports/report_job_display_api/display")
+    assert response.status_code == 200
+    assert response.json() == display_report(report).model_dump(mode="json")
+    assert response.json()["source_match"]["label"] == "Source-match confidence"
+    assert response.json()["clip_coverage"]["label"] == "Submitted clip aligned"
+    assert response.json()["context_assessment"]["label"] == "Context-assessment confidence"
+    assert "local_path" not in response.text and "/tmp/" not in response.text
+
+
+@pytest.mark.parametrize("status", ["running", "ingested", "failed"])
+def test_every_job_url_is_immutable(client, store, upstream, status):
+    store.upsert_job("job_immutable", CLIP_URL, status)
+    before = store.get_job("job_immutable")
+    response = client.post("/analyze/job_immutable/run", json={"url": "https://example.com/other.mp4"})
+    assert response.status_code == 409
+    assert store.get_job("job_immutable") == before
+    assert upstream["compare_calls"] == []
+
+
+def test_status_preserves_retryability_and_safe_message(client, store, upstream):
+    upstream["search_error"] = ConnectionError("private provider detail")
+    response = _run(client, "job_status_retry", conversation_id=None)
+    assert response.status_code == 500
+    status = client.get("/analyze/job_status_retry/status").json()
+    assert status["error"] == response.json()["error"]
+    assert status["error"]["retryable"] is True
+    assert "private" not in json.dumps(status)
+
+
+def test_status_expires_stalled_job_but_never_completed_job(client, store):
+    from datetime import UTC, datetime, timedelta
+    for job_id, status in [("job_stale", "running"), ("job_done", "completed")]:
+        store.upsert_job(job_id, CLIP_URL, status)
+        with store._engine.begin() as connection:
+            connection.execute(store.jobs.update().where(store.jobs.c.id == job_id).values(
+                updated_at=datetime.now(UTC) - timedelta(hours=2)))
+    response = client.get("/analyze/job_stale/status").json()
+    assert response["status"] == "failed"
+    assert response["error"]["retryable"] is True
+    assert response["error"]["stage"] == "run_analysis"
+    assert client.get("/analyze/job_done/status").json()["status"] == "completed"
+
+
+def test_recent_worker_heartbeat_prevents_stale_expiry(store):
+    from datetime import UTC, datetime, timedelta
+    store.upsert_job("job_heartbeat", CLIP_URL, "running")
+    old_cutoff = datetime.now(UTC) - timedelta(minutes=15)
+    store.touch_job("job_heartbeat")
+    assert not store.expire_stale_job("job_heartbeat", old_cutoff)
+    assert store.get_job("job_heartbeat")["status"] == "running"
+
+
+def test_analyze_extra_fields_are_rejected_without_rows(client, store):
+    response = client.post("/analyze/job_extra/run", json={"url": CLIP_URL, "unexpected": "private"})
+    assert response.status_code == 422
+    assert "private" not in response.text
+    assert store.get_job("job_extra") is None

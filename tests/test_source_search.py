@@ -12,17 +12,23 @@ from typing import Any, cast
 import pytest
 
 from backend.services.external_apis.build_search_queries import build_search_queries
-from backend.services.shared.types import Post
 from backend.services.external_apis.retrieve_candidate_media import (
-    retrieve_candidate_media,
+    retrieve_candidate_media as _retrieve_candidate_media,
 )
 from backend.services.external_apis.search_candidates import search_candidates
-from backend.services.shared.types import Candidate
 from backend.services.external_apis.tigerdata_storage import (
     StorageError,
     TigerDataPostStore,
 )
 from backend.services.shared.errors import QuantroError
+from backend.services.shared.types import Candidate, Post
+
+
+def retrieve_candidate_media(*args, **kwargs):
+    result = _retrieve_candidate_media(*args, **kwargs)
+    assert isinstance(result, Post)
+    return result.model_dump(mode="json")
+
 
 QUERY = '"those numbers were accurate"'
 URL = "https://www.youtube.com/watch?v=full123"
@@ -252,6 +258,7 @@ def test_default_search_owns_connection(
 ) -> None:
     monkeypatch.setattr("backend.services.external_apis.search_candidates._environment", lambda: {"SEARCH_PROVIDER": "tiger"})
     provider = Provider([(post, [QUERY])])
+    monkeypatch.setenv("SEARCH_PROVIDER", "tigerdata")
     monkeypatch.setattr(TigerDataPostStore, "from_env", lambda: provider)
     result = search_candidates([QUERY], 1)
     assert provider.closed and result["candidates"]
@@ -376,6 +383,22 @@ def downloader(args: list[str], **options: Any) -> subprocess.CompletedProcess[s
     return subprocess.CompletedProcess(args, 0, json.dumps(info), "")
 
 
+@pytest.fixture(autouse=True)
+def measured_retrieval_streams(monkeypatch):
+    module = importlib.import_module("backend.services.external_apis.retrieve_post")
+    monkeypatch.setattr(
+        module,
+        "_probe_download",
+        lambda path, is_image: {
+            "duration_seconds": None if is_image else 19.0,
+            "width": 640,
+            "height": 480,
+            "fps": None if is_image else 30.0,
+            "has_audio": not is_image,
+        },
+    )
+
+
 @pytest.mark.parametrize("image", [False, True])
 def test_candidate_download_persists_linked_post_before_return(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, candidate: Candidate, image: bool
@@ -453,11 +476,15 @@ def test_backend_environment_is_loaded_without_overriding_root(
     )
     (tmp_path / ".env").write_text("TIGERDATA_DSN=root\n")
     module = importlib.import_module("backend.services.external_apis.tigerdata_storage")
-    monkeypatch.setattr(module, "ROOT", tmp_path)
+    config = importlib.import_module("backend.services.shared.config")
+    original_load = config.load_environment
+    monkeypatch.setattr(config, "load_environment", lambda: original_load(tmp_path))
     monkeypatch.delenv("TIGERDATA_DSN", raising=False)
     monkeypatch.delenv("BACKEND_ONLY", raising=False)
     values = module._environment()
     assert values["TIGERDATA_DSN"] == "root" and values["BACKEND_ONLY"] == "kept"
+    (tmp_path / ".env").write_text("TIGERDATA_DSN=changed\n")
+    assert module._environment()["TIGERDATA_DSN"] == "root"
 
 
 def test_three_stage_handoff_preserves_contract_and_stored_link(

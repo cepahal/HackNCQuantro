@@ -3,17 +3,18 @@
 import hashlib
 import importlib
 import json
-import os
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 
-from backend.services.shared.types import Post
 from backend.services.external_apis.tigerdata_storage import (
+    MEDIA_CHUNK_BYTES,
     StorageError,
+    TigerDataPostPool,
     TigerDataPostStore,
 )
+from backend.services.shared.types import Post
 
 JPEG = b"\xff\xd8\xff\xe0real-image-bytes\xff\xd9"
 MP4 = b"\x00\x00\x00\x18ftypisom\x00\x00\x00\x00isommp42video-bytes"
@@ -49,7 +50,7 @@ class FakeCursor:
         self.connection = connection
         self.closed = False
 
-    def execute(self, command: str, parameters: tuple[object, ...]) -> object:
+    def execute(self, command: str, parameters: tuple[object, ...] = ()) -> object:
         self.connection.calls.append((command, parameters))
         self.connection.fail("execute")
         return self
@@ -72,6 +73,7 @@ class FakeConnection:
         self.commits = 0
         self.rollbacks = 0
         self.closes = 0
+        self.closed = False
         self.cursors: list[FakeCursor] = []
 
     def fail(self, operation: str) -> None:
@@ -94,7 +96,76 @@ class FakeConnection:
 
     def close(self) -> None:
         self.closes += 1
+        self.closed = True
         self.fail("close")
+
+
+def test_media_metadata_select_never_reads_bytea() -> None:
+    connection = FakeConnection()
+    digest = hashlib.sha256(JPEG).hexdigest()
+    connection.returned = ("image/jpeg", len(JPEG), digest)
+    result = TigerDataPostStore(connection).read_media_info("media_123")
+    assert result == ("image/jpeg", len(JPEG), digest)
+    sql, parameters = connection.calls[0]
+    assert "media_bytes" not in sql and parameters == ("media_123",)
+    assert connection.rollbacks == 1 and connection.cursors[0].closed
+
+
+def test_media_chunk_select_is_bound_sliced_and_guarded() -> None:
+    connection = FakeConnection()
+    connection.returned = (memoryview(JPEG[2:6]),)
+    digest = hashlib.sha256(JPEG).hexdigest()
+    result = TigerDataPostStore(connection).read_media_chunk(
+        "media_123", 2, 4, size=len(JPEG), digest=digest
+    )
+    assert result == JPEG[2:6]
+    sql, parameters = connection.calls[0]
+    assert "substring(media_bytes FROM %s FOR %s)" in sql
+    assert parameters == (3, 4, "media_123", len(JPEG), digest)
+    assert connection.rollbacks == 1 and connection.cursors[0].closed
+
+
+@pytest.mark.parametrize(
+    "start,length,size",
+    [
+        (-1, 1, 10),
+        (0, 0, 10),
+        (0, MEDIA_CHUNK_BYTES + 1, 10000000),
+        (0, 11, 10),
+        (10, 1, 10),
+        (True, 1, 10),
+        (0, 1, True),
+    ],
+)
+def test_invalid_media_chunks_never_reach_database(start, length, size) -> None:
+    connection = FakeConnection()
+    with pytest.raises(StorageError, match="range is invalid"):
+        TigerDataPostStore(connection).read_media_chunk(
+            "media_123", start, length, size=size, digest="a" * 64
+        )
+    assert connection.calls == []
+
+
+@pytest.mark.parametrize("returned", [None, (b"short",), ("not bytes",)])
+def test_missing_or_replaced_media_chunk_fails_closed(returned) -> None:
+    connection = FakeConnection()
+    connection.returned = returned
+    with pytest.raises(StorageError, match="changed or could not be read"):
+        TigerDataPostStore(connection).read_media_chunk(
+            "media_123", 0, 10, size=10, digest="a" * 64
+        )
+    assert connection.rollbacks == 1 and connection.cursors[0].closed
+
+
+def test_failed_media_chunk_read_is_redacted_and_rolls_back() -> None:
+    connection = FakeConnection()
+    connection.failure.add("fetch")
+    with pytest.raises(StorageError, match="could not read") as error:
+        TigerDataPostStore(connection).read_media_chunk(
+            "media_123", 0, 10, size=10, digest="a" * 64
+        )
+    assert "private_password" not in str(error.value)
+    assert connection.rollbacks == 1 and connection.cursors[0].closed
 
 
 def post_file(
@@ -435,24 +506,63 @@ def test_closed_owned_store_cannot_save(tmp_path: Path) -> None:
         store.save_post(post_file(tmp_path))
 
 
-def test_environment_precedence_and_other_keys_are_preserved_without_mutation(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_environment_delegates_to_shared_once_only_loader(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    (tmp_path / ".env").write_text(
-        "TIGERDATA_DSN=file-base\nOTHER_KEY=base\nFILE_ONLY=kept\n", encoding="utf-8"
-    )
-    (tmp_path / ".env.local").write_text(
-        "TIGERDATA_DSN=file-local\nOTHER_KEY=local\nLOCAL_ONLY=kept\n", encoding="utf-8"
-    )
-    monkeypatch.setattr(MODULE + ".ROOT", tmp_path)
-    monkeypatch.setenv("TIGERDATA_DSN", "process-value")
-    monkeypatch.delenv("OTHER_KEY", raising=False)
-    monkeypatch.delenv("FILE_ONLY", raising=False)
-    monkeypatch.delenv("LOCAL_ONLY", raising=False)
-    before = dict(os.environ)
+    settings = {"TIGERDATA_DSN": "", "OTHER_KEY": "kept"}
+    monkeypatch.setattr(MODULE + ".environment", lambda: settings)
     module = importlib.import_module(MODULE)
-    values = module._environment()
-    assert values["TIGERDATA_DSN"] == "process-value"
-    assert values["OTHER_KEY"] == "local"
-    assert values["FILE_ONLY"] == values["LOCAL_ONLY"] == "kept"
-    assert dict(os.environ) == before
+    assert module._environment() is settings
+
+
+def test_media_pool_is_lazy_reuses_connection_and_disposes_on_shutdown(monkeypatch):
+    connection, calls = install_connector(monkeypatch, {"TIGERDATA_DSN": DSN})
+    pool = TigerDataPostPool.from_env()
+    assert calls == []
+    first = pool.acquire()
+    assert len(calls) == 1 and calls[0][1]["sslmode"] == "verify-full"
+    first.close()
+    assert connection.closes == 0 and connection.rollbacks == 1
+    second = pool.acquire()
+    assert (
+        len(calls) == 1 and len(connection.calls) == 1
+    )  # Reuse performs one dialect ping.
+    assert not connection.autocommit
+    second.close()
+    pool.close()
+    pool.close()
+    assert connection.closes == 1
+    with pytest.raises(StorageError, match="pool is closed"):
+        pool.acquire()
+
+
+def test_media_pool_connection_failures_are_redacted(monkeypatch):
+    _, calls = install_connector(monkeypatch, {"TIGERDATA_DSN": DSN}, fail=True)
+    pool = TigerDataPostPool.from_env()
+    with pytest.raises(StorageError, match="connection is unavailable") as caught:
+        pool.acquire()
+    assert len(calls) == 1 and "private_password" not in str(caught.value)
+    pool.close()
+
+
+def test_media_pool_has_bounded_capacity_without_overflow():
+    created = []
+
+    def connect():
+        connection = FakeConnection()
+        created.append(connection)
+        return connection
+
+    pool = TigerDataPostPool(connect)
+    stores = [pool.acquire() for _ in range(3)]
+    assert len(created) == 3 and pool._pool.checkedout() == 3
+    assert pool._pool.size() == 3 and pool._pool._max_overflow == 0
+    pool._pool._timeout = 0.01
+    with pytest.raises(StorageError, match="connection is unavailable"):
+        pool.acquire()
+    assert len(created) == 3
+    for store in stores:
+        store.close()
+    assert pool._pool.checkedout() == 0
+    pool.close()
+    assert all(connection.closes == 1 for connection in created)

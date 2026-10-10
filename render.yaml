@@ -9,6 +9,10 @@ services:
     # Served only after startup has connected to Tiger; no database query per probe.
     healthCheckPath: /openapi.json
     envVars:
+      - key: APP_ENV
+        value: production
+      - key: PHOTON_WEBHOOK_SECRET
+        sync: false
       - key: REPORT_STORE
         value: tiger
       - key: TRANSCRIPTION_PROVIDER
@@ -30,6 +34,10 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
+        sync: false
+      - key: PHOTON_BRIDGE_TOKEN
+        sync: false
+      - key: FRONTEND_ORIGIN
         sync: false
       - key: PHOTON_API_KEY
         sync: false

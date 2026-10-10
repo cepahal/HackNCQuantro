@@ -14,16 +14,26 @@ Set backend `REPORT_BASE_URL=http://localhost:3000` so saved report links and CO
 For deployment, set that variable to the actual public frontend origin. Configure
 `NEXT_PUBLIC_API_BASE_URL` in private `frontend/.env.local` before building if the browser-visible
 backend is not `http://localhost:8000`. This is a public URL, never a credential.
+For Vercel, configure it in the project's build environment and redeploy. A successful
+frontend build alone does not deploy or connect the backend. Public hosts fail with a
+configuration message when this URL is missing, rather than contacting the visitor's localhost.
+The backend must allow the deployed frontend origin through `FRONTEND_ORIGIN`.
+`NEXT_PUBLIC_REPORT_API_BASE_URL` optionally separates public read-only report/media
+reads from analysis; local loopback pages keep using the analysis API.
 
 The "Try now" dialog starts `POST /analyze/{job_id}/run` with `{url}` and opens
 `/results?job={job_id}`, which shows the loading state until the request returns and then
 replaces the URL with `/results?id={report_id}` and reads `GET /reports/{report_id}`.
-`/reports/{report_id}` (the backend's iMessage link) and `/results/{report_id}` redirect there.
+`/reports/{report_id}` (the backend's iMessage link) renders the same report component
+directly, including through the read-only report gateway. `/results/{report_id}` redirects there.
 Video file upload is not supported by the backend yet; the dialog asks for a post link instead.
 Reports show source evidence, available transcripts, source-match and context-assessment
 confidence separately, clip coverage, and limitations. JPG/MP4 playback uses a returned
 `playback_url`, or the backend `GET /media/{media_id}` endpoint. The backend remains responsible
 for URL validation, provider calls, persistence, and safe public report serialization.
+The three confidence blocks consume `GET /reports/{report_id}/display` from the backend.
+`lib/api-types.ts` is the single generated wire-type file. Regenerate from the repository
+root with `python -m backend.services.shared.export_frontend_types`; add `--check` to detect drift.
 
 ```powershell
 npm --prefix frontend test

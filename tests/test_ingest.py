@@ -9,6 +9,38 @@ from backend.services.shared.errors import QuantroError
 from backend.services.storage.tiger import TigerConfigError, TigerStore
 
 
+@pytest.mark.parametrize("frontend_origin,expected_origin", [
+    ("http://localhost:3000/", "http://localhost:3000"),
+    ("", "https://reports.example"),
+])
+def test_frontend_cors_can_remain_local_with_public_report_links(frontend_origin, expected_origin):
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    result = subprocess.run(
+        [sys.executable, "-c", """
+import json
+from fastapi.testclient import TestClient
+from backend.main import app, FRONTEND_ORIGIN
+client = TestClient(app)
+response = client.options('/analyze/job_cors/run', headers={
+    'Origin': FRONTEND_ORIGIN,
+    'Access-Control-Request-Method': 'POST',
+    'Access-Control-Request-Headers': 'Content-Type',
+})
+print(json.dumps({'origin': FRONTEND_ORIGIN, 'status': response.status_code,
+                  'allowed': response.headers.get('access-control-allow-origin')}))
+"""],
+        cwd=Path(__file__).resolve().parents[1],
+        env={**os.environ, "FRONTEND_ORIGIN": frontend_origin, "REPORT_BASE_URL": "https://reports.example/"},
+        capture_output=True, text=True, check=True, timeout=60,
+    )
+    assert json.loads(result.stdout) == {"origin": expected_origin, "status": 200, "allowed": expected_origin}
+
+
 @pytest.fixture
 def store(tmp_path):
     tiger = TigerStore(f"sqlite:///{tmp_path / 'tiger.db'}")
@@ -62,7 +94,7 @@ def upstream(monkeypatch):
         return _post()
 
     def fake_extract(media, options):
-        calls["media"], calls["options"] = media, options
+        calls["media"], calls["options"] = media.model_dump(mode="json") if hasattr(media, "model_dump") else media, options
         return _features()
 
     monkeypatch.setattr(ingest_module, "retrieve_post", fake_retrieve)
@@ -101,18 +133,17 @@ def test_media_unavailable_returns_404_and_marks_job_failed(client, store, monke
     assert job["post_json"] is None and job["features_json"] is None
 
 
-@pytest.mark.parametrize("code", ["INVALID_URL", "UNSUPPORTED_PLATFORM"])
-def test_bad_input_urls_return_400(client, store, monkeypatch, code):
-    def fail(url):
-        raise RetrievalError(code, "Provide a valid public post URL.", status_code=400)
-
-    monkeypatch.setattr(ingest_module, "retrieve_post", fail)
-
-    response = client.post("/ingest/job_3", json={"url": "ftp://nope"})
-
+@pytest.mark.parametrize("url,code", [
+    ("not-a-url", "INVALID_URL"), ("ftp://nope", "INVALID_URL"),
+    ("http://127.0.0.1/video.mp4", "INVALID_URL"),
+    ("https://example.com/article", "UNSUPPORTED_PLATFORM"),
+])
+def test_bad_input_urls_return_400_before_storage_or_retrieval(client, store, upstream, url, code):
+    response = client.post("/ingest/job_3", json={"url": url})
     assert response.status_code == 400
     assert response.json()["error"]["code"] == code
-    assert store.get_job("job_3")["status"] == "failed"
+    assert store.get_job("job_3") is None
+    assert upstream == {}
 
 
 def test_transcription_failure_returns_502_and_marks_job_failed(client, store, monkeypatch, upstream):
@@ -165,19 +196,20 @@ def test_untyped_extraction_error_uses_safe_message_and_correct_retryability(cli
     assert "private" not in response.text
 
 
-def test_tiger_round_trip_keeps_internal_paths_private(client, store, upstream):
+def test_tiger_round_trip_matches_exact_contract_json(client, store, upstream):
     client.post("/ingest/job_5", json={"url": "https://www.youtube.com/watch?v=x"})
 
     response = client.get("/ingest/job_5")
 
     assert response.status_code == 200
-    job = response.json()
+    envelope = response.json()
+    assert set(envelope) == {"job", "post", "features"}
+    job = envelope["job"]
     stored = store.get_job("job_5")
     assert stored["post_json"] == _post()
     assert stored["features_json"] == _features()
-    assert "local_path" not in job["post_json"]["media"]
-    assert "image_path" not in job["features_json"]["frames"][0]
-    assert "/tmp/" not in response.text
+    assert envelope["post"] == _post()
+    assert envelope["features"] == _features()
     assert job["created_at"].endswith("Z") and job["updated_at"].endswith("Z")
 
 
@@ -217,3 +249,117 @@ def test_postgres_url_with_sslmode_require_is_accepted():
     store = TigerStore("postgres://user:pw@db.example.com:5432/tsdb?sslmode=require")
     assert store._engine.url.drivername == "postgresql+psycopg"
     store.close()
+
+
+def test_missing_primary_database_url_cannot_fall_back_at_startup(monkeypatch):
+    monkeypatch.delenv("TIGER_DATABASE_URL", raising=False)
+    monkeypatch.setenv("TIGERDATA_DSN", "postgresql://user:password@localhost/db")
+    with pytest.raises(TigerConfigError, match="TIGER_DATABASE_URL is not set"), TestClient(app):
+        pass
+
+
+@pytest.mark.parametrize("url", ["postgresql://user:password@localhost/db", "sqlite:///:memory:"])
+def test_production_requires_postgres_tls(monkeypatch, url):
+    monkeypatch.setenv("APP_ENV", "production")
+    with pytest.raises(TigerConfigError):
+        TigerStore(url)
+
+
+def test_report_save_prompt3_order_is_idempotent(store):
+    store.upsert_job("job_report", "https://youtube.com/watch?v=x", "ingested")
+    assert store.save_report("report_prompt3", "job_report", {"value": 1})
+    assert not store.save_report("report_prompt3", "job_report", {"value": 2})
+    assert store.get_report("report_prompt3") == {"value": 1}
+
+
+@pytest.mark.parametrize("status", ["running", "ingested", "completed", "failed"])
+def test_public_ingest_never_overwrites_an_existing_job(client, store, upstream, status):
+    original_url = "https://www.youtube.com/watch?v=original"
+    store.upsert_job("job_owned", original_url, status, "SEARCH_FAILED" if status == "failed" else None)
+    store.save_post_and_features("job_owned", _post(), _features())
+    before = store.get_job("job_owned")
+    response = client.post("/ingest/job_owned", json={"url": "https://www.youtube.com/watch?v=changed"})
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "PROCESSING_FAILED"
+    assert response.json()["error"]["retryable"] is False
+    assert store.get_job("job_owned") == before
+    assert upstream == {}
+
+
+def test_public_ingest_duplicate_keeps_the_original_features(client, store, upstream):
+    body = {"url": "https://www.youtube.com/watch?v=x"}
+    assert client.post("/ingest/job_once", json=body).status_code == 200
+    before = store.get_job("job_once")
+    upstream.clear()
+    assert client.post("/ingest/job_once", json=body).status_code == 409
+    assert store.get_job("job_once") == before
+    assert upstream == {}
+
+
+def test_ingest_job_reservation_is_atomic_under_concurrent_claims(store):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    barrier = Barrier(2)
+    def claim(index):
+        barrier.wait(timeout=5)
+        return store.try_create_job("job_race", f"https://example.com/{index}.mp4")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(claim, range(2)))
+    assert sorted(results) == [False, True]
+    assert store.get_job("job_race")["status"] == "running"
+    assert store.get_job("job_race")["post_json"] is None
+
+
+def test_job_error_columns_migrate_existing_schema(tmp_path):
+    from sqlalchemy import create_engine, text
+    url = f"sqlite:///{tmp_path / 'old.db'}"
+    engine = create_engine(url)
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE quantro_jobs (id TEXT PRIMARY KEY, url TEXT NOT NULL, status TEXT NOT NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP NOT NULL, error_code TEXT, error_stage TEXT)"))
+        connection.execute(text("INSERT INTO quantro_jobs VALUES ('prior','https://example.com/v.mp4','failed','2026-10-10','2026-10-10','SEARCH_FAILED','search_candidates')"))
+    engine.dispose()
+    tiger = TigerStore(url)
+    try:
+        tiger.ensure_schema()
+        tiger.ensure_schema()
+        assert tiger.get_job("prior")["error_retryable"] is False
+        tiger.set_job_status("prior", "failed", "SEARCH_FAILED", "search_candidates", "Try again later.", True)
+        row = tiger.get_job("prior")
+        assert row["error_message"] == "Try again later."
+        assert row["error_retryable"] is True
+        assert row["url"] == "https://example.com/v.mp4"
+    finally:
+        tiger.close()
+
+
+def test_ingest_extra_fields_are_rejected_without_rows(client, store):
+    response = client.post("/ingest/job_extra", json={"url": "https://example.com/v.mp4", "extra": "private"})
+    assert response.status_code == 422
+    assert "private" not in response.text
+    assert store.get_job("job_extra") is None
+
+
+@pytest.mark.parametrize("method,stage", [
+    ("try_create_job", "retrieve_post"),
+    ("save_post_and_features", "extract_media_features"),
+])
+def test_ingest_storage_failures_are_safe(client, store, upstream, monkeypatch, method, stage):
+    def fail(*args, **kwargs):
+        raise RuntimeError("postgresql://private-password@host/db")
+    monkeypatch.setattr(store, method, fail)
+    response = client.post("/ingest/job_storage_failure", json={"url": "https://example.com/video.mp4"})
+    assert response.status_code == 500
+    error = response.json()["error"]
+    assert error["code"] == "STORAGE_FAILED" and error["stage"] == stage
+    assert error["retryable"] is True
+    assert "private-password" not in response.text
+
+
+def test_real_error_type_is_logged_without_private_details(client, upstream, monkeypatch, caplog):
+    def fail(media, options):
+        raise ValueError("secret private evidence")
+    monkeypatch.setattr(ingest_module, "extract_media_features", fail)
+    response = client.post("/ingest/job_logged", json={"url": "https://example.com/video.mp4"})
+    assert response.status_code == 502
+    assert "stage=extract_media_features type=ValueError" in caplog.text
+    assert "secret private evidence" not in caplog.text

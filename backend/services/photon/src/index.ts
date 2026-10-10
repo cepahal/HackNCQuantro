@@ -6,10 +6,15 @@ import { readConfig } from "./config.ts";
 import { createReceiver, hasConversation } from "./receive.ts";
 import { createBridgeServer } from "./server.ts";
 import { BridgeError, createSummarySender } from "./summary.ts";
-import { createAnalysisDispatcher } from "./analysis.ts";
+import { assertBackendReady, BACKEND_NOT_READY_MESSAGE, createAnalysisDispatcher } from "./analysis.ts";
+import { createPublicReportPreparer } from "./public-reports.ts";
 
 async function main(): Promise<void> {
   const config = readConfig(process.env, process.argv.slice(2));
+  if (config.cloud) await assertBackendReady(config.backendPort);
+  const prepareReport = config.publicReportsFile
+    ? await createPublicReportPreparer({ directory: config.directory, file: config.publicReportsFile, reportBaseUrl: config.reportBaseUrl })
+    : undefined;
   const cloudApp = config.cloud
     ? await Spectrum({
       projectId: config.projectId, projectSecret: config.projectSecret,
@@ -25,16 +30,18 @@ async function main(): Promise<void> {
     conversations.set(space.id, space);
     analysis.enqueue(record, eventKey, space);
   } });
+  const resolveConversation = async (id: string): Promise<Space> => {
+    const live = conversations.get(id);
+    if (live) return live;
+    if (cloudApp && await hasConversation(directory, id)) {
+      return imessage(cloudApp).space.get(id);
+    }
+    throw new BridgeError(409, "CONVERSATION_UNAVAILABLE", "Receive a submission in this conversation before sending its report.", false);
+  };
   const sendSummary = createSummarySender({
     deliveryDirectory: join(config.directory, "deliveries"),
-    resolveConversation: async (id) => {
-      const live = conversations.get(id);
-      if (live) return live;
-      if (cloudApp && await hasConversation(directory, id)) {
-        return imessage(cloudApp).space.get(id);
-      }
-      throw new BridgeError(409, "CONVERSATION_UNAVAILABLE", "Receive a submission in this conversation before sending its report.", false);
-    },
+    prepareReport,
+    resolveConversation,
   });
   const server = createBridgeServer({ token: config.token, sendSummary });
   let stopping = false;
@@ -58,6 +65,19 @@ async function main(): Promise<void> {
       console.error("The private Photon bridge stopped accepting requests.");
       stop();
     });
+    if (cloudApp) {
+      // Recovery never delays inbound acknowledgments. Existing markers are GET-only.
+      void analysis.recover({
+        inboxDirectory: directory,
+        resumeUnstarted: config.resumeSaved,
+        resolveConversation: (record) => resolveConversation(record.conversation_id),
+      }).then((result) => {
+        console.log(`Saved-request recovery: ${result.scanned} scanned, ${result.reconciled} reconciled, ${result.resumed} resumed, ${result.unresolved} unresolved, ${result.skipped} skipped; limited=${result.limited}.`);
+        if (result.limited) console.error("Saved-request recovery reached its limit. Review remaining saved requests manually; existing markers will not be replayed.");
+      }).catch(() => {
+        console.error("Saved-request recovery could not finish. Processing markers were preserved.");
+      });
+    }
     console.log(`Quantro Photon (${config.cloud ? "iMessage" : "terminal"}) ready at http://127.0.0.1:${config.port}.`);
     for await (const [space, message] of app.messages) {
       if (message.direction !== "inbound") continue;
@@ -82,7 +102,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(() => {
-  console.error("Quantro Photon could not start. Check the private env, Node 24, SDK setup and local port. Credentials were omitted.");
+main().catch((error: unknown) => {
+  console.error(error instanceof Error && error.message === BACKEND_NOT_READY_MESSAGE
+    ? BACKEND_NOT_READY_MESSAGE
+    : "Quantro Photon could not start. Check the private env, Node 24, SDK setup and local port. Credentials were omitted.");
   process.exitCode = 1;
 });

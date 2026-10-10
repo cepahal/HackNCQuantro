@@ -2,11 +2,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from backend.routes.common import get_tiger_store, not_found, quantro_error_response
+from backend.routes.common import get_tiger_store, quantro_error_response
+from backend.services.external_apis.retrieve_post import _validate_url
 from backend.services.pipeline.run_ingest import run_ingest
-from backend.services.reporting.build_report import sanitize_report
 from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.storage.tiger import TigerStore
 
@@ -17,11 +17,24 @@ TigerDependency = Annotated[TigerStore, Depends(get_tiger_store)]
 
 
 class IngestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     url: str = Field(min_length=1, max_length=8192)
 
 
 @router.post("/ingest/{job_id}")
 def ingest(job_id: JobId, body: IngestRequest, store: TigerDependency) -> JSONResponse:
+    try:
+        _validate_url(body.url)
+    except QuantroError as error:
+        return quantro_error_response(error)
+    try:
+        created = store.try_create_job(job_id, body.url)
+    except Exception:  # noqa: BLE001 - Storage diagnostics must not expose credentials.
+        return quantro_error_response(QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True))
+    if not created:
+        conflict = QuantroError(ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_POST,
+                             "This job ID already exists. Use a new job ID for a new ingest.", retryable=False)
+        return JSONResponse(status_code=409, content={"error": conflict.public_dict()})
     try:
         result = run_ingest(job_id, body.url, store=store)
     except QuantroError as error:
@@ -36,8 +49,13 @@ def get_ingest(job_id: JobId, store: TigerDependency) -> JSONResponse:
     except Exception as exc:
         raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.EXTRACT_MEDIA_FEATURES, retryable=True) from exc
     if job is None:
-        return not_found("Job not found")
+        return quantro_error_response(QuantroError(
+            ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST, "Job not found", retryable=False
+        ))
     try:
-        return JSONResponse(content=sanitize_report(job))
+        # Internal ingest inspection retains the exact persisted contract JSON.
+        post = job.pop("post_json")
+        features = job.pop("features_json")
+        return JSONResponse(content={"job": job, "post": post, "features": features})
     except QuantroError as error:
         return quantro_error_response(error)

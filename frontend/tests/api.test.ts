@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  analysisInFlight, getReport, ingest, mediaUrl, publicUrl, QuantroApiError, runAnalysis, startAnalysis, waitForReport,
+  analysisInFlight, getDisplayModel, getReport, ingest, mediaUrl, publicUrl, QuantroApiError, runAnalysis, startAnalysis, waitForReport,
 } from "../lib/api.ts";
 import type { ReportV2 } from "../lib/api-types.ts";
 import { reportFixture } from "./fixtures/report_v2.ts";
+
+const displayFixture = {
+  source_match: null, clip_coverage: null, context_assessment: null,
+  confidence_note: "Evidence is not a probability.", no_source_message: "No verified source found",
+  context_unavailable_message: null, submitted_panel: {}, source_panel: null,
+  poster_info: {submitted: {}, source: null}, matches: [], edit_analysis: null, findings: [], limitations: [],
+};
 
 test("getReport returns the typed ReportV2 from the report route", async (t) => {
   const fetch = t.mock.method(globalThis, "fetch", async () => Response.json(reportFixture));
@@ -163,4 +170,84 @@ test("refresh recovery polls running jobs until the saved report exists", async 
     : {job_id: "job_saved", status: "completed", report_id: "report_job_saved", error: null}));
   assert.equal(await waitForReport("job_saved"), "report_job_saved");
   assert.equal(calls, 2);
+});
+
+test("confidence labels use the backend display endpoint and reject malformed data", async (t) => {
+  const fetch = t.mock.method(globalThis, "fetch", async () => Response.json(displayFixture));
+  assert.equal((await getDisplayModel("report_job_1")).confidence_note, displayFixture.confidence_note);
+  assert.match(String(fetch.mock.calls[0]?.arguments[0]), /\/reports\/report_job_1\/display$/);
+  fetch.mock.mockImplementation(async () => Response.json({}));
+  await assert.rejects(getDisplayModel("report_job_1"), /invalid display model/);
+});
+
+test("report sharing keeps analysis local and uses the public report API only off loopback", async (t) => {
+  const api = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const reports = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL;
+  const window = Object.getOwnPropertyDescriptor(globalThis, "window");
+  t.after(() => {
+    if (api === undefined) delete process.env.NEXT_PUBLIC_API_BASE_URL; else process.env.NEXT_PUBLIC_API_BASE_URL = api;
+    if (reports === undefined) delete process.env.NEXT_PUBLIC_REPORT_API_BASE_URL; else process.env.NEXT_PUBLIC_REPORT_API_BASE_URL = reports;
+    if (window) Object.defineProperty(globalThis, "window", window); else Reflect.deleteProperty(globalThis, "window");
+  });
+  process.env.NEXT_PUBLIC_API_BASE_URL = "http://localhost:8000";
+  process.env.NEXT_PUBLIC_REPORT_API_BASE_URL = "https://reports.example/api/";
+  const urls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    urls.push(url);
+    if (url.endsWith("/run")) return Response.json({job_id:"job_1",report_id:"report_job_1",
+      report_url:"http://localhost:3000/reports/report_job_1",outcome:"matched",delivery_status:"skipped",delivery_warning:null,warnings:[]});
+    return Response.json(url.endsWith("/display") ? displayFixture : reportFixture);
+  });
+  await runAnalysis("https://example.com/video.mp4", undefined, "job_1");
+  await getReport("report_job_1");
+  await getDisplayModel("report_job_1");
+  assert.deepEqual(urls, ["http://localhost:8000/analyze/job_1/run", "https://reports.example/api/reports/report_job_1",
+    "https://reports.example/api/reports/report_job_1/display"]);
+  assert.equal(mediaUrl({media_id:"media_1",playback_url:null}), "https://reports.example/api/media/media_1");
+  for (const hostname of ["localhost", "127.0.0.1", "[::1]"]) {
+    Object.defineProperty(globalThis, "window", {configurable:true,value:{location:{hostname}}});
+    await getReport("report_job_1");
+    assert.equal(urls.at(-1), "http://localhost:8000/reports/report_job_1");
+    assert.equal(mediaUrl({media_id:"media_1",playback_url:null}), "http://localhost:8000/media/media_1");
+  }
+});
+
+test("public deployment without a backend URL fails before fetching visitor localhost", async (t) => {
+  const api = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const reports = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL;
+  const window = Object.getOwnPropertyDescriptor(globalThis, "window");
+  t.after(() => {
+    if (api === undefined) delete process.env.NEXT_PUBLIC_API_BASE_URL; else process.env.NEXT_PUBLIC_API_BASE_URL = api;
+    if (reports === undefined) delete process.env.NEXT_PUBLIC_REPORT_API_BASE_URL; else process.env.NEXT_PUBLIC_REPORT_API_BASE_URL = reports;
+    if (window) Object.defineProperty(globalThis, "window", window); else Reflect.deleteProperty(globalThis, "window");
+  });
+  delete process.env.NEXT_PUBLIC_API_BASE_URL;
+  delete process.env.NEXT_PUBLIC_REPORT_API_BASE_URL;
+  Object.defineProperty(globalThis, "window", {configurable:true,value:{location:{hostname:"quantro-ten.vercel.app"}}});
+  const fetch = t.mock.method(globalThis, "fetch");
+  await assert.rejects(runAnalysis("https://example.com/video.mp4"), /NEXT_PUBLIC_API_BASE_URL and redeploy/);
+  await assert.rejects(getReport("report_job_1"), /NEXT_PUBLIC_API_BASE_URL and redeploy/);
+  assert.equal(fetch.mock.callCount(), 0);
+});
+
+test("same-origin report API preserves original and playback URLs safely", (t) => {
+  const reports = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL;
+  const window = Object.getOwnPropertyDescriptor(globalThis, "window");
+  t.after(() => {
+    if (reports === undefined) delete process.env.NEXT_PUBLIC_REPORT_API_BASE_URL; else process.env.NEXT_PUBLIC_REPORT_API_BASE_URL = reports;
+    if (window) Object.defineProperty(globalThis, "window", window); else Reflect.deleteProperty(globalThis, "window");
+  });
+  process.env.NEXT_PUBLIC_REPORT_API_BASE_URL = "/api";
+  Object.defineProperty(globalThis, "window", {configurable:true,value:{location:{hostname:"reports.example",origin:"https://reports.example"}}});
+  assert.equal(publicUrl("https://www.instagram.com/reel/example/"), "https://www.instagram.com/reel/example/");
+  assert.equal(publicUrl("/api/media/media_1"), "https://reports.example/api/media/media_1");
+  assert.equal(mediaUrl({media_id:"media_1",playback_url:"https://media.example/video.mp4"}), "https://media.example/video.mp4");
+  assert.equal(mediaUrl({media_id:"media_1",playback_url:null}), "/api/media/media_1");
+  assert.equal(publicUrl("javascript:alert(1)"), null);
+  assert.equal(publicUrl("https://name:secret@example.com/video.mp4"), null);
+});
+
+test("refresh recovery rejects an array status instead of coercing it", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({job_id:"job_saved",status:["running"]}));
+  await assert.rejects(waitForReport("job_saved"), /unknown job status/);
 });

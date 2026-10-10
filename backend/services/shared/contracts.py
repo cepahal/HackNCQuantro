@@ -1,5 +1,5 @@
 """Runtime validation at the existing JSON-native function boundaries."""
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar, overload
 
 from pydantic import BaseModel
 
@@ -11,6 +11,18 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 
 def contract_input(value: Any) -> Any:
     return value.model_dump(mode="json") if isinstance(value, BaseModel) else value
+
+
+@overload
+def validate_contract_result(model: type[ModelT], value: Any, stage: Stage, *, json_native: Literal[False] = False) -> ModelT: ...
+
+
+@overload
+def validate_contract_result(model: type[ModelT], value: Any, stage: Stage, *, json_native: Literal[True]) -> dict[str, Any]: ...
+
+
+@overload
+def validate_contract_result(model: type[ModelT], value: Any, stage: Stage, *, json_native: bool) -> ModelT | dict[str, Any]: ...
 
 
 def validate_contract_result(model: type[ModelT], value: Any, stage: Stage, *, json_native: bool = False) -> ModelT | dict[str, Any]:

@@ -14,13 +14,20 @@ import logging
 import os
 import re
 import stat
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 
+from sqlalchemy.dialects.postgresql.psycopg import PGDialect_psycopg
+from sqlalchemy.engine.interfaces import DBAPIConnection
+from sqlalchemy.pool import QueuePool
+
+from ..shared.config import environment
 from ..shared.types import Post
 
 ROOT = Path(__file__).resolve().parents[3]
 MAX_MEDIA_BYTES = 100_000_000
+MEDIA_CHUNK_BYTES = 1024 * 1024
 logger = logging.getLogger(__name__)
 _MEDIA_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
 _HOST = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?\.?\Z")
@@ -88,19 +95,9 @@ class SearchCursor(Cursor, Protocol):
 
 
 def _environment() -> dict[str, str]:
-    """Read local settings without changing the process's environment or other keys."""
+    """Use the same once-only configuration and process precedence as the API."""
     try:
-        dotenv = importlib.import_module("dotenv")
-        values: dict[str, str] = {}
-        for filename in ("backend/.env", ".env", ".env.local"):
-            parsed = dotenv.dotenv_values(ROOT / filename, interpolate=False)
-            values.update(
-                (key, value)
-                for key, value in parsed.items()
-                if isinstance(key, str) and isinstance(value, str)
-            )
-        values.update(os.environ)
-        return values
+        return environment()
     except (ImportError, OSError):
         raise StorageError("Could not read Tiger Data environment settings.") from None
 
@@ -129,6 +126,91 @@ def _validate_dsn(parameters: dict[str, str], values: dict[str, str]) -> None:
         raise StorageError("Tiger Data requires one valid TCP port.")
 
 
+def _connection_factory(values: dict[str, str]) -> Callable[[], Connection]:
+    # A blank primary setting never falls back to a different database.
+    dsn = values.get("TIGERDATA_DSN", values.get("DATABASE_URL", ""))
+    if not dsn.strip():
+        raise StorageError("Set TIGERDATA_DSN before retrieving posts.")
+    try:
+        conninfo = importlib.import_module("psycopg.conninfo")
+        parameters = cast(dict[str, str], conninfo.conninfo_to_dict(dsn))
+        _validate_dsn(parameters, values)
+        connector = importlib.import_module("psycopg")
+    except StorageError:
+        raise
+    except Exception:  # noqa: BLE001 - redact optional driver configuration diagnostics
+        raise StorageError("Could not read Tiger Data connection settings.") from None
+
+    def connect() -> Connection:
+        try:
+            return cast(
+                Connection,
+                connector.connect(
+                    dsn,
+                    sslmode="verify-full",
+                    sslrootcert=values.get("TIGERDATA_SSL_ROOT_CERT", "").strip()
+                    or "system",
+                    gssencmode="disable",
+                    connect_timeout=10,
+                    options="-c statement_timeout=120000",
+                    autocommit=False,
+                ),
+            )
+        except Exception as error:  # noqa: BLE001 - optional driver diagnostics may contain credentials
+            logger.warning("Tiger Data connection failed (%s)", type(error).__name__)
+            raise StorageError(
+                "Could not connect to Tiger Data. Check settings, certificates and access."
+            ) from None
+
+    return connect
+
+
+class TigerDataPostPool:
+    """API-lifespan media pool; leases return after streaming, dispose after requests drain."""
+
+    def __init__(self, creator: Callable[[], Connection]) -> None:
+        connector = importlib.import_module("psycopg")
+        self._pool = QueuePool(
+            cast(Callable[[], DBAPIConnection], creator),
+            pool_size=3,
+            max_overflow=0,
+            timeout=10,
+            recycle=300,
+            pre_ping=True,
+            dialect=PGDialect_psycopg(dbapi=connector),
+        )
+        self._closed = False
+
+    @classmethod
+    def from_env(cls) -> TigerDataPostPool:
+        return cls(_connection_factory(_environment()))
+
+    def acquire(self) -> TigerDataPostStore:
+        if self._closed:
+            raise StorageError("The Tiger Data media pool is closed.")
+        connection = None
+        try:
+            connection = self._pool.connect()
+            return TigerDataPostStore(
+                cast(Connection, connection), owned_connection=True
+            )
+        except Exception:  # noqa: BLE001 - redact pool and optional driver diagnostics
+            if connection is not None:
+                try:
+                    connection.close()
+                except Exception as close_error:  # noqa: BLE001 - never expose connection cleanup diagnostics
+                    logger.warning(
+                        "Tiger Data pooled connection cleanup failed (%s)",
+                        type(close_error).__name__,
+                    )
+            raise StorageError("The stored media connection is unavailable.") from None
+
+    def close(self) -> None:
+        if not self._closed:
+            self._closed = True
+            self._pool.dispose()
+
+
 class TigerDataPostStore:
     """Store one Post and its JPG/MP4 bytes in a single PostgreSQL transaction."""
 
@@ -142,45 +224,17 @@ class TigerDataPostStore:
 
     @classmethod
     def from_env(cls) -> TigerDataPostStore:
-        values = _environment()
-        # A present but blank primary setting is an error, never a fallback to a
-        # different database the user did not choose for this storage feature.
-        dsn = values.get("TIGERDATA_DSN", values.get("DATABASE_URL", ""))
-        if not dsn.strip():
-            raise StorageError("Set TIGERDATA_DSN before retrieving posts.")
-        try:
-            conninfo = importlib.import_module("psycopg.conninfo")
-            parameters = cast(dict[str, str], conninfo.conninfo_to_dict(dsn))
-            _validate_dsn(parameters, values)
-            connector = importlib.import_module("psycopg")
-            connection = cast(
-                Connection,
-                connector.connect(
-                    dsn,
-                    sslmode="verify-full",
-                    sslrootcert=values.get("TIGERDATA_SSL_ROOT_CERT", "").strip()
-                    or "system",
-                    gssencmode="disable",
-                    connect_timeout=10,
-                    options="-c statement_timeout=120000",
-                    autocommit=False,
-                ),
-            )
-        except StorageError:
-            raise
-        except Exception as error:  # noqa: BLE001 - redact optional driver diagnostics and connection strings
-            logger.warning("Tiger Data connection failed (%s)", type(error).__name__)
-            raise StorageError(
-                "Could not connect to Tiger Data. Check settings, certificates and access."
-            ) from None
-        return cls(connection, owned_connection=True)
+        return cls(_connection_factory(_environment())(), owned_connection=True)
 
-    def save_post(self, post: Post) -> None:
+    def save_post(self, post: Post | Mapping[str, Any]) -> None:
         connection = self._connection
         if connection is None:
             raise StorageError("The Tiger Data connection is closed.")
         cursor: Cursor | None = None
         try:
+            post = (
+                post.model_dump(mode="json") if isinstance(post, Post) else dict(post)
+            )
             media = post.get("media")
             if not isinstance(media, dict):
                 raise StorageError("Post must contain a downloaded MediaAsset.")
@@ -357,7 +411,94 @@ class TigerDataPostStore:
                 try:
                     cursor.close()
                 except Exception as error:  # noqa: BLE001 - preserve the safe read result
-                    logger.warning("Media cursor close failed (%s)", type(error).__name__)
+                    logger.warning(
+                        "Media cursor close failed (%s)", type(error).__name__
+                    )
+
+    def _read_media_row(
+        self, command: str, parameters: tuple[object, ...]
+    ) -> tuple[object, ...] | None:
+        """Finish each bounded SELECT transaction before yielding bytes to the browser."""
+        connection = self._connection
+        if connection is None:
+            raise StorageError("The Tiger Data connection is closed.")
+        cursor: Cursor | None = None
+        try:
+            cursor = connection.cursor()
+            cursor.execute(command, parameters)
+            row = cursor.fetchone()
+            connection.rollback()
+            return row
+        except Exception:  # noqa: BLE001 - database diagnostics can expose credentials
+            try:
+                connection.rollback()
+            except Exception as error:  # noqa: BLE001 - preserve the safe failure
+                logger.warning("Media read rollback failed (%s)", type(error).__name__)
+            raise StorageError("Tiger Data could not read the stored media.") from None
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as error:  # noqa: BLE001 - preserve the safe result
+                    logger.warning(
+                        "Media cursor close failed (%s)", type(error).__name__
+                    )
+
+    def read_media_info(self, media_id: str) -> tuple[str, int, str] | None:
+        """Read playback headers without transferring the stored BYTEA."""
+        if not isinstance(media_id, str) or not _MEDIA_ID.fullmatch(media_id):
+            raise StorageError("The media identifier is invalid.")
+        row = self._read_media_row(
+            "SELECT mime_type, size_bytes, sha256 FROM quantro_retrieval.posts WHERE media_id = %s",
+            (media_id,),
+        )
+        if row is None:
+            return None
+        if len(row) != 3:
+            raise StorageError("The stored media is invalid.")
+        mime, size, digest = row
+        if (
+            mime not in ("image/jpeg", "video/mp4")
+            or not isinstance(size, int)
+            or isinstance(size, bool)
+            or not 0 < size <= MAX_MEDIA_BYTES
+            or not isinstance(digest, str)
+            or re.fullmatch(r"[a-f0-9]{64}", digest) is None
+        ):
+            raise StorageError("The stored media is invalid.")
+        return cast(str, mime), size, digest
+
+    def read_media_chunk(
+        self, media_id: str, start: int, length: int, *, size: int, digest: str
+    ) -> bytes:
+        """Fetch at most 1 MiB, guarded against replacement between HTTP stream chunks."""
+        if (
+            not isinstance(media_id, str)
+            or not _MEDIA_ID.fullmatch(media_id)
+            or any(
+                not isinstance(value, int) or isinstance(value, bool)
+                for value in (start, length, size)
+            )
+            or not 0 < size <= MAX_MEDIA_BYTES
+            or not 0 <= start < size
+            or not 0 < length <= min(MEDIA_CHUNK_BYTES, size - start)
+            or not isinstance(digest, str)
+            or re.fullmatch(r"[a-f0-9]{64}", digest) is None
+        ):
+            raise StorageError("The media range is invalid.")
+        row = self._read_media_row(
+            "SELECT substring(media_bytes FROM %s FOR %s) FROM quantro_retrieval.posts "
+            "WHERE media_id = %s AND size_bytes = %s AND sha256 = %s",
+            (start + 1, length, media_id, size, digest),
+        )
+        if (
+            row is None
+            or len(row) != 1
+            or not isinstance(row[0], (bytes, memoryview))
+            or len(row[0]) != length
+        ):
+            raise StorageError("The stored media changed or could not be read.")
+        return bytes(row[0])
 
     def close(self) -> None:
         """Release only a connection opened or explicitly owned by this store."""

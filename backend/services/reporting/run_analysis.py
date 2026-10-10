@@ -13,20 +13,24 @@ and a messaging failure becomes a delivery warning rather than undoing the save.
 
 import logging
 from collections.abc import Callable, Sequence
-from ..pipeline.artifacts import artifact_scope
 from dataclasses import dataclass
-from typing import Any, TypeVar
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from typing import Any, Literal, TypeVar
 
 from ..external_apis.build_search_queries import build_search_queries
 from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
+from ..external_apis.retrieve_post import _validate_url
 from ..external_apis.search_candidates import search_candidates
-from ..pipeline.run_ingest import EXTRACTION_OPTIONS, ingest_post_and_features
+from ..pipeline.artifacts import artifact_scope
+from ..pipeline.run_ingest import EXTRACTION_OPTIONS, run_ingest
 from ..processing.preprocessing import extract_media_features
 from ..shared.contracts import validate_contract_result
 from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.post_identity import ensure_distinct_source
+from ..shared.post_identity import normalized_post_url as _normalized_post_url
+from ..shared.post_identity import post_identities as _post_identities
+from ..shared.post_identity import post_identity as _post_identity
 from ..shared.types import (
     Alignment,
     AnalysisResult,
@@ -34,6 +38,7 @@ from ..shared.types import (
     ConfidenceLevel,
     Context,
     DeliveryResult,
+    JobCompletionResult,
     MediaFeatures,
     Post,
     ReportV2,
@@ -68,6 +73,14 @@ _LEVEL_RANK: dict[ConfidenceLevel, int] = {
 T = TypeVar("T")
 
 
+class JobConflictError(QuantroError):
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__(ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_POST,
+                         "This job ID already belongs to a different submitted URL.")
+
+
 
 
 
@@ -98,8 +111,7 @@ def select_source(
         return None, []
 
     ordered = sorted(verified, key=lambda entry: _rank(entry[1], entry[2]), reverse=True)
-    tied = len(ordered) > 1 and _rank(*ordered[0][1:]) == _rank(*ordered[1][1:])
-    return ordered[0][0], [MULTIPLE_PLAUSIBLE_SOURCES] if tied else []
+    return ordered[0][0], [MULTIPLE_PLAUSIBLE_SOURCES] if len(ordered) > 1 else []
 
 
 def deliver_summary_after_save(
@@ -119,7 +131,8 @@ def deliver_summary_after_save(
     if not conversation_id:
         return None, None
     try:
-        delivery = send_summary(
+        delivery = _call(
+            Stage.SEND_SUMMARY, send_summary,
             conversation_id, summary, report_url, job_id=job_id, provider=provider, tracker=tracker
         )
     except QuantroError as error:
@@ -132,7 +145,9 @@ def _call(stage: Stage, function: Callable[..., Any], *args: Any, **kwargs: Any)
     try:
         return function(*args, **kwargs)
     except Exception as exc:
-        raise normalize_exception(stage, exc) from exc
+        error = normalize_exception(stage, exc)
+        logger.warning("Pipeline failure code=%s stage=%s type=%s", error.code.value, error.stage.value, type(exc).__name__)
+        raise error from exc
 
 
 def _candidate_label(candidate: dict[str, Any], index: int) -> str:
@@ -140,25 +155,18 @@ def _candidate_label(candidate: dict[str, Any], index: int) -> str:
     return candidate_id if isinstance(candidate_id, str) and candidate_id else f"#{index}"
 
 
-def _normalized_post_url(value: str) -> str:
-    try:
-        url = urlsplit(value)
-        host = (url.hostname or "").lower()
-        port = url.port
-        if port is not None and (url.scheme.lower(), port) not in {("http", 80), ("https", 443)}:
-            host = f"{host}:{port}"
-        return urlunsplit((url.scheme.lower(), host, url.path.rstrip("/") or "/", urlencode(sorted(parse_qsl(url.query))), ""))
-    except (TypeError, ValueError):
-        return value
-
-
-def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures) -> _AssessedSource:
+def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures, submitted_identities: set[str]) -> _AssessedSource:
     raw_post = _call(Stage.RETRIEVE_CANDIDATE_MEDIA, retrieve_candidate_media, candidate)
     post = parse_stage_output(Post, raw_post, Stage.RETRIEVE_CANDIDATE_MEDIA)
+    if _post_identities(post) & submitted_identities:
+        raise QuantroError(
+            ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_CANDIDATE_MEDIA,
+            "The submitted post cannot be its own source.",
+        )
     raw_features = _call(
         Stage.EXTRACT_MEDIA_FEATURES,
         extract_media_features,
-        post.media.model_dump(mode="json"),
+        post.media,
         dict(EXTRACTION_OPTIONS),
     )
     features = parse_stage_output(MediaFeatures, raw_features, Stage.EXTRACT_MEDIA_FEATURES)
@@ -172,9 +180,16 @@ def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures) -
     return _AssessedSource(post=post, features=features, alignment=alignment)
 
 
+def _heartbeat(store: TigerStore, job_id: str) -> None:
+    try:
+        store.touch_job(job_id)
+    except Exception as exc:
+        raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RUN_ANALYSIS, retryable=True) from exc
+
+
 def _mark_failed(store: TigerStore, job_id: str, error: QuantroError) -> None:
     try:
-        store.set_job_status(job_id, "failed", error.code.value, error.stage.value)
+        store.set_job_status(job_id, "failed", error.code.value, error.stage.value, str(error.public_dict()["message"]), error.retryable)
     except Exception as exc:  # noqa: BLE001 - Preserve the original stage error and redact storage details.
         logger.warning("Could not record failure for job %s (%s)", job_id, type(exc).__name__)
 
@@ -191,6 +206,7 @@ def run_analysis(
 ) -> AnalysisResult:
     # aligned with shared/types.py on 2026-10-10
     try:
+        _validate_url(url)
         if store is None:
             try:
                 owned_store = TigerStore.from_env()
@@ -213,17 +229,26 @@ def run_analysis(
             existing_report = store.get_report(report_id_for_job(job_id)) if existing_job and existing_job["status"] == "completed" else None
         except Exception as exc:
             raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.RETRIEVE_POST, retryable=True) from exc
+        if existing_job and _normalized_post_url(existing_job["url"]) != _normalized_post_url(url):
+            raise JobConflictError()
         if existing_job and existing_job["status"] == "completed":
-            if _normalized_post_url(existing_job["url"]) != _normalized_post_url(url):
-                raise QuantroError(ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_POST, "This job ID already belongs to a different submitted URL.")
             if existing_report is None:
                 raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
             report = parse_stage_output(ReportV2, existing_report, Stage.BUILD_REPORT)
+            ensure_distinct_source(report.submitted.post, report.source.post if report.source else None, Stage.BUILD_REPORT)
             return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, []), _ContractStage.RUN_ANALYSIS, json_native=False)
 
-        ingested = ingest_post_and_features(job_id, url, store=store)
+        _call(Stage.RETRIEVE_POST, run_ingest, job_id, url, store=store)
         try:
-            return validate_contract_result(_ReturnModel, _analyze(job_id, ingested.post, ingested.features, conversation_id, store, provider, tracker), _ContractStage.RUN_ANALYSIS, json_native=False)
+            ingested = store.get_job(job_id)
+            if ingested is None:
+                raise LookupError("Ingest job is missing.")
+        except Exception as exc:
+            raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.EXTRACT_MEDIA_FEATURES, retryable=True) from exc
+        try:
+            post = parse_stage_output(Post, ingested["post_json"], Stage.RETRIEVE_POST)
+            features = parse_stage_output(MediaFeatures, ingested["features_json"], Stage.EXTRACT_MEDIA_FEATURES)
+            return validate_contract_result(_ReturnModel, _analyze(job_id, post, features, conversation_id, store, provider, tracker), _ContractStage.RUN_ANALYSIS, json_native=False)
         except QuantroError as error:
             _mark_failed(store, job_id, error)
             raise
@@ -242,6 +267,7 @@ def _analyze(
 ) -> AnalysisResult:
     warnings: list[str] = []
 
+    _heartbeat(store, job_id)
     raw_queries = _call(
         Stage.BUILD_SEARCH_QUERIES,
         build_search_queries,
@@ -252,20 +278,18 @@ def _analyze(
     warnings.extend(queries.warnings)
 
     try:
-        raw_search = search_candidates(queries.queries, limit=SEARCH_LIMIT)
-    except QuantroError:
-        raise
+        raw_search = _call(Stage.SEARCH_CANDIDATES, search_candidates, queries.model_dump(mode="json"), limit=SEARCH_LIMIT)
     except Exception as exc:
         raise QuantroError(
             code=ErrorCode.SEARCH_FAILED, stage=Stage.SEARCH_CANDIDATES, retryable=True
         ) from exc
     search = parse_stage_output(_CandidateSearch, raw_search, Stage.SEARCH_CANDIDATES)
-    warnings.extend(search.warnings)
-    submitted_url = _normalized_post_url(submitted_post.post_url)
+    warnings.extend(warning for warning in search.warnings if warning not in warnings)
+    submitted_identities = _post_identities(submitted_post)
     candidate_rows = [candidate.model_dump(mode="json") for candidate in search.candidates]
     eligible_candidates = [
         candidate for candidate in candidate_rows
-        if _normalized_post_url(candidate.get("url", "")) != submitted_url
+        if _post_identity(candidate.get("url", "")) not in submitted_identities
     ]
     candidates = eligible_candidates[:SEARCH_LIMIT]
     if len(eligible_candidates) < len(candidate_rows):
@@ -274,8 +298,9 @@ def _analyze(
     viable: list[_AssessedSource] = []
     skipped = 0
     for index, candidate in enumerate(candidates, start=1):
+        _heartbeat(store, job_id)
         try:
-            assessed = _assess_candidate(candidate, submitted_features)
+            assessed = _assess_candidate(candidate, submitted_features, submitted_identities)
         except QuantroError as error:
             skipped += 1
             warnings.append(f"Candidate {_candidate_label(candidate, index)} was skipped: {error.message}")
@@ -296,7 +321,7 @@ def _analyze(
             for source in viable
         ]
     )
-    if tie_limitations:
+    if tie_limitations and chosen is not None:
         extra_limitations.extend(tie_limitations)
         chosen_rank = _rank(chosen.alignment.match_quality.confidence.level, chosen.alignment.match_quality.clip_coverage_ratio)
         extra_limitations.extend(
@@ -310,6 +335,7 @@ def _analyze(
     context: Context | None = None
     comparison: Comparison | None = None
     if chosen is not None:
+        _heartbeat(store, job_id)
         raw_context = _call(
             Stage.SELECT_SURROUNDING_CONTEXT,
             select_surrounding_context,
@@ -323,7 +349,7 @@ def _analyze(
             compare_context_and_caption,
             submitted_features.model_dump(mode="json"),
             context.model_dump(mode="json"),
-            submitted_post.caption,
+            chosen.post.caption,
         )
         comparison = parse_stage_output(Comparison, raw_comparison, Stage.COMPARE_CONTEXT_AND_CAPTION)
 
@@ -352,9 +378,11 @@ def _complete_and_deliver(
     tracker: DeliveryTracker | None,
     warnings: list[str],
 ) -> AnalysisResult:
-    saved = save_report_and_complete_job(
+    saved = _call(
+        Stage.SAVE_REPORT_AND_COMPLETE_JOB, save_report_and_complete_job,
         job_id, report, report_store=TigerReportStore(store), job_store=TigerJobStore(store)
     )
+    saved = parse_stage_output(JobCompletionResult, saved, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
     try:
         saved_report = store.get_report(saved.report_id)
     except Exception as exc:
@@ -364,6 +392,7 @@ def _complete_and_deliver(
     report = parse_stage_output(ReportV2, saved_report, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
     if report.job_id != job_id:
         raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
+    ensure_distinct_source(report.submitted.post, report.source.post if report.source else None, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
 
     delivery, delivery_warning = deliver_summary_after_save(
         job_id,
@@ -373,6 +402,7 @@ def _complete_and_deliver(
         provider=provider,
         tracker=tracker,
     )
+    delivery_status: Literal["accepted", "failed", "skipped"]
     if not conversation_id:
         delivery_status = "skipped"
     else:
@@ -385,5 +415,5 @@ def _complete_and_deliver(
         report_url=saved.report_url,
         delivery_status=delivery_status,
         delivery_warning=delivery_warning,
-        warnings=warnings,
+        warnings=warnings + ([delivery_warning] if delivery_warning else []),
     )

@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import ReportPage from "../../../components/ReportPage";
 
-// The backend's report_url (also sent over iMessage) uses /reports/{id}; /results?id={id} is the canonical page.
+// Render this stable path directly so read-only report gateways need no redirects.
 export default async function SavedReport({ params }: { params: Promise<{ report_id: string }> }) {
   const { report_id } = await params;
-  redirect(`/results?id=${encodeURIComponent(report_id)}`);
+  return <ReportPage key={report_id} reportId={report_id} jobId={null}/>;
 }

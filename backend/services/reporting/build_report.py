@@ -14,6 +14,7 @@ from ..shared.contracts import validate_contract_result
 from ..shared.errors import ErrorCode, QuantroError, Stage
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.post_identity import ensure_distinct_source
 from ..shared.types import (
     Alignment,
     Comparison,
@@ -109,7 +110,6 @@ def build_report(
         if submitted_post.media.media_id != submitted_features.media_id:
             raise _build_error("Submitted post and features describe different media")
 
-        matched = source_post is not None and alignment is not None and alignment.status == "verified"
         report: dict[str, Any] = {
             "schema_version": "2.1",
             "job_id": job_id,
@@ -121,7 +121,8 @@ def build_report(
             "summary": None,
         }
 
-        if matched:
+        if source_post is not None and alignment is not None and alignment.status == "verified":
+            ensure_distinct_source(submitted_post, source_post, Stage.BUILD_REPORT)
             if alignment.match_quality.confidence.level not in {ConfidenceLevel.HIGH, ConfidenceLevel.MODERATE} or not alignment.matches:
                 raise _build_error("A verified source requires an accepted passage and high or moderate match confidence")
             if source_features is None or context is None or comparison is None:

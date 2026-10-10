@@ -1,7 +1,7 @@
 """End-to-end smoke test over the real HTTP layer and a real Postgres.
 
 Run against a local Postgres or Tiger Data:
-    TIGER_DATABASE_URL=postgresql://localhost:5432/quantro_smoke pytest tests/test_smoke_e2e.py -v
+    QUANTRO_SMOKE=1 TIGER_DATABASE_URL=postgresql://localhost:5432/quantro_smoke pytest tests/test_smoke_e2e.py -v
 
 All eight upstream functions are replaced with contract-shaped fixtures, so no
 network, model or messaging calls are made. Rows written by the test are deleted
@@ -24,7 +24,8 @@ from backend.routes.common import get_tiger_store
 from backend.services.storage.tiger import TigerStore
 
 pytestmark = pytest.mark.skipif(
-    not os.getenv("TIGER_DATABASE_URL"), reason="TIGER_DATABASE_URL is not set; smoke test needs a real Postgres"
+    os.getenv("QUANTRO_SMOKE") != "1" or not os.getenv("TIGER_DATABASE_URL"),
+    reason="QUANTRO_SMOKE=1 and TIGER_DATABASE_URL are required for the database-writing smoke test",
 )
 
 SUBMITTED_URL = "https://www.tiktok.com/@creator/video/1234567890"
@@ -178,6 +179,7 @@ def upstream(monkeypatch, store):
     features_by_media = {"media_smoke_clip": CLIP_FEATURES, "media_smoke_source": SOURCE_FEATURES}
 
     def extract(media, options=None):
+        media = media.model_dump(mode="json") if hasattr(media, "model_dump") else media
         return copy.deepcopy(features_by_media[media["media_id"]])
 
     fakes = {

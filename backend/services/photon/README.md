@@ -107,11 +107,27 @@ directories without a completed record. No extraction, verdict, or report is gen
 
 URL analyses are serialized with a maximum of 32 queued requests, keeping message reception
 responsive while backend work runs. Processing markers are in `.data/photon/analysis/`.
-They record `pending`, `completed`, or `uncertain`. A request whose completion cannot be
-confirmed is never automatically replayed. After a process restart or queue overflow, inspect
-saved inbox requests and the backend job/report state before manually processing outstanding
-items. This avoids duplicate investigations and uncertain message sends. The backend request
-deadline is 30 minutes; notification sends retain a 12-second deadline.
+They record `pending`, `completed`, `failed`, or `uncertain`. Known structured API errors
+retain safe code/stage/status fields; raw provider diagnostics are not forwarded. A saved
+report takes precedence over a late HTTP error. A request whose completion cannot be
+confirmed is never automatically replayed. The backend request deadline is 30 minutes;
+notification sends retain a 12-second deadline.
+
+Managed startup reconciles existing markers with GET-only report/job lookups in the
+background, without delaying acknowledgments or resending messages. Default recovery
+never starts an old marker-free request. Explicit operator opt-in is available after
+reviewing saved intake and any external processing/delivery permissions:
+
+```powershell
+npm.cmd --prefix backend/services/photon run start:imessage -- --resume-saved
+```
+
+This cloud-only flag resumes a saved native URL request only when its event hash and
+intake validate, no marker exists, both backend lookups explicitly confirm absence,
+and the native conversation resolves to the original ID. An exclusive fsynced marker
+still precedes the POST. Existing markers are never re-posted. Scans are bounded to
+256 entries, 32 jobs, and a 60-second lookup budget; unresolved/limited work needs
+operator review. Run one listener instance and preserve all processing/delivery state.
 
 Duplicate event IDs are suppressed across restarts. A crash can leave a directory without
 `request.json`; review such incomplete intake before cleanup/replay. A failed acknowledgement
@@ -190,3 +206,8 @@ Sources: [Photon setup](https://photon.codes/docs/spectrum-ts/getting-started),
 [attachments](https://photon.codes/docs/spectrum-ts/content/attachments),
 [cloud routing](https://photon.codes/docs/spectrum-ts/providers/imessage/connection-and-routing),
 [shared-pool allowlist](https://photon.codes/docs/spectrum-ts/troubleshooting/imessage).
+
+Recovery limits apply across both marker and inbox scans. A large marker history
+can exhaust the scan before the inbox is reached. Startup logs `limited=true`
+and a manual-review instruction in that case; do not treat a truncated scan as
+a fully drained queue. Automated pagination of large backlogs is not implemented.

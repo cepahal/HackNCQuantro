@@ -16,11 +16,11 @@ import re
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -28,12 +28,15 @@ from sqlalchemy import (
     Table,
     Text,
     create_engine,
+    inspect,
     select,
+    text,
 )
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import URL, Engine, make_url
 from sqlalchemy.exc import ArgumentError, OperationalError, ProgrammingError
+from sqlalchemy.schema import CreateColumn
 
 _SECURE_SSL_MODES = {"require", "verify-ca", "verify-full"}
 _LOOPBACK_HOSTS = {None, "", "localhost", "127.0.0.1", "::1"}
@@ -51,9 +54,12 @@ def _engine_url(database_url: str) -> URL:
     except (ArgumentError, TypeError, ValueError):
         raise TigerConfigError("TIGER_DATABASE_URL is not a valid database URL.") from None
 
+    production = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "")).lower() == "production"
+    if production and url.get_backend_name() not in {"postgres", "postgresql"}:
+        raise TigerConfigError("Production TIGER_DATABASE_URL must use PostgreSQL with TLS.")
     if url.get_backend_name() in {"postgres", "postgresql"}:
         # A loopback Postgres (local smoke tests) never crosses the network, so TLS is optional there.
-        if url.host not in _LOOPBACK_HOSTS and url.query.get("sslmode") not in _SECURE_SSL_MODES:
+        if (production or url.host not in _LOOPBACK_HOSTS) and url.query.get("sslmode") not in _SECURE_SSL_MODES:
             raise TigerConfigError(
                 "TIGER_DATABASE_URL must include sslmode=require (or verify-ca/verify-full)."
             )
@@ -87,6 +93,8 @@ class TigerStore:
             Column("updated_at", DateTime(timezone=True), nullable=False),
             Column("error_code", Text),
             Column("error_stage", Text),
+            Column("error_message", Text),
+            Column("error_retryable", Boolean),
         )
         self.posts = Table(
             f"{table_prefix}posts",
@@ -104,6 +112,13 @@ class TigerStore:
             Column("report_json", _JsonColumn, nullable=False),
             Column("created_at", DateTime(timezone=True), nullable=False),
         )
+        self.deliveries = Table(
+            f"{table_prefix}message_deliveries", metadata,
+            Column("id", Text, primary_key=True),
+            Column("namespace", Text, nullable=False),
+            Column("message_id", Text),
+            Column("created_at", DateTime(timezone=True), nullable=False),
+        )
         self._metadata = metadata
 
     @classmethod
@@ -117,7 +132,7 @@ class TigerStore:
                     if url.get_backend_name() in {"postgres", "postgresql"}:
                         database_url = url.update_query_dict({
                             "sslmode": "verify-full",
-                            "sslrootcert": os.getenv("TIGERDATA_SSL_ROOT_CERT") or url.query.get("sslrootcert") or "system",
+                            "sslrootcert": os.getenv("TIGERDATA_SSL_ROOT_CERT") or str(url.query.get("sslrootcert") or "system"),
                             "connect_timeout": "10",
                         }).render_as_string(hide_password=False)
                 except (ArgumentError, TypeError, ValueError):
@@ -134,6 +149,25 @@ class TigerStore:
 
     def ensure_schema(self) -> None:
         self._metadata.create_all(self._engine, checkfirst=True)
+        # Additive migration preserves existing jobs and reports from earlier deployments.
+        with self._engine.begin() as connection:
+            columns = {item["name"] for item in inspect(connection).get_columns(self.jobs.name)}
+            table = connection.dialect.identifier_preparer.quote(self.jobs.name)
+            for name in ("error_message", "error_retryable"):
+                if name not in columns:
+                    clause = "IF NOT EXISTS " if connection.dialect.name == "postgresql" else ""
+                    definition = str(CreateColumn(self.jobs.c[name]).compile(dialect=connection.dialect))
+                    connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {clause}{definition}"))
+
+    def try_create_job(self, job_id: str, url: str) -> bool:
+        """Atomically reserve a new public ingest ID without changing any existing row."""
+        now = datetime.now(UTC)
+        statement = self._insert(self.jobs).values(
+            id=job_id, url=url, status="running", error_code=None, error_stage=None,
+            created_at=now, updated_at=now,
+        ).on_conflict_do_nothing(index_elements=[self.jobs.c.id])
+        with self._engine.begin() as connection:
+            return connection.execute(statement).rowcount == 1
 
     def upsert_job(
         self,
@@ -142,6 +176,8 @@ class TigerStore:
         status: str,
         error_code: str | None = None,
         error_stage: str | None = None,
+        error_message: str | None = None,
+        error_retryable: bool = False,
     ) -> None:
         now = datetime.now(UTC)
         statement = self._insert(self.jobs).values(
@@ -152,6 +188,8 @@ class TigerStore:
             updated_at=now,
             error_code=error_code,
             error_stage=error_stage,
+            error_message=error_message,
+            error_retryable=error_retryable,
         )
         statement = statement.on_conflict_do_update(
             index_elements=[self.jobs.c.id],
@@ -161,6 +199,8 @@ class TigerStore:
                 "updated_at": statement.excluded.updated_at,
                 "error_code": statement.excluded.error_code,
                 "error_stage": statement.excluded.error_stage,
+                "error_message": statement.excluded.error_message,
+                "error_retryable": statement.excluded.error_retryable,
             },
         )
         with self._engine.begin() as connection:
@@ -192,6 +232,8 @@ class TigerStore:
         status: str,
         error_code: str | None = None,
         error_stage: str | None = None,
+        error_message: str | None = None,
+        error_retryable: bool = False,
     ) -> None:
         statement = (
             self.jobs.update()
@@ -201,14 +243,39 @@ class TigerStore:
                 updated_at=datetime.now(UTC),
                 error_code=error_code,
                 error_stage=error_stage,
+                error_message=error_message,
+                error_retryable=error_retryable,
             )
         )
         with self._engine.begin() as connection:
             if connection.execute(statement).rowcount != 1:
                 raise LookupError(f"No job row for {job_id!r}")
 
-    def save_report(self, report_id: str, report_json: dict[str, Any], job_id: str) -> bool:
+    def expire_stale_job(self, job_id: str, cutoff: datetime) -> bool:
+        """Atomically expire a stalled job without racing a worker's recent heartbeat."""
+        statement = self.jobs.update().where(
+            self.jobs.c.id == job_id,
+            self.jobs.c.status.in_(("running", "ingested")),
+            self.jobs.c.updated_at < cutoff,
+        ).values(status="failed", updated_at=datetime.now(UTC),
+                 error_code="PROCESSING_FAILED", error_stage="run_analysis",
+                 error_message="Analysis stopped before completion. Please retry.", error_retryable=True)
+        with self._engine.begin() as connection:
+            return connection.execute(statement).rowcount == 1
+
+    def touch_job(self, job_id: str) -> None:
+        with self._engine.begin() as connection:
+            connection.execute(self.jobs.update().where(
+                self.jobs.c.id == job_id, self.jobs.c.status.in_(("running", "ingested")),
+            ).values(updated_at=datetime.now(UTC)))
+
+    def save_report(self, report_id: str, job_id: str | dict[str, Any], report_json: dict[str, Any] | str) -> bool:
         """Insert a report once; returns False when report_id already exists (the first save wins)."""
+        # Preserve teammates using the earlier (report_id, report_json, job_id) order.
+        if isinstance(job_id, dict) and isinstance(report_json, str):
+            job_id, report_json = report_json, job_id
+        if not isinstance(job_id, str) or not isinstance(report_json, dict):
+            raise TypeError("save_report expects report_id, job_id, report_json.")
         statement = (
             self._insert(self.reports)
             .values(
@@ -264,6 +331,8 @@ class TigerStore:
                 "report_id": row["report_id"],
                 "error_code": row["error_code"],
                 "error_stage": row["error_stage"],
+                "error_message": row["error_message"],
+                "error_retryable": bool(row["error_retryable"]),
                 "created_at": _iso(row["created_at"]),
                 "updated_at": _iso(row["updated_at"]),
             }
@@ -288,6 +357,8 @@ class TigerStore:
             "updated_at": _iso(row["updated_at"]),
             "error_code": row["error_code"],
             "error_stage": row["error_stage"],
+            "error_message": row["error_message"],
+            "error_retryable": bool(row["error_retryable"]),
             "post_json": row["post_json"],
             "features_json": row["features_json"],
         }
@@ -304,7 +375,7 @@ class TigerReportStore:
 
     def put(self, report_id: str, report_json: str) -> None:
         report = json.loads(report_json)
-        self._store.save_report(report_id, report, report["job_id"])
+        self._store.save_report(report_id, report["job_id"], report)
 
     def get(self, report_id: str) -> str | None:
         report = self._store.get_report(report_id)
@@ -338,11 +409,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     show_command.add_argument("job_id")
     args = parser.parse_args(argv)
 
-    from dotenv import load_dotenv
+    from ..shared.config import load_environment
 
-    load_dotenv(Path(__file__).resolve().parents[3] / ".secrets" / ".env")
-    load_dotenv(Path(__file__).resolve().parents[3] / ".env.local")
-    load_dotenv()
+    load_environment()
     try:
         store = TigerStore.from_env()
     except TigerConfigError as error:

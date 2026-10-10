@@ -6,6 +6,7 @@ the precise cause raise QuantroError directly; anything else is converted by
 normalize_exception using a per-stage default code.
 """
 
+import re
 from enum import Enum
 
 
@@ -63,6 +64,7 @@ class QuantroError(Exception):
             message if message is not None else _SAFE_MESSAGE_BY_CODE[self.code]
         )
         self.retryable = retryable
+        self.exception_type: str = type(self).__name__
         super().__init__(self.message)
 
     def to_dict(self) -> dict[str, str | bool]:
@@ -72,6 +74,13 @@ class QuantroError(Exception):
             "message": self.message,
             "retryable": self.retryable,
         }
+
+    def public_dict(self) -> dict[str, str | bool]:
+        result = self.to_dict()
+        # Configuration diagnostics belong to operators, not browser clients.
+        if re.search(r"\b[A-Z][A-Z0-9_]*(?:API_KEY|SECRET|TOKEN|PASSWORD|DSN|DATABASE_URL)\b", self.message):
+            result["message"] = _SAFE_MESSAGE_BY_CODE[self.code]
+        return result
 
 
 _DEFAULT_CODE_BY_STAGE: dict[Stage, ErrorCode] = {
@@ -98,11 +107,13 @@ def normalize_exception(stage: Stage | str, exc: BaseException) -> QuantroError:
         return exc
 
     stage = Stage(stage)
-    return QuantroError(
+    normalized = QuantroError(
         code=_DEFAULT_CODE_BY_STAGE[stage],
         stage=stage,
         retryable=isinstance(exc, _RETRYABLE_EXCEPTIONS),
     )
+    normalized.exception_type = type(exc).__name__
+    return normalized
 
 
 __all__ = ["ErrorCode", "QuantroError", "Stage", "normalize_exception"]

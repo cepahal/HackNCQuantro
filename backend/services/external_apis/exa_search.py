@@ -1,4 +1,5 @@
 """Bounded Exa web discovery; results remain unverified candidate pages."""
+import ssl
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
@@ -12,10 +13,10 @@ class ExaSearch:
     def __init__(self, api_key: str, *, client=None):
         if not api_key.strip():
             raise QuantroError('SEARCH_FAILED', Stage.SEARCH_CANDIDATES,
-                               'EXA_API_KEY is required when SEARCH_PROVIDER=exa.')
+                               'The source search is not configured.')
         self._key = api_key
-        self._client = client or httpx.Client(timeout=20, follow_redirects=False)
-        self.warnings = []
+        self._client = client or httpx.Client(timeout=20, follow_redirects=False, trust_env=False, verify=ssl.create_default_context())
+        self.warnings: list[str] = []
 
     def close(self):
         self._client.close()
@@ -43,7 +44,7 @@ class ExaSearch:
                 response.raise_for_status()
                 raw = response.json()['results']
                 if not isinstance(raw, list):
-                    raise ValueError('Invalid results')
+                    raise TypeError('Invalid results')
                 page = []
                 for item in raw[:min(limit, 10)]:
                     try:
@@ -54,7 +55,7 @@ class ExaSearch:
                     published = None
                     if isinstance(item.get('publishedDate'), str):
                         try:
-                            parsed = datetime.fromisoformat(item['publishedDate'].replace('Z', '+00:00'))
+                            parsed = datetime.fromisoformat(item['publishedDate'])
                             if parsed.tzinfo is not None:
                                 published = parsed.astimezone(UTC).isoformat().replace('+00:00', 'Z')
                         except ValueError:
@@ -95,8 +96,8 @@ class ExaSearch:
         # This is a retrieval heuristic, never evidence that the source matches.
         def recording_priority(url):
             try:
-                _, platform = _validate_url(url)
-                return 0 if platform != "direct_image" and not urlsplit(url).path.lower().endswith((".jpg", ".jpeg")) else 1
+                _validate_url(url)
+                return 0 if not urlsplit(url).path.lower().endswith((".jpg", ".jpeg")) else 1
             except QuantroError:
                 return 1
         order.sort(key=recording_priority)

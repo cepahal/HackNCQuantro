@@ -57,9 +57,9 @@ python -m services.storage.tiger list     # recent jobs as JSON ([] on a fresh d
 ```
 
 The API creates `quantro_jobs`, `quantro_posts` and `quantro_reports` on first boot.
-`REPORT_STORE` supports `tiger` and `memory` only; use Tiger Data for the MVP.
+Production `REPORT_STORE` supports `tiger` only; tests can inject in-memory stores; use Tiger Data for the MVP.
 
-### Frontend (Node 20+)
+### Frontend (Node 24+)
 
 ```bash
 cd frontend
@@ -124,8 +124,8 @@ Ingest only. This retrieves the post, extracts features and stores both in Tiger
 curl -sS -X POST http://localhost:8000/ingest/demo_001 \
   -H 'Content-Type: application/json' \
   -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
-# {"job_id":"demo_001","url":"â€¦","post_id":"post_â€¦","media_id":"media_â€¦",
-#  "transcript_status":"complete","sentence_count":12,"frames_count":12,"persisted_at":"â€¦Z"}
+# {"job_id":"demo_001","url":"…","post_id":"post_…","media_id":"media_…",
+#  "transcript_status":"complete","sentence_count":12,"frames_count":12,"persisted_at":"…Z"}
 ```
 
 Full analysis. This runs ingest itself, so the call above is optional. Leave out
@@ -179,7 +179,7 @@ grep -rn --include='*.py' "/tmp/\|local_path\|api_key\|secret" backend/services/
 ## 5. Pre-demo checklist
 
 - [ ] `.secrets/.env` has a valid `TIGER_DATABASE_URL` (one line, `sslmode=require`) and a rotated password
-- [ ] `psql â€¦ -c 'select 1'` and `python -m services.storage.tiger list` both succeed
+- [ ] `psql … -c 'select 1'` and `python -m services.storage.tiger list` both succeed
 - [ ] `GEMINI_API_KEY` set; `which ffmpeg ffprobe` finds both
 - [ ] `TIGERDATA_DSN` set in `.secrets/.env`, `.env.local` links to it, and the search corpus is seeded with the demo source video
 - [ ] `pytest tests/ -v` is green, including `test_smoke_e2e.py` against local Postgres
@@ -192,21 +192,86 @@ grep -rn --include='*.py' "/tmp/\|local_path\|api_key\|secret" backend/services/
 
 ## 6. Deploy
 
-Frontend on Vercel, API on Render, both from this repo. Set values in each dashboard; never commit them.
+Keep the Next.js frontend on Vercel and deploy the existing FastAPI Docker image
+on a host with enough RAM and outbound PostgreSQL access. See [HOSTING.md](HOSTING.md)
+for verified Railway/Render/free-tier limits and conditional cost estimates.
+No paid host has been selected or purchased by this integration change.
 
-- **API (Render):** New > Blueprint, pick this repo. `render.yaml` builds `backend/Dockerfile.vercel`
-  with `backend/` as the context. The image bakes in Whisper and its model (`WHISPER_MODEL` is set
-  by the image; do not override it). The Blueprint sets `SEARCH_PROVIDER=exa`,
-  `TRANSCRIPTION_PROVIDER=whisper`, `REPORT_STORE=tiger` and `TIGERDATA_SSL_ROOT_CERT`, and prompts
-  for: `REPORT_BASE_URL` (the Vercel URL; it is also the only CORS origin), `EXA_API_KEY`,
-  `TIGER_DATABASE_URL`, `TIGERDATA_DSN`, `TIGER_TABLE_PREFIX`, `GEMINI_API_KEY`, `GEMINI_MODEL`,
-  `PHOTON_API_KEY`, `PHOTON_BASE_URL`, `PHOTON_SENDER_ID`. Startup needs a reachable Tiger database;
-  the health check is `/openapi.json`. The Blueprint uses the free plan (512 MB); check memory
-  before relying on Whisper there (see [PROVIDERS.md](PROVIDERS.md)).
-- **Frontend (Vercel):** project `quantro`, production URL https://quantro-ten.vercel.app.
-  `vercel.json` routes everything to the `frontend/` service and `.vercelignore` limits CLI uploads
-  to `vercel.json` and `frontend/`. Set `NEXT_PUBLIC_API_BASE_URL` (the Render URL, no `/api`
-  suffix), `NEXT_PUBLIC_REPORT_BASE_URL` (the Vercel URL) and `NEXT_PUBLIC_PHOTON_NUMBER`; they are
-  inlined at build time, so redeploy (`vercel deploy --prod` from the repo root) after changing them.
-- The Photon Node bridge (`backend/services/photon`) is a long-running local process and is not part
-  of either deploy.
+- The checked-in Render Blueprint builds `backend/Dockerfile.vercel` with `backend/`
+  as its Docker context. Its existing free plan is not a verified Whisper deployment:
+  the recorded small.en run used about 980 MiB before API/media overhead, while
+  Render free has 512 MB. Railway's service trial/free tiers also require capacity
+  review. The Docker command binds `0.0.0.0` and the platform's `$PORT`.
+- API environment: `APP_ENV=production`, `REPORT_STORE=tiger`, `SEARCH_PROVIDER=exa`,
+  `EXA_API_KEY`, `TIGER_DATABASE_URL`, `TIGERDATA_DSN`, `TIGER_TABLE_PREFIX`,
+  `TIGERDATA_SSL_ROOT_CERT`, `GEMINI_API_KEY`, `GEMINI_MODEL`, and
+  `TRANSCRIPTION_PROVIDER=whisper`. The image includes its Whisper model; keep
+  `WHISPER_MODEL` at the baked model path. Supply credentials only through private
+  hosting settings. The actual Tiger CA must validate the deployment's connection.
+- Set `REPORT_BASE_URL=https://quantro-ten.vercel.app` for report links and
+  `FRONTEND_ORIGIN=https://quantro-ten.vercel.app` for browser CORS. These settings
+  are independent; a report-sharing gateway is not an analysis API.
+- Verify the assigned HTTPS backend URL returns this app's `/openapi.json` with
+  `/analyze/{job_id}/run`, `/analyze/{job_id}/status`, `/reports/{report_id}`, and
+  `/ingest/{job_id}`. Do not guess a hostname: `quantro-api.onrender.com` was checked
+  and belongs to an unrelated trading API.
+- Vercel production currently builds the `frontend/` service using `vercel.json`.
+  Set `NEXT_PUBLIC_API_BASE_URL` to the verified backend HTTPS origin, without an
+  `/api` suffix. Optionally set `NEXT_PUBLIC_REPORT_API_BASE_URL` only when using a
+  separate read-only report gateway. The frontend uses direct `process.env` access
+  so Next.js embeds these public values at build time; redeploy after changes.
+  A missing production backend setting now raises an explicit configuration error
+  rather than silently calling the visitor's localhost. Node is pinned to `24.x`.
+- The Spectrum Node listener is a separate long-running process and remains the
+  primary iMessage workflow. `PHOTON_BRIDGE_TOKEN` authenticates its private summary
+  bridge; a deployed backend also needs a reachable `PHOTON_BRIDGE_URL` if it sends
+  summaries through that bridge. Its loopback default is not reachable from a
+  remote container. Web analysis without a conversation ID does not send messages.
+- The optional archived AdvancedKit HTTP webhook transport uses its own
+  `PHOTON_WEBHOOK_SECRET` and documented signed timestamp. Production rejects the
+  legacy send-key signature. This transport's outbound `/messages` API is not
+  verified against a live provider; do not substitute it for tested Spectrum.
+
+## 7. Failure recovery and regression gate
+
+Start the healthy backend first, then managed Photon. On every managed startup,
+Photon reconciles existing pending/uncertain/failed markers through GET requests.
+This runs in the background, so incoming acknowledgments do not wait for recovery.
+A valid saved report confirms completion even if the analysis HTTP response failed.
+A failed backend job supplies its safe error code/stage. Unknown or running work is
+never reported as completed or automatically replayed. Recovery never resends a
+report or failure notice for an existing marker.
+
+Default startup does not process old marker-free inbox records. After reviewing
+saved intake and obtaining approval for any external processing/delivery, an
+operator can explicitly resume only provably never-started URL requests:
+
+```bash
+npm --prefix backend/services/photon run start:imessage -- --resume-saved
+```
+
+Use one listener instance. Recovery validates native intake/event hashes, requires
+both job and report lookups to return the expected absence responses, resolves the
+original conversation, and writes an exclusive durable marker before queuing a POST.
+It scans at most 256 directory entries / 32 jobs with a 60-second lookup budget.
+Inspect unresolved/limited recovery manually; do not delete existing markers or
+delivery ledgers to force a replay. Leave the flag off for ordinary restarts.
+
+Same-post sources are rejected at selection, report construction, cached reuse,
+serving, display, and final delivery. A legacy invalid report returns structured
+PROCESSING_FAILED; evidence in Tiger is preserved. Use a fresh job for a corrected
+analysis. Definitive caption assessments require a separate transcript-grounding
+check with valid source citations. Missing evidence, disagreement, or an unavailable
+secondary check yields Not assessed. Two model interpretations can still share
+reasoning errors; citations establish provenance, not universal logical correctness.
+
+`.github/workflows/reliability.yml` checks every push and pull request with isolated
+offline backend tests, dependency/startup checks, both Node suites/typechecks, and
+a frontend production build. It supplies no provider credentials and removes
+NETWORK. Live platform access, real Tiger semantics, message receipt, and mobile
+report rendering remain separate acceptance tests.
+
+Recovery limits apply across both marker and inbox scans. A large marker history
+can exhaust the scan before the inbox is reached. Startup logs `limited=true`
+and a manual-review instruction in that case; do not treat a truncated scan as
+a fully drained queue. Automated pagination of large backlogs is not implemented.

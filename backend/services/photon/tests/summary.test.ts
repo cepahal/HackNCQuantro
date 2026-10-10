@@ -198,6 +198,57 @@ test("unexpected resolver failures are normalized and retryable without exposing
   });
 });
 
+test("report preparation runs after preflight, fails without sending, and safely retries", async () => {
+  await withDirectory(async (deliveryDirectory) => {
+    let resolutions = 0;
+    let preparations = 0;
+    let sends = 0;
+    const options = {
+      deliveryDirectory,
+      resolveConversation: async () => {
+        resolutions++;
+        return { send: async () => { sends++; return { id: "prepared-message" }; } };
+      },
+      prepareReport: async (value: SummaryInput, jobId: string) => {
+        preparations++;
+        assert.deepEqual(value, input);
+        assert.equal(jobId, "prepare-job");
+        assert.equal(resolutions, preparations);
+        assert.equal(sends, 0);
+        if (preparations === 1) throw new Error("private preparation details");
+      },
+    };
+    await assert.rejects(createSummarySender(options)(input, "prepare-job"), (error: unknown) => {
+      assert.ok(error instanceof BridgeError);
+      assert.equal(error.body.error.code, "DELIVERY_STORAGE_UNAVAILABLE");
+      assert.equal(error.status, 503);
+      assert.ok(!JSON.stringify(error.body).includes("private preparation details"));
+      return true;
+    });
+    assert.equal(sends, 0);
+    assert.deepEqual(await readdir(deliveryDirectory), []);
+    assert.equal((await createSummarySender(options)(input, "prepare-job")).message_id, "prepared-message");
+    assert.equal((await createSummarySender(options)(input, "prepare-job")).message_id, "prepared-message");
+    assert.equal(preparations, 2);
+    assert.equal(sends, 1);
+  });
+});
+
+test("invalid inputs and failed conversation preflight never prepare a public report", async () => {
+  await withDirectory(async (deliveryDirectory) => {
+    let preparations = 0;
+    const send = createSummarySender({
+      deliveryDirectory,
+      resolveConversation: async () => { throw new BridgeError(409, "CONVERSATION_UNAVAILABLE", "Missing conversation."); },
+      prepareReport: async () => { preparations++; },
+    });
+    await assert.rejects(send(null, "prepare-invalid"), hasError(400, "INVALID_SUMMARY_INPUT"));
+    await assert.rejects(send(input, "prepare-preflight"), hasError(409, "CONVERSATION_UNAVAILABLE"));
+    assert.equal(preparations, 0);
+    assert.deepEqual(await readdir(deliveryDirectory), []);
+  });
+});
+
 test("failed preflight marker cleanup fails closed without a provider send", async () => {
   await withDirectory(async (deliveryDirectory) => {
     let resolutions = 0;

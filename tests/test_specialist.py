@@ -4,10 +4,11 @@ from unittest.mock import Mock
 import pytest
 
 from backend.services.processing import preprocessing as p
+from backend.services.shared.errors import QuantroError
 from backend.services.specialist import comparison as c
 from backend.services.specialist.alignment import verify_and_align
 from backend.services.specialist.context import select_surrounding_context
-from backend.services.shared.errors import QuantroError
+
 
 @pytest.fixture(autouse=True)
 def isolate_transcription_provider(monkeypatch):
@@ -174,9 +175,13 @@ def test_empty_context_does_not_call_provider(clip, monkeypatch):
 def test_comparison_provider_boundary(clip, context, comparison, monkeypatch):
     client = Mock()
     monkeypatch.setattr(c, 'client_and_model', lambda stage: (client, 'test-model'))
-    monkeypatch.setattr(c, 'generate_json', lambda *args: comparison)
+    generate = Mock(side_effect=[
+        {**comparison, 'caption_evidence_basis': 'direct_transcript'},
+    ])
+    monkeypatch.setattr(c, 'generate_json', generate)
     result = c.compare_context_and_caption(clip, context, 'Cancel it')
     assert result['context_assessment'] == 'uncertain'
+    generate.assert_called_once()
     client.close.assert_called_once()
 
 
@@ -336,7 +341,10 @@ def test_invalid_comparison_gets_one_correction_attempt(clip, context, compariso
     invalid['findings'][0]['evidence'][0]['quote'] = 'Fabricated words'
     client = Mock()
     monkeypatch.setattr(c, 'client_and_model', lambda stage: (client, 'test'))
-    generate = Mock(side_effect=[invalid, comparison])
+    generate = Mock(side_effect=[
+        {**invalid, 'caption_evidence_basis': 'direct_transcript'},
+        {**comparison, 'caption_evidence_basis': 'direct_transcript'},
+    ])
     monkeypatch.setattr(c, 'generate_json', generate)
     result = c.compare_context_and_caption(clip, context, None)
     assert generate.call_count == 2

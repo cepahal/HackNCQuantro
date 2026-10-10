@@ -39,6 +39,7 @@ interface SummarySenderOptions {
   }>;
   deliveryDirectory: string;
   sendTimeoutMs?: number;
+  prepareReport?: (input: SummaryInput, jobId: string) => Promise<void>;
 }
 
 interface DeliveryRecord {
@@ -146,7 +147,7 @@ export function createSummarySender(options: SummarySenderOptions) {
   const directory = resolve(options.deliveryDirectory);
   const inFlight = new Map<string, { fingerprint: string; promise: Promise<SummaryAccepted> }>();
 
-  async function deliver(input: SummaryInput, key: string, fingerprint: string): Promise<SummaryAccepted> {
+  async function deliver(input: SummaryInput, jobId: string, key: string, fingerprint: string): Promise<SummaryAccepted> {
     const path = resolve(directory, `${key}.json`);
     const pending: DeliveryRecord = { version: 1, fingerprint, state: "pending" };
     try {
@@ -186,6 +187,18 @@ export function createSummarySender(options: SummarySenderOptions) {
       throw new BridgeError(503, "CONVERSATION_UNAVAILABLE", "The conversation could not be resolved. Retry when it becomes available.", true);
     }
 
+    try {
+      await options.prepareReport?.(input, jobId);
+    } catch {
+      // Preparation has not sent anything; allow a safe retry of this same job.
+      try {
+        await unlink(path);
+      } catch {
+        throw storageError();
+      }
+      throw storageError();
+    }
+
     let messageId: string;
     try {
       // A timeout cannot cancel provider delivery; its ledger must remain ambiguous.
@@ -217,7 +230,7 @@ export function createSummarySender(options: SummarySenderOptions) {
       }
       return active.promise;
     }
-    const promise = deliver(validated, key, fingerprint);
+    const promise = deliver(validated, jobId, key, fingerprint);
     inFlight.set(key, { fingerprint, promise });
     try {
       return await promise;
