@@ -52,6 +52,13 @@ NEXT_PUBLIC_REPORT_BASE_URL=http://localhost:3000
 `REPORT_STORE` is `memory` (default) or `snowflake` (not implemented yet). In-memory
 reports, job statuses and delivery records are lost when the backend restarts.
 
+Submitted-post media has its own Tiger Data storage: set `TIGERDATA_DSN` in ignored
+root `.env.local` (or the process environment) and apply
+`backend/services/external_apis/tigerdata_schema.sql` once. `retrieve_post(url)`
+saves JPG/MP4 bytes and the unchanged Post metadata before returning success.
+See [retrieve_post setup and contract](retrieve_post.md). Report persistence above
+is a separate stage.
+
 ## 3. Verify
 
 Run from the repo root unless noted.
