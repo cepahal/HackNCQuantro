@@ -15,6 +15,7 @@ load_dotenv()
 if not __package__:
     sys.path.insert(0, str(_REPO_ROOT))
 
+import inspect
 import os
 from contextlib import asynccontextmanager
 from importlib import import_module
@@ -52,6 +53,10 @@ def validate_contract_functions() -> None:
         function = getattr(module, name, None)
         if not callable(function):
             missing.append(f"{name}: missing or not callable; expected {expected}")
+        else:
+            source = inspect.getsourcefile(inspect.unwrap(function))
+            if source and any(marker in Path(source).name.lower() for marker in ("stub", "mock")):
+                missing.append(f"{name}: stub/mock implementation at {source}; expected {expected}")
     if missing:
         raise RuntimeError("Required contract functions are unavailable: " + "; ".join(missing))
 

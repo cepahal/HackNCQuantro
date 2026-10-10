@@ -10,6 +10,13 @@ from backend.services.reporting.types import MediaFeatures
 from backend.services.specialist.alignment import verify_and_align
 
 
+def _gemini_features(media, options=None):
+    """Exercise the explicit legacy Gemini adapter and serialize at its caller boundary."""
+    settings = {"provider": "gemini", **(options or {})} if options is None or isinstance(options, dict) else options
+    return p.extract_media_features(media, settings).model_dump(mode="json")
+
+
+
 @pytest.fixture
 def image(tmp_path):
     path = tmp_path / "submitted.jpg"
@@ -21,7 +28,7 @@ def test_jpeg_without_ocr_is_contract_valid_without_ffmpeg_or_provider(image, mo
     monkeypatch.setattr(p, "_probe", Mock(side_effect=AssertionError("No video probe")))
     monkeypatch.setattr(p, "client_and_model", Mock(side_effect=AssertionError("No provider")))
 
-    result = p.extract_media_features(image, {"extract_visual_text": False, "max_frames": 12})
+    result = _gemini_features(image, {"extract_visual_text": False, "max_frames": 12})
 
     assert MediaFeatures.model_validate(result).model_dump(mode="json") == result
     assert result["duration_seconds"] == 0.0
@@ -39,7 +46,7 @@ def test_jpeg_ocr_returns_linked_frame_even_when_extract_frames_is_false(image, 
     monkeypatch.setattr(p, "client_and_model", lambda stage: (client, "test-model"))
     monkeypatch.setattr(p, "_ask", lambda *args: {"text": "The visible headline"})
 
-    result = p.extract_media_features(image, {"extract_frames": False})
+    result = _gemini_features(image, {"extract_frames": False})
 
     assert result["visual_text"] == [{
         "frame_id": result["frames"][0]["frame_id"], "timestamp_seconds": 0.0,
@@ -53,7 +60,7 @@ def test_successful_empty_jpeg_ocr_remains_valid(image, monkeypatch):
     monkeypatch.setattr(p, "client_and_model", lambda stage: (client, "test-model"))
     monkeypatch.setattr(p, "_ask", lambda *args: {"text": ""})
 
-    result = p.extract_media_features(image)
+    result = _gemini_features(image)
 
     assert len(result["frames"]) == 1
     assert result["visual_text"] == []
@@ -69,7 +76,7 @@ def test_jpeg_ocr_provider_failure_is_an_error(image, monkeypatch):
     )))
 
     with pytest.raises(QuantroError) as error:
-        p.extract_media_features(image)
+        _gemini_features(image)
 
     assert error.value.retryable
     assert error.value.stage is Stage.EXTRACT_MEDIA_FEATURES
@@ -90,7 +97,7 @@ def test_video_ocr_provider_failure_is_an_error(image, monkeypatch, tmp_path):
     )))
 
     with pytest.raises(QuantroError) as error:
-        p.extract_media_features({**image, "mime_type": "video/mp4"}, {"max_frames": 1})
+        _gemini_features({**image, "mime_type": "video/mp4"}, {"max_frames": 1})
 
     assert error.value.retryable
     assert error.value.stage is Stage.EXTRACT_MEDIA_FEATURES
@@ -104,7 +111,7 @@ def test_jpeg_ocr_invalid_output_is_a_safe_error(image, monkeypatch, response):
     monkeypatch.setattr(p, "_ask", lambda *args: response)
 
     with pytest.raises(QuantroError) as error:
-        p.extract_media_features(image)
+        _gemini_features(image)
 
     assert error.value.code.value == "PROCESSING_FAILED"
     assert error.value.stage is Stage.EXTRACT_MEDIA_FEATURES
@@ -118,14 +125,14 @@ def test_jpeg_ocr_invalid_output_is_a_safe_error(image, monkeypatch, response):
 def test_jpeg_disabled_extraction_does_not_call_provider(image, monkeypatch, options):
     monkeypatch.setattr(p, "client_and_model", Mock(side_effect=AssertionError("No provider")))
 
-    result = p.extract_media_features(image, options)
+    result = _gemini_features(image, options)
 
     assert result["frames"] == []
     assert result["visual_text"] == []
 
 
 def test_jpeg_cannot_be_verified_by_transcript_alignment(image):
-    features = p.extract_media_features(image, {"extract_visual_text": False})
+    features = _gemini_features(image, {"extract_visual_text": False})
     candidate = {**features, "media_id": "source_still"}
 
     result = verify_and_align(features, candidate)
@@ -162,7 +169,7 @@ def test_processed_silence_is_not_assessed_without_speech_or_other_matching():
 ])
 def test_invalid_still_image_options_have_normalized_errors(image, options):
     with pytest.raises(QuantroError) as error:
-        p.extract_media_features(image, options)
+        _gemini_features(image, options)
 
     assert error.value.code.value == "PROCESSING_FAILED"
     assert error.value.stage is Stage.EXTRACT_MEDIA_FEATURES
@@ -175,7 +182,7 @@ def test_invalid_still_image_options_have_normalized_errors(image, options):
 ])
 def test_malformed_extraction_inputs_have_safe_normalized_errors(media, options):
     with pytest.raises(QuantroError) as error:
-        p.extract_media_features(media, options)
+        _gemini_features(media, options)
 
     assert error.value.code.value == "PROCESSING_FAILED"
     assert "private-path" not in error.value.message
@@ -186,7 +193,7 @@ def test_invalid_probe_metadata_does_not_leak_key_error(image, monkeypatch):
     video = {**image, "mime_type": "video/mp4"}
 
     with pytest.raises(QuantroError) as error:
-        p.extract_media_features(video)
+        _gemini_features(video)
 
     assert error.value.stage is Stage.EXTRACT_MEDIA_FEATURES
     assert error.value.code.value == "PROCESSING_FAILED"
@@ -197,6 +204,6 @@ def test_non_jpeg_file_is_not_returned_as_an_image(image):
     Path(image["local_path"]).write_bytes(b"not an image")
 
     with pytest.raises(QuantroError) as error:
-        p.extract_media_features(image, {"extract_visual_text": False})
+        _gemini_features(image, {"extract_visual_text": False})
 
     assert error.value.code.value == "PROCESSING_FAILED"

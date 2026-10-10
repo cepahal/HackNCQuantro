@@ -1,0 +1,35 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\mogal\Documents\ChatGPT\HackNCQuantro\.venv\Scripts\python.exe
+rootdir: C:\Users\mogal\Documents\ChatGPT\HackNCQuantro
+configfile: pytest.ini
+plugins: anyio-4.15.1, platformdirs-4.12.4, asyncio-1.4.0, mock-3.16.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
+
+tests/test_real_pipeline.py::test_retrieve_post_real_video local_path: C:\Users\mogal\AppData\Local\Temp\quantro\quantro-post-1bcxuua2\media.mp4
+exists: True size: 533931
+fps: 15.0 has_audio: True title: Me at the zoo
+unavailable_fields: ['author.bio', 'author.following_count', 'author.posts_count', 'engagement.shares_count']
+PASS retrieve_post 19.063583 320 240
+PASSED
+tests/test_real_pipeline.py::test_extract_media_features_real_video 0.18 4.18 'All right, so here we are, one of the elephants.'
+4.18 14.18 "The cool thing about these guys is that they have really, really, really long punks, and that's cool."
+14.18 19.0635625 "And that's pretty much all there is to say."
+frame: C:\Users\mogal\AppData\Local\Temp\quantro_frames_zsqn_pok\frame_0001.jpg True
+frame: C:\Users\mogal\AppData\Local\Temp\quantro_frames_zsqn_pok\frame_0002.jpg True
+frame: C:\Users\mogal\AppData\Local\Temp\quantro_frames_zsqn_pok\frame_0003.jpg True
+visual_text: 0 warnings: ['Whisper segment timestamps are speech-model estimates; speaker identities are not assessed.', 'Frame timestamps are requested sample positions and may differ by a frame from decoded timestamps.']
+PASS extract_media_features 3 3
+PASSED
+tests/test_real_pipeline.py::test_search_candidates_real PASS build_search_queries ['"All right so here we are one of the elephants"', '"The cool thing about these guys is that they have really really"', '"And that\'s pretty much all there is to say"', '"Me at the zoo"', '"Microplastics are accumulating in human brains at an alarming rate https www"']
+https://www.youtube.com/watch?v=044O0mMUXgk&xstg=CAMSBhUDzO3xHw%3D%3D | Me at the zoo | Jawed Karim | First Youtube Video | 2005
+https://open.spotify.com/track/7AN2BmbMRsh0eCVVjY19oJ | The Elephant Bowling Team - song and lyrics by SteveSongs
+https://www.facebook.com/EvanCarmichaelcom/posts/did-you-know-youtubes-very-first-video-was-only-18-seconds-longin-2005-a-guy-nam/1590775962410721/ | Did you know YouTube's very first video was only 18 ...
+warnings: ['The submitted caption is an unverified search clue, not established fact.']
+PASS search_candidates 3
+PASSED
+tests/test_real_pipeline.py::test_verify_and_align_real PASS verify_and_align verified moderate
+ALL PASS
+PASSED
+
+============================= 4 passed in 23.12s ==============================

@@ -1,12 +1,16 @@
-fastapi
-uvicorn
-pydantic>=2,<3
+fastapi==0.143.0
+uvicorn==0.54.0
+pydantic==2.14.0
 python-dotenv==1.2.1
-pytest
-pytest-asyncio
-pytest-mock
-httpx
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-mock==3.16.0
+httpx==0.28.1
 -r requirements-specialist.txt
 yt-dlp==2026.8.19
 psycopg[binary]==3.3.6
-sqlalchemy>=2,<3
+sqlalchemy==2.1.4
+pytesseract==0.3.13
+pillow==12.3.0
+faster-whisper==1.2.1
+av==16.1.0

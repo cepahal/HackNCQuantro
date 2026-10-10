@@ -4,10 +4,17 @@ from unittest.mock import Mock
 import pytest
 
 from backend.services.processing import preprocessing as p
+from backend.services.reporting.errors import QuantroError
 from backend.services.specialist import comparison as c
 from backend.services.specialist.alignment import verify_and_align
 from backend.services.specialist.context import select_surrounding_context
-from backend.services.reporting.errors import QuantroError
+
+
+def _gemini_features(media, options=None):
+    """Exercise the explicit legacy Gemini adapter and serialize at its caller boundary."""
+    settings = {"provider": "gemini", **(options or {})} if options is None or isinstance(options, dict) else options
+    return p.extract_media_features(media, settings).model_dump(mode="json")
+
 
 TEXT = 'If those numbers were accurate, I would recommend canceling the program.'
 FOLLOWUP = 'But those numbers are not accurate, so that is not my recommendation.'
@@ -218,14 +225,14 @@ def fake_media(tmp_path, monkeypatch):
 
 
 def test_full_extraction_chunk_offsets(fake_media):
-    result = p.extract_media_features(fake_media, {'extract_frames': False, 'extract_visual_text': False})
+    result = _gemini_features(fake_media, {'extract_frames': False, 'extract_visual_text': False})
     assert result['transcript']['status'] == 'complete'
     assert [s['start_seconds'] for s in result['transcript']['sentences']] == [0, 60, 120]
     assert result['transcript']['processed_ranges'] == [{'start_seconds': 0, 'end_seconds': 130}]
 
 
 def test_ranged_extraction_is_partial(fake_media):
-    result = p.extract_media_features(fake_media, {'transcript_scope': 'ranges', 'transcript_ranges': [{'start_seconds': 120, 'end_seconds': 130}], 'extract_frames': False, 'extract_visual_text': False})
+    result = _gemini_features(fake_media, {'transcript_scope': 'ranges', 'transcript_ranges': [{'start_seconds': 120, 'end_seconds': 130}], 'extract_frames': False, 'extract_visual_text': False})
     assert result['transcript']['status'] == 'partial'
     assert result['transcript']['sentences'][0]['start_seconds'] == 120
 
@@ -233,14 +240,14 @@ def test_ranged_extraction_is_partial(fake_media):
 def test_provider_failure_is_not_silent_transcript(fake_media, monkeypatch):
     monkeypatch.setattr(p, '_ask', Mock(side_effect=QuantroError('PROCESSING_FAILED', 'extract_media_features', retryable=True)))
     with pytest.raises(QuantroError) as error:
-        p.extract_media_features(fake_media)
+        _gemini_features(fake_media)
     assert error.value.code.value == 'TRANSCRIPTION_FAILED'
     assert error.value.retryable
 
 
 def test_missing_media_error(tmp_path):
     with pytest.raises(QuantroError) as error:
-        p.extract_media_features({'media_id': 'x', 'local_path': str(tmp_path / 'absent')})
+        _gemini_features({'media_id': 'x', 'local_path': str(tmp_path / 'absent')})
     assert error.value.code.value == 'MEDIA_UNAVAILABLE'
 
 
@@ -257,7 +264,7 @@ def test_real_ffmpeg_frames_and_audio(tmp_path, monkeypatch):
         assert path.stat().st_size > 0
         return {'language': None, 'sentences': []} if mime == 'audio/wav' else {'text': ''}
     monkeypatch.setattr(p, '_ask', fake_ask)
-    result = p.extract_media_features({'media_id': 'synthetic', 'local_path': str(video)}, {'max_frames': 2})
+    result = _gemini_features({'media_id': 'synthetic', 'local_path': str(video)}, {'max_frames': 2})
     try:
         assert result['transcript']['status'] == 'complete'
         assert len(result['frames']) == 2

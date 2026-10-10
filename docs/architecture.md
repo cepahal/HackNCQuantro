@@ -82,3 +82,19 @@ See its README and `docs/RUNBOOK.md` for operator steps. Live model generation i
 currently paused at the user's request after the configured key returned depleted
 prepaid credits. Real iMessage round-trip and a public deployment remain live
 verification gates; local storage/browser checks do not imply those passed.
+
+
+## Prompt 2.5 integration branch (2026-10-10)
+
+Retrieval and candidate retrieval share the guarded downloader plus actual ffprobe
+measurement and return canonical Post models. Tiger storage receives JSON dictionaries.
+Extraction defaults to local cached faster-whisper base CPU/int8 and Tesseract OCR;
+explicit options.provider=gemini preserves the previous Gemini adapter. Local speech
+or OCR failures produce unavailable features and warnings, per Prompt 2.5. Comparison
+still uses Gemini and requires funded credits.
+
+Search defaults to explicitly configured public-web Brave, SerpAPI or Google CSE.
+SEARCH_PROVIDER=tigerdata selects the real stored corpus; no silent fallback occurs.
+SerpAPI credentials are configured only in the ignored local environment. Startup rejects functions
+whose implementation filename includes stub or mock. Real YouTube retrieval, local transcription/frames, public search, candidate retrieval
+and verified alignment passed; see PROMPT_2_5_NETWORK_TEST_OUTPUT.txt. No Prompt 3 or main merge.

@@ -1,7 +1,7 @@
 """Pydantic models mirroring the Quantro v2 contract (report schema 2.1).
 
-Canonical shared models for every stage of run_analysis. Upstream stages keep returning
-plain dicts; parse_stage_output enforces these shapes at the reporting boundary.
+Canonical shared models for every stage of run_analysis. Retrieval and extraction
+return model instances; legacy JSON boundaries serialize with model_dump().
 Field sets are pinned to the teammates' declared contracts by
 tests/test_types_contract.py.
 

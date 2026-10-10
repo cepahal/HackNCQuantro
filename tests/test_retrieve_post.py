@@ -17,7 +17,14 @@ from backend.services.external_apis import retrieve_post as retrieval
 from backend.services.external_apis.post_contract import MediaAsset, Post
 
 RetrievalError = retrieval.RetrievalError
-retrieve_post = retrieval.retrieve_post
+
+
+def retrieve_post(*args, **kwargs):
+    """Exercise legacy JSON consumers at the documented model_dump boundary."""
+    model = retrieval.retrieve_post(*args, **kwargs)
+    assert isinstance(model, Post)
+    return model.model_dump(mode="json")
+
 
 POST_URL = "https://www.youtube.com/watch?v=abcdefghijk"
 CAPTION = "A real caption: café, 世界.\nSecond line."
@@ -195,6 +202,21 @@ def install(
     )
     monkeypatch.setattr(
         "backend.services.external_apis.retrieve_post.subprocess.run", downloader
+    )
+    monkeypatch.setattr(
+        retrieval,
+        "_probe_download",
+        lambda path, is_image: {
+            "duration_seconds": None
+            if is_image
+            else retrieval._number(downloader.metadata.get("duration")),
+            "width": retrieval._count(downloader.metadata.get("width")) or None,
+            "height": retrieval._count(downloader.metadata.get("height")) or None,
+            "fps": None
+            if is_image
+            else retrieval._number(downloader.metadata.get("fps"), positive=True),
+            "has_audio": retrieval._has_audio(downloader.metadata, is_image=is_image),
+        },
     )
     return downloader
 
@@ -637,7 +659,7 @@ def test_injected_store_receives_exact_downstream_post(
     post = retrieve_post(POST_URL, output_dir=tmp_path, storage=supplied_store)
 
     assert supplied_store.posts == [post]
-    assert supplied_store.posts[0] is post
+    assert supplied_store.posts[0] == post
     assert supplied_store.media_bytes == [
         Path(post["media"]["local_path"]).read_bytes()
     ]
@@ -1060,7 +1082,8 @@ def test_trigger_success_returns_persisted_downstream_post(
     )
 
     assert "error" not in result
-    assert result == recording_store.posts[0]
+    assert isinstance(result, Post)
+    assert result.model_dump(mode="json") == recording_store.posts[0]
     assert Path(recording_store.posts[0]["media"]["local_path"]).read_bytes() == MP4
 
 

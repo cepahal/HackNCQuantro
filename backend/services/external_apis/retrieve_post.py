@@ -20,9 +20,6 @@ from ..shared.errors import ErrorCode, QuantroError, Stage
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
 from ..shared.types import (
-    Author,
-    Engagement,
-    MediaAsset,
     Post,
 )
 from ..shared.types import Post as _ReturnModel
@@ -54,7 +51,9 @@ class RetrievalError(QuantroError):
         retryable: bool = False,
         status_code: int = 502,
     ) -> None:
-        normalized_code = code if code in ErrorCode._value2member_map_ else "MEDIA_UNAVAILABLE"
+        normalized_code = (
+            code if code in ErrorCode._value2member_map_ else "MEDIA_UNAVAILABLE"
+        )
         super().__init__(normalized_code, Stage.RETRIEVE_POST, message, retryable)
         self.status_code = status_code
 
@@ -241,9 +240,132 @@ def _is_complete_mp4(path: Path, file_size: int) -> bool:
     return {b"ftyp", b"moov", b"mdat"} <= boxes
 
 
+def _probe_download(path: Path, *, is_image: bool) -> dict[str, Any]:
+    """Measure saved bytes, never trust provider duration or stream metadata."""
+    executable = shutil.which("ffprobe")
+    if executable is None:
+        raise RetrievalError(
+            "PROCESSING_FAILED", "ffprobe is required to inspect downloaded media."
+        )
+    try:
+        result = subprocess.run(
+            [
+                executable,
+                "-v",
+                "error",
+                "-protocol_whitelist",
+                "file,pipe",
+                "-show_entries",
+                "format=duration:stream=width,height,avg_frame_rate,codec_type",
+                "-of",
+                "json",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+        )
+        data = json.loads(result.stdout)
+        streams = data.get("streams", [])
+        videos = [stream for stream in streams if stream.get("codec_type") == "video"]
+        if result.returncode != 0 or not videos:
+            raise ValueError("unreadable media")
+        video = videos[0]
+        rate = str(video.get("avg_frame_rate", "0/0")).split("/")
+        fps = (
+            float(rate[0]) / float(rate[1])
+            if len(rate) == 2 and float(rate[1])
+            else None
+        )
+        duration = data.get("format", {}).get("duration")
+        return {
+            "duration_seconds": None
+            if is_image
+            else _number(float(duration))
+            if duration is not None
+            else None,
+            "width": _count(video.get("width")) or None,
+            "height": _count(video.get("height")) or None,
+            "fps": None if is_image else _number(fps, positive=True),
+            "has_audio": any(stream.get("codec_type") == "audio" for stream in streams),
+        }
+    except (OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired):
+        raise RetrievalError(
+            "PROCESSING_FAILED", "The downloaded media could not be inspected."
+        ) from None
+
+
+def _merge_local_streams(workspace: Path, max_bytes: int) -> None:
+    """Merge separate guarded HTTP downloads without giving FFmpeg network access."""
+    audio = workspace / "media.m4a"
+    if not audio.exists():
+        return
+    video = workspace / "media.mp4"
+    if any(path.is_symlink() or not path.is_file() for path in (video, audio)):
+        raise RetrievalError(
+            "MEDIA_UNAVAILABLE", "The downloaded streams are incomplete."
+        )
+    if sum(path.stat().st_size for path in (video, audio)) > max_bytes:
+        raise RetrievalError(
+            "MEDIA_UNAVAILABLE", "The downloaded streams exceed the size limit."
+        )
+    executable = shutil.which("ffmpeg")
+    if executable is None:
+        raise RetrievalError(
+            "PROCESSING_FAILED", "ffmpeg is required to merge downloaded media."
+        )
+    merged = workspace / "merged.mp4"
+    result = subprocess.run(
+        [
+            executable,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-protocol_whitelist",
+            "file,pipe",
+            "-i",
+            str(video),
+            "-protocol_whitelist",
+            "file,pipe",
+            "-i",
+            str(audio),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            str(merged),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+        check=False,
+    )
+    if (
+        result.returncode != 0
+        or not merged.is_file()
+        or merged.stat().st_size > max_bytes
+    ):
+        raise RetrievalError(
+            "PROCESSING_FAILED",
+            "The downloaded streams could not be merged within the size limit.",
+        )
+    merged.replace(video)
+    audio.unlink()
+
+
 def _result(
     url: str, platform: str, workspace: Path, stdout: str, max_bytes: int
-) -> Post:
+) -> dict[str, Any]:
     try:
         info = json.loads(stdout)
     except (ValueError, TypeError):
@@ -309,7 +431,7 @@ def _result(
     profile_url = _source_url(info.get("uploader_url")) or _source_url(
         info.get("channel_url")
     )
-    author: Author = {
+    author: dict[str, Any] = {
         "id": _first_text(info, "channel_id", "uploader_id"),
         "handle": _first_text(info, "uploader_id"),
         "display_name": _first_text(info, "uploader", "channel"),
@@ -324,13 +446,13 @@ def _result(
             info, "uploader_video_count", "channel_video_count"
         ),
     }
-    engagement: Engagement = {
+    engagement: dict[str, Any] = {
         "views_count": _count(info.get("view_count")),
         "likes_count": _count(info.get("like_count")),
         "comments_count": _count(info.get("comment_count")),
         "shares_count": _first_count(info, "repost_count", "share_count"),
     }
-    media: MediaAsset = {
+    media: dict[str, Any] = {
         "media_id": "media_" + uuid4().hex,
         "local_path": str(media_path.resolve()),
         "mime_type": "image/jpeg" if is_image else "video/mp4",
@@ -341,17 +463,18 @@ def _result(
         "fps": None if is_image else _number(info.get("fps"), positive=True),
         "has_audio": _has_audio(info, is_image=is_image),
     }
+    media.update(_probe_download(media_path, is_image=is_image))
     source_urls = [url]
     for source in (_source_url(info.get("webpage_url")),):
         if source is not None and source not in source_urls:
             source_urls.append(source)
-    post: Post = {
+    post: dict[str, Any] = {
         "post_id": "post_" + uuid4().hex,
         "candidate_id": None,
         "post_url": url,
         "platform": platform,
         "title": _text(info.get("title")),
-        "caption": _text(info.get("description")),
+        "caption": (_text(info.get("description")) or "")[:500] or None,
         "author": author,
         "engagement": engagement,
         "published_at": _published_at(info),
@@ -386,11 +509,13 @@ def _result(
 
 
 class PostStorage(Protocol):
-    def save_post(self, post: Post) -> None: ...
+    def save_post(self, post: dict[str, Any]) -> None: ...
 
 
-def retrieve_post(
+def _download_and_probe(
     url: str,
+    post_id: str | None = None,
+    candidate_id: str | None = None,
     *,
     storage: PostStorage | None = None,
     output_dir: str | Path | None = None,
@@ -410,7 +535,9 @@ def retrieve_post(
         try:
             timeout = float(timeout_seconds)
         except (ValueError, TypeError, OverflowError):
-            raise ValueError("timeout_seconds must be a positive finite limit") from None
+            raise ValueError(
+                "timeout_seconds must be a positive finite limit"
+            ) from None
         if (
             isinstance(max_bytes, bool)
             or not isinstance(max_bytes, int)
@@ -419,12 +546,16 @@ def retrieve_post(
             or not math.isfinite(timeout)
             or timeout <= 0
         ):
-            raise ValueError("max_bytes and timeout_seconds must be positive finite limits")
+            raise ValueError(
+                "max_bytes and timeout_seconds must be positive finite limits"
+            )
         workspace: Path | None = None
-        base = Path(output_dir or tempfile.gettempdir()).resolve()
+        base = Path(output_dir or Path(tempfile.gettempdir()) / "quantro").resolve()
         try:
             base.mkdir(parents=True, exist_ok=True)
-            workspace = Path(tempfile.mkdtemp(prefix="quantro-post-", dir=base)).resolve()
+            workspace = Path(
+                tempfile.mkdtemp(prefix="quantro-post-", dir=base)
+            ).resolve()
             command = [
                 sys.executable,
                 "-m",
@@ -451,7 +582,7 @@ def retrieve_post(
                 "--compat-options",
                 "prefer-legacy-http-handler,no-certifi",
                 "--format",
-                "b[ext=mp4][protocol=https]/b[ext=mp4][protocol=http]",
+                "bv[ext=mp4][protocol=https]/b[ext=mp4][protocol=https]/b[ext=mp4][protocol=http],ba[ext=m4a][protocol=https]/b[ext=mp4][protocol=https]/b[ext=mp4][protocol=http]",
                 "--match-filter",
                 "!is_live & !is_upcoming",
                 "--output",
@@ -487,9 +618,22 @@ def retrieve_post(
             if completed.returncode != 0:
                 # Never expose downloader stderr: it can contain signed URLs and provider responses.
                 raise RetrievalError(
-                    "MEDIA_UNAVAILABLE", "The submitted video could not be retrieved."
+                    "MEDIA_UNAVAILABLE",
+                    "The submitted video could not be retrieved.",
+                    retryable=any(
+                        marker in completed.stderr.lower()
+                        for marker in (
+                            "timed out",
+                            "connection reset",
+                            "temporary failure",
+                            "network is unreachable",
+                        )
+                    ),
                 )
+            _merge_local_streams(workspace, max_bytes)
             post = _result(url, platform, workspace, completed.stdout, max_bytes)
+            post["post_id"] = post_id or post["post_id"]
+            post["candidate_id"] = candidate_id
             owned_store: TigerDataPostStore | None = None
             try:
                 if storage is None:
@@ -538,9 +682,30 @@ def retrieve_post(
                     "STORAGE_FAILED", "The downloaded media could not be stored."
                 ) from None
             raise
-        return validate_contract_result(_ReturnModel, post, _ContractStage.RETRIEVE_POST, json_native=True)
+        return validate_contract_result(
+            _ReturnModel, post, _ContractStage.RETRIEVE_POST
+        )
     except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
         raise _normalize_contract_exception(_ContractStage.RETRIEVE_POST, exc) from None
+
+
+def retrieve_post(
+    url: str,
+    *,
+    storage: PostStorage | None = None,
+    output_dir: str | Path | None = None,
+    timeout_seconds: float = 120,
+    max_bytes: int = 100_000_000,
+) -> Post:
+    """Retrieve, probe and persist actual media; return the canonical Post model."""
+    # aligned with shared/types.py on 2026-10-10
+    return _download_and_probe(
+        url,
+        storage=storage,
+        output_dir=output_dir,
+        timeout_seconds=timeout_seconds,
+        max_bytes=max_bytes,
+    )
 
 
 def handle_post_trigger(

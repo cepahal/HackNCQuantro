@@ -1,6 +1,5 @@
 """Download a candidate through the existing bounded downloader and Tiger store."""
 
-import logging
 from pathlib import Path
 
 from ..shared.contracts import contract_input, validate_contract_result
@@ -12,36 +11,8 @@ from ..shared.types import Post as _ReturnModel
 from .retrieve_post import (
     PostStorage,
     RetrievalError,
-    retrieve_post,
+    _download_and_probe,
 )
-from .tigerdata_storage import TigerDataPostStore
-
-logger = logging.getLogger(__name__)
-
-
-class _LinkedStorage:
-    def __init__(self, candidate_id: str, storage: PostStorage | None) -> None:
-        self.candidate_id = candidate_id
-        self.storage = storage
-
-    def save_post(self, post: Post) -> None:
-        # Link before the single transaction, so returned and persisted metadata match.
-        post["candidate_id"] = self.candidate_id
-        owned: TigerDataPostStore | None = None
-        try:
-            store = self.storage
-            if store is None:
-                owned = TigerDataPostStore.from_env()
-                store = owned
-            store.save_post(post)
-        finally:
-            if owned is not None:
-                try:
-                    owned.close()
-                except Exception as error:  # noqa: BLE001 - do not mask a committed save or leak diagnostics
-                    logger.warning(
-                        "Candidate storage cleanup failed (%s)", type(error).__name__
-                    )
 
 
 def retrieve_candidate_media(
@@ -85,13 +56,18 @@ def retrieve_candidate_media(
                 "MEDIA_UNAVAILABLE", stage, "Provide a complete search candidate."
             ) from None
         try:
-            return validate_contract_result(_ReturnModel, retrieve_post(
-                url,
-                storage=_LinkedStorage(identity, storage),
-                output_dir=output_dir,
-                timeout_seconds=timeout_seconds,
-                max_bytes=max_bytes,
-            ), _ContractStage.RETRIEVE_CANDIDATE_MEDIA, json_native=True)
+            return validate_contract_result(
+                _ReturnModel,
+                _download_and_probe(
+                    url,
+                    candidate_id=identity,
+                    storage=storage,
+                    output_dir=output_dir,
+                    timeout_seconds=timeout_seconds,
+                    max_bytes=max_bytes,
+                ),
+                _ContractStage.RETRIEVE_CANDIDATE_MEDIA,
+            )
         except RetrievalError as error:
             try:
                 code = ErrorCode(error.code)
@@ -105,4 +81,6 @@ def retrieve_candidate_media(
                 "MEDIA_UNAVAILABLE", stage, "Candidate retrieval options are invalid."
             ) from None
     except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
-        raise _normalize_contract_exception(_ContractStage.RETRIEVE_CANDIDATE_MEDIA, exc) from None
+        raise _normalize_contract_exception(
+            _ContractStage.RETRIEVE_CANDIDATE_MEDIA, exc
+        ) from None
