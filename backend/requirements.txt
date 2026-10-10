@@ -9,3 +9,4 @@ httpx
 -r requirements-specialist.txt
 yt-dlp==2026.8.19
 psycopg[binary]==3.3.6
+sqlalchemy>=2,<3

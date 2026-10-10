@@ -6,15 +6,17 @@ before the job status changes, so a storage failure leaves the job in its prior
 state, and nothing here ever deletes a saved report.
 
 Idempotency: report_id is derived deterministically from job_id
-(report_<job_id>), so retries overwrite the same record instead of creating a
-duplicate.
+(report_<job_id>), so retries reuse the same record instead of creating a
+duplicate. The Tiger Data store keeps the first saved report for a report_id.
 """
 
 import os
 from datetime import UTC, datetime
+from functools import cache
 from typing import Protocol
 from urllib.parse import quote
 
+from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from .errors import ErrorCode, QuantroError, Stage, normalize_exception
 from .types import JobCompletionResult
 
@@ -77,16 +79,32 @@ _memory_report_store = InMemoryReportStore()
 _memory_job_store = InMemoryJobStore()
 
 
+@cache
+def _shared_tiger_store() -> TigerStore:
+    store = TigerStore.from_env()
+    store.ensure_schema()
+    return store
+
+
+def _store_backend() -> str:
+    backend = os.getenv("REPORT_STORE", "tiger").strip().lower() or "tiger"
+    if backend not in {"tiger", "memory", "snowflake"}:
+        raise ValueError(f"REPORT_STORE must be 'tiger', 'memory' or 'snowflake', got {backend!r}")
+    return backend
+
+
 def get_report_store() -> ReportStore:
-    backend = os.getenv("REPORT_STORE", "memory").strip().lower()
+    backend = _store_backend()
+    if backend == "tiger":
+        return TigerReportStore(_shared_tiger_store())
     if backend == "memory":
         return _memory_report_store
-    if backend == "snowflake":
-        return SnowflakeReportStore()
-    raise ValueError(f"REPORT_STORE must be 'memory' or 'snowflake', got {backend!r}")
+    return SnowflakeReportStore()
 
 
 def get_job_store() -> JobStore:
+    if _store_backend() == "tiger":
+        return TigerJobStore(_shared_tiger_store())
     return _memory_job_store
 
 

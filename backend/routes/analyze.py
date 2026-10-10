@@ -1,27 +1,43 @@
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+import json
+from typing import Annotated
 
-from services.reporting.errors import ErrorCode, QuantroError
-from services.reporting.run_analysis import run_analysis
+from fastapi import APIRouter, Depends, Path
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+from backend.routes.common import get_tiger_store, not_found, quantro_error_response
+from backend.services.reporting.build_report import sanitize_report
+from backend.services.reporting.errors import QuantroError
+from backend.services.reporting.run_analysis import run_analysis
+from backend.services.storage.tiger import TigerReportStore, TigerStore
 
 router = APIRouter()
 
-_CLIENT_ERROR_CODES = {ErrorCode.INVALID_URL, ErrorCode.UNSUPPORTED_PLATFORM}
+JobId = Annotated[str, Path(pattern=r"^[A-Za-z0-9_-]{1,128}$")]
+ReportId = Annotated[str, Path(pattern=r"^report_[A-Za-z0-9_-]{1,128}$")]
+
+
+class AnalyzeRequest(BaseModel):
+    url: str = Field(min_length=1, max_length=8192)
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=256)
 
 
 @router.post("/analyze/{job_id}/run")
-def run_job(job_id: str) -> JSONResponse:
+def run_job(job_id: JobId, body: AnalyzeRequest, store: TigerStore = Depends(get_tiger_store)) -> JSONResponse:
     try:
-        result = run_analysis(job_id)
+        result = run_analysis(job_id, body.url, body.conversation_id, store=store)
     except QuantroError as error:
-        status = 422 if error.code in _CLIENT_ERROR_CODES else 502
-        return JSONResponse(status_code=status, content={"success": False, "result": None, "error": error.to_dict()})
-    except NotImplementedError:
-        return JSONResponse(
-            status_code=501,
-            content={"success": False, "result": None, "error": {"message": "run_analysis is not wired up yet"}},
-        )
+        return quantro_error_response(error)
+    return JSONResponse(content=result.model_dump(mode="json"))
 
-    payload = result.model_dump(mode="json") if isinstance(result, BaseModel) else result
-    return JSONResponse(content={"success": True, "result": payload, "error": None})
+
+@router.get("/reports/{report_id}")
+def get_report(report_id: ReportId, store: TigerStore = Depends(get_tiger_store)) -> JSONResponse:
+    raw = TigerReportStore(store).get(report_id)
+    if raw is None:
+        return not_found("Report not found")
+    try:
+        report = sanitize_report(json.loads(raw))
+    except QuantroError as error:
+        return quantro_error_response(error)
+    return JSONResponse(content=report)

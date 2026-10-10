@@ -4,14 +4,17 @@ from datetime import datetime
 import pytest
 from pydantic import BaseModel
 
+import backend.services.reporting.save_report as save_report_module
 from backend.services.reporting.errors import ErrorCode, QuantroError, Stage
 from backend.services.reporting.save_report import (
     InMemoryJobStore,
     InMemoryReportStore,
     SnowflakeReportStore,
+    get_job_store,
     get_report_store,
     save_report_and_complete_job,
 )
+from backend.services.storage.tiger import TigerJobStore, TigerReportStore
 
 
 class FakeReport(BaseModel):
@@ -124,9 +127,18 @@ def test_unexpected_store_exception_is_normalized_to_storage_failed():
     assert job_store.get_status("job_123") is None
 
 
-def test_report_store_selection_from_env(monkeypatch):
+def test_report_store_selection_from_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("TIGER_DATABASE_URL", f"sqlite:///{tmp_path / 'tiger.db'}")
+    save_report_module._shared_tiger_store.cache_clear()
     monkeypatch.delenv("REPORT_STORE", raising=False)
+    assert isinstance(get_report_store(), TigerReportStore)
+    assert isinstance(get_job_store(), TigerJobStore)
+    save_report_module._shared_tiger_store().close()
+    save_report_module._shared_tiger_store.cache_clear()
+
+    monkeypatch.setenv("REPORT_STORE", "memory")
     assert isinstance(get_report_store(), InMemoryReportStore)
+    assert isinstance(get_job_store(), InMemoryJobStore)
 
     monkeypatch.setenv("REPORT_STORE", "snowflake")
     assert isinstance(get_report_store(), SnowflakeReportStore)
