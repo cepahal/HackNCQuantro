@@ -28,11 +28,16 @@ from ..shared.errors import (
     normalize_exception,
 )
 from ..shared.post_identity import ensure_distinct_source, normalized_post_url
-from ..shared.types import AnalysisResult, IngestResult, Post, ReportV2
+from ..shared.types import AnalysisResult, Comparison, IngestResult, Post, ReportV2
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from . import context_video
 from .alignment import build_alignment, build_context
-from .analysis import compare_clip, interpret_clip
+from .analysis import (
+    _extractive_clip_summary,
+    _extractive_context_summary,
+    compare_clip,
+    interpret_clip,
+)
 from .candidates import CandidateSearchError, check_source_video, find_source_video
 from .diagnostics import DiagnosticCapture, media_snapshot, record
 from .download import MediaDownloadError
@@ -335,9 +340,46 @@ async def _build(job_id: str, url: str, store: TigerStore, *, source_url: str | 
                     record('context_video', 'unavailable', details)
         stage = Stage.COMPARE_CONTEXT_AND_CAPTION
         started = time.monotonic()
-        comparison = compare_clip(post, features, chosen[3]) if chosen else None
-        summary = comparison.summary if comparison else interpret_clip(post, features)
-        record(stage.value, "completed", {"comparison": comparison.model_dump(mode="json") if comparison else None, "summary": summary}, started=started)
+        try:
+            comparison = compare_clip(post, features, chosen[3]) if chosen else None
+            summary = comparison.summary if comparison else interpret_clip(post, features)
+        except QuantroError as exc:
+            # Language assessment is optional; retrieval, storage and programming
+            # failures still use the normal fatal error path.
+            if exc.code != ErrorCode.PROCESSING_FAILED or exc.stage != stage:
+                raise
+            warning = "Automated explanation was unavailable; observed transcript evidence is shown without a meaning or fact-check verdict."
+            warnings.append(warning)
+            comparison = None
+            if chosen:
+                source_sentences = {
+                    sentence.sentence_id: sentence
+                    for window in chosen[3].windows
+                    for sentence in window.sentences
+                }
+                summary = _extractive_context_summary(features, source_sentences)
+                comparison = Comparison.model_validate({
+                    "context_assessment": "not_assessed",
+                    "caption_assessment": "not_assessed" if post.caption and post.caption.strip() else "not_provided",
+                    "assessment_confidence": {
+                        "level": "not_assessed",
+                        "method": "transcript_evidence_only",
+                        "basis": ["Language assessment was unavailable; the independent source alignment is retained."],
+                        "limitations": [warning],
+                    },
+                    "summary": summary,
+                    "findings": [],
+                    "limitations": [warning],
+                })
+            else:
+                summary = _extractive_clip_summary(features)
+            record(stage.value, "unavailable", {
+                "reason": "language_assessment_unavailable",
+                "retryable": exc.retryable,
+                "source_match_preserved": chosen is not None,
+            }, started=started)
+        else:
+            record(stage.value, "completed", {"comparison": comparison.model_dump(mode="json") if comparison else None, "summary": summary}, started=started)
         stage = Stage.BUILD_REPORT
         started = time.monotonic()
         report = build_report(
