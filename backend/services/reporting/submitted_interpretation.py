@@ -98,10 +98,17 @@ def interpret_submitted(report: ReportV2) -> ReportV2:
         "Provide a cautious interpretation of the submitted transcript, explicitly assuming "
         "it is political speech. This assumption is not evidence of speaker identity or genre. "
         "Describe only the apparent argument or theme expressed by the cited sentences, "
-        "not whether its factual claims are true. Cite one to four supplied sentence IDs. "
+        "not whether its factual claims are true. Write the overview in plain English: "
+        "two or three short sentences, at most 70 words. Say directly what the speaker "
+        "asks or claims and describe any observed change of topic. Avoid vague phrases "
+        "such as 'the provided text consists of' and avoid academic jargon. Use familiar "
+        "words and active sentences. Use no em dashes, bold markers, HTML or links. "
+        "Do not turn a topic change into a claim that footage was edited. "
+        "Cite one to four supplied sentence IDs. "
         "Keep IDs only in cited_sentence_ids; do not put implementation identifiers in prose. "
-        "Possible references must be at most three short hypotheses suggested by the speech, "
-        "not new alleged facts; return an empty list when none is supported. Do not identify "
+        "Possible references must be at most three specific, short hypotheses suggested by the speech, "
+        "not new alleged facts. Return an empty list rather than generic speculation about "
+        "politics, diplomacy or personal activities. Do not identify "
         "the speaker, infer deception/intent, declare misinformation/disinformation, assign "
         "confidence or percentages, or claim source/context verification. Caption relation is "
         "a tentative topic relation only: not_provided when caption is null, otherwise uncertain, "
@@ -151,7 +158,7 @@ def interpret_submitted(report: ReportV2) -> ReportV2:
         if report.summary:
             prior = report.summary[:1_200]
             parts.append("Existing pipeline result: " + prior + ("…" if len(report.summary) > len(prior) else ""))
-        summary = sanitize_report({"summary": " ".join(parts)})["summary"]
+        summary = sanitize_report({"summary": " ".join(parts).replace("\u2014", ", ")})["summary"]
         result = _with_limitation(report, INTERPRETATION_LIMIT)
         result.summary = summary
         if len(sentences) < len(report.submitted.transcript.sentences):

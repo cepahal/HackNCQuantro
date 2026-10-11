@@ -75,7 +75,7 @@ from ..specialist.comparison import compare_context_and_caption
 from ..specialist.context import select_surrounding_context
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from .build_report import build_report, sanitize_report
-from .remote_source_analysis import assess_remote_sources
+from .remote_source_analysis import _has_surrounding_speech, assess_remote_sources
 from .remote_youtube import (
     NO_DISCOVERY_LIMITATION,
     build_remote_youtube_report,
@@ -357,6 +357,45 @@ def _discover_sources(queries: _SearchQueries, store: TigerStore, excluded: set[
     return eligible[:limit]
 
 
+def _remote_context_query(queries: list[str], title: str | None) -> str | None:
+    """Keep a spoken quote exact while spending one lexical request on fuller context."""
+    if not queries:
+        return None
+    # Longer distinctive speech is a stronger locator than a short viral payoff.
+    # Ranking does not rewrite words or infer the identity in unverified metadata.
+    quote = max(queries, key=lambda text: (len(set(re.findall(r"\w+", text.casefold()))), len(text)))
+    base = _with_clue(_title_clue(title), quote) or quote
+    intent = ' ("full remarks" OR "full interview" OR "full speech" OR "full context")'
+    site = ' site:youtube.com/watch'
+    if len(base + intent + site) <= 512:
+        return base + intent + site
+    if len(quote + intent + site) <= 512:
+        return quote + intent + site
+    # Preserve an unusually long complete quote rather than truncating evidence.
+    return quote + site
+
+
+def _remote_context_priority(candidate: dict[str, Any]) -> tuple[int, float]:
+    """Unverified discovery hints prioritize inspection; they never verify context."""
+    metadata = ' '.join(value for key in ('title', 'snippet')
+                        if isinstance(value := candidate.get(key), str))[:1_000].casefold()
+    duration: float | None = None
+    clock = re.search(r'\b(?:duration|length)\s*[:=]\s*(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\b', metadata)
+    units = re.search(r'\b(?:duration|length)\s*[:=]\s*(\d{1,5}(?:\.\d{1,2})?)\s*(hours?|hrs?|minutes?|mins?|seconds?|secs?|s)\b', metadata)
+    if clock and int(clock[2]) < 60 and int(clock[3]) < 60:
+        duration = int(clock[1] or 0) * 3_600 + int(clock[2]) * 60 + int(clock[3])
+    elif units:
+        unit = units[2]
+        duration = float(units[1]) * (3_600 if unit.startswith(('hour', 'hr')) else 60 if unit.startswith('min') else 1)
+    if duration is not None and not 0 < duration <= 86_400:
+        duration = None
+    fuller = bool(re.search(r'\b(?:full|complete|entire|unedited|unabridged)\s+(?:speech|remarks|address|interview|press conference|recording|debate|event|video|context)\b', metadata))
+    short = bool(re.search(r'\b(?:shorts?|clips?|highlights?|excerpt|compilation|meme|remix)\b', metadata))
+    short = short or '/shorts/' in str(candidate.get('url', '')).casefold()
+    priority = 0 if fuller or duration is not None and duration > 90 else 2 if short or duration is not None and duration <= 60 else 1
+    return priority, -(duration or 0)
+
+
 def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_candidates: bool = False) -> ReportV2:
     """Discover leads from partial text without inventing timed source evidence."""
     post = report.submitted.post
@@ -387,7 +426,8 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
         if fallback_provider in {'serpapi', 'brave', 'google_cse'}:
             # A lexical engine complements Exa's semantic web index. This uses
             # an explicitly configured existing credential, never an inferred key.
-            exact_query = _with_clue(_title_clue(post.title), queries.queries[0])
+            exact_query = (_remote_context_query(queries.queries, post.title) if assess_candidates
+                           else _with_clue(_title_clue(post.title), queries.queries[0]))
             if exact_query:
                 settings = dict(os.environ)
                 settings['SEARCH_PROVIDER'] = fallback_provider
@@ -395,7 +435,7 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
                                                         or os.getenv('SEARCH_PROVIDER_API_KEY', ''))
                 try:
                     exact = _call(Stage.SEARCH_CANDIDATES, _web_search,
-                                  [exact_query + ' site:youtube.com/watch'], 5, [], settings)
+                                  [exact_query if assess_candidates else exact_query + ' site:youtube.com/watch'], 5, [], settings)
                     if not isinstance(exact, dict) or not isinstance(exact.get('candidates'), list) or not isinstance(exact.get('warnings'), list):
                         raise QuantroError(ErrorCode.SEARCH_FAILED, Stage.SEARCH_CANDIDATES)
                     parsed = parse_stage_output(_CandidateSearch, exact, Stage.SEARCH_CANDIDATES)
@@ -406,8 +446,9 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
                     warnings.append('The optional lexical search was unavailable; semantic search coverage remains limited.')
     else:
         warnings.append("Source discovery was skipped because the partial transcript contains no distinctive searchable phrase.")
+    if assess_candidates:
+        candidates.sort(key=_remote_context_priority)
     seen = _post_identities(post)
-    urls: list[str] = []
     eligible: list[dict[str, Any]] = []
     for candidate in candidates:
         try:
@@ -425,10 +466,16 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
         if identity in seen:
             continue
         seen.add(identity)
-        urls.append(url)
         eligible.append(dict(candidate, url=url))
-        if len(urls) == 3:
+        if not assess_candidates and len(eligible) == 3:
             break
+    if assess_candidates:
+        # Inspect likely broader recordings before repeated short copies. Neither
+        # metadata nor declared duration can satisfy the independent speech gate.
+        if eligible:
+            warnings.append('Source candidates were prioritized using unverified fuller-recording metadata; titles and duration hints do not establish additional context or originality.')
+        eligible = eligible[:3]
+    urls = [candidate['url'] for candidate in eligible]
     result = report.model_copy(deep=True)
     result.limitations = [item for item in result.limitations if item != NO_DISCOVERY_LIMITATION]
     result.submitted.post.retrieval.warnings = [
@@ -497,6 +544,10 @@ def _analyze(
             attempted_identities.update(_post_identities(assessed.post))
             confidence = assessed.alignment.match_quality.confidence
             if assessed.alignment.status == "verified" and confidence.level in _VIABLE_LEVELS:
+                if not _call(Stage.SELECT_SURROUNDING_CONTEXT, _has_surrounding_speech,
+                             submitted_features.transcript, assessed.features.transcript, assessed.alignment):
+                    warnings.append(f"Candidate {_candidate_label(candidate, index)} matched submitted speech but supplied no additional observed surrounding speech; it remains an unverified lead rather than a context source.")
+                    continue
                 viable.append(assessed)
 
     assess_batch(candidates)

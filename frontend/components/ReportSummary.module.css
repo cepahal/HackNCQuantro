@@ -1,0 +1,23 @@
+.summary { max-width: 1080px; margin-block: 30px; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.badges span { padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); font-size: 15px; }
+.sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; }
+.section { min-width: 0; padding: 22px 0; border-top: 1px solid var(--line); }
+.section:first-child { grid-column: 1 / -1; }
+.wide { grid-column: 1 / -1; }
+.section h2 { margin: 0 0 12px; font-size: 21px; line-height: 1.25; letter-spacing: -.02em; font-weight: 600; }
+.section p { margin: 10px 0; color: var(--ink); font-size: 16px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.section:first-child > p:first-of-type { color: var(--ink); font-size: 19px; }
+.section .note { color: var(--ink); font-size: 15px; line-height: 1.6; }
+.details > summary { color: var(--ink); font-size: 16px; font-weight: 400; line-height: 1.5; cursor: pointer; }
+.details > summary:focus-visible { outline: 2px solid var(--red); outline-offset: 5px; }
+.hypotheses { margin: 10px 0; padding-left: 22px; color: var(--ink); font-size: 16px; line-height: 1.65; }
+.hypotheses li { margin-block: 10px; overflow-wrap: anywhere; }
+.evidence { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--red); }
+.evidence blockquote { margin: 0 0 8px; font-size: 17px; line-height: 1.55; overflow-wrap: anywhere; }
+.evidence figcaption { color: var(--ink); font-size: 15px; line-height: 1.5; }
+@media (max-width: 700px) {
+  .sections { grid-template-columns: minmax(0, 1fr); }
+  .section { padding: 20px 0; }
+  .summary { margin-top: 24px; }
+}

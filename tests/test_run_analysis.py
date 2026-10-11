@@ -204,6 +204,43 @@ def test_empty_search_produces_no_verified_match(client, store, upstream):
     assert upstream["provider"].sent[0][1].startswith("No verified source was found for this excerpt.")
 
 
+def test_matching_repost_is_skipped_for_recording_with_observed_surrounding_speech(client, store, upstream, monkeypatch):
+    upstream['candidates'] = [_candidate(1), _candidate(2)]
+
+    def extract(media, options):
+        value = media.model_dump(mode='json') if hasattr(media, 'model_dump') else media
+        if value['media_id'] == 'clip_media':
+            return CLIP_FEATURES
+        if value['media_id'] == 'src_media_1':
+            return _features('src_media_1', 23.0, [(0.5, 9.5, SHARED)])
+        return _source_features(value['media_id'])
+
+    monkeypatch.setattr(analysis_module, 'extract_media_features', extract)
+    response = _run(client, 'job_context_over_copy')
+
+    assert response.status_code == 200
+    assert response.json()['outcome'] == 'matched'
+    report = store.get_report(response.json()['report_id'])
+    assert report['source']['post']['candidate_id'] == 'cand_2'
+    assert any('cand_1' in warning and 'no additional observed' in warning for warning in response.json()['warnings'])
+    assert upstream['compare_calls'] == ['The bridge is closed forever.']
+
+
+def test_only_matching_repost_is_unverified_lead_without_context_comparison(client, store, upstream, monkeypatch):
+    monkeypatch.setattr(analysis_module, 'extract_media_features', lambda media, options:
+                        _features(media.media_id if hasattr(media, 'media_id') else media['media_id'],
+                                  23.0, [(0.5, 9.5, SHARED)]))
+    response = _run(client, 'job_only_copy')
+
+    assert response.status_code == 200
+    assert response.json()['outcome'] == 'no_verified_match'
+    report = store.get_report(response.json()['report_id'])
+    assert report['source'] is report['alignment'] is report['context'] is report['comparison'] is None
+    assert any('unverified lead' in warning for warning in response.json()['warnings'])
+    assert upstream['compare_calls'] == []
+    assert store.get_job('job_only_copy')['status'] == 'completed'
+
+
 def test_optional_submitted_interpretation_is_saved_once_and_reused(client, store, upstream, monkeypatch):
     upstream["candidates"] = []
     monkeypatch.setenv("SUBMITTED_INTERPRETATION_ENABLED", "true")

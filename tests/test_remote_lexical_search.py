@@ -331,3 +331,77 @@ def test_unsupported_primary_leads_cannot_hide_later_youtube_assessment(report, 
         assessor.assert_not_called()
         assert _links(result) == articles
     _assert_unverified(result)
+
+
+def test_active_assessment_uses_one_fuller_context_query_preserving_spoken_words(report, search_mocks, monkeypatch):
+    monkeypatch.setenv('SEARCH_FALLBACK_PROVIDER', 'serpapi')
+    monkeypatch.setenv('SEARCH_FALLBACK_API_KEY', 'test-key')
+    report.submitted.post.title = 'Bush Texas Education Address'
+    report.submitted.post.caption = 'An unsupported identity and a guaranteed cancellation.'
+    report.submitted.transcript.sentences.append(report.submitted.transcript.sentences[0].model_copy(update={
+        'sentence_id': 'payoff', 'start_seconds': 6.0, 'end_seconds': 8.0,
+        'text': 'Now watch this drive.',
+    }))
+    assessor = Mock(side_effect=lambda result, *args: result)
+    monkeypatch.setattr(analysis, 'assess_remote_sources', assessor)
+    before = report.model_dump(mode='json')
+
+    result = analysis._discover_remote_sources(report, object(), assess_candidates=True)
+
+    search_mocks[0].assert_called_once()
+    search_mocks[1].assert_called_once()
+    query = search_mocks[1].call_args.args[0]
+    assert query == ['Bush Texas Education Address ' + QUOTE
+                     + ' ("full remarks" OR "full interview" OR "full speech" OR "full context") site:youtube.com/watch']
+    assert 'guaranteed' not in query[0]
+    assert len(query) == 1 and len(query[0]) <= 512
+    assert report.model_dump(mode='json') == before
+    assessor.assert_called_once()
+    assert len(assessor.call_args.args[1]) <= 3
+    _assert_unverified(result)
+
+
+def test_context_query_drops_only_optional_clues_before_a_long_exact_quote():
+    quote = '"' + ' '.join('distinctive' * 4 + str(index) for index in range(11)) + '"'
+    assert analysis._remote_context_query([quote], 'Unverified title clue') == quote + ' site:youtube.com/watch'
+    assert analysis._remote_context_query([], 'Unverified title') is None
+
+
+def test_broader_recording_ranks_ahead_of_short_lexical_reposts_before_cutoff(report, search_mocks, monkeypatch):
+    monkeypatch.setenv('SEARCH_FALLBACK_PROVIDER', 'serpapi')
+    full = dict(_candidate(OTHER, 9), title='Full remarks and questions', snippet='Duration: 18:42')
+    search_mocks[0].return_value = [full]
+    search_mocks[1].return_value = {'candidates': [
+        dict(_candidate(LEXICAL, 1), title='Viral clip', snippet='Duration: 23 seconds'),
+        dict(_candidate(PRIMARY, 2), title='Best highlights'),
+        _candidate('https://youtu.be/jNQXAC9IVRw', 3),
+        dict(_candidate('https://youtu.be/YE7VzlLtp-4', 4), title='Full remarks'),
+    ], 'warnings': []}
+    assessor = Mock(side_effect=lambda result, *args: result)
+    monkeypatch.setattr(analysis, 'assess_remote_sources', assessor)
+
+    result = analysis._discover_remote_sources(report, object(), assess_candidates=True)
+
+    rows = assessor.call_args.args[1]
+    assert [item['url'] for item in rows] == [OTHER, LEXICAL, PRIMARY]
+    assert len({item['url'] for item in rows}) == 3
+    assert _links(result) == [OTHER, LEXICAL, PRIMARY]
+    assert all('duration_seconds' not in item for item in rows)
+    assert any('unverified fuller-recording metadata' in item for item in result.limitations)
+    assert result.submitted.post.media.duration_seconds is None
+    search_mocks[1].assert_called_once()
+    _assert_unverified(result)
+
+
+@pytest.mark.parametrize(('metadata', 'expected'), [
+    ({'title': 'Full interview'}, 0),
+    ({'snippet': 'Duration: 1:02:03'}, 0),
+    ({'snippet': 'Length: 2 minutes'}, 0),
+    ({'snippet': 'Duration: 23 seconds'}, 2),
+    ({'url': 'https://www.youtube.com/shorts/aqz-KE-bpKQ'}, 2),
+    ({'title': 'A speech in 2026 at 12:30'}, 1),
+    ({'snippet': 'Duration: 1:99:99'}, 1),
+    ({'snippet': 'Duration: 99999 hours'}, 1),
+])
+def test_ranking_uses_only_explicit_bounded_unverified_metadata(metadata, expected):
+    assert analysis._remote_context_priority(metadata)[0] == expected

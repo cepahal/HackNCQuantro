@@ -5,6 +5,7 @@ duration. It verifies only distinctive text in independently requested windows;
 recording edits, earliest upload and the unobserved content remain unassessed.
 """
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -19,8 +20,9 @@ from ..shared.types import (
     Outcome,
     ReportMedia,
     ReportV2,
+    Transcript,
 )
-from ..specialist.alignment import _align
+from ..specialist.alignment import _STOP, _align
 from ..specialist.comparison import compare_transcript_windows
 from .build_report import merge_limitations, sanitize_report
 from .remote_youtube import (
@@ -32,6 +34,10 @@ from .remote_youtube import (
 
 MAX_SOURCE_CANDIDATES = 2
 CONTEXT_PADDING_SECONDS = 30.0
+_CONTEXT_NOISE = (_STOP - {"not", "no"}) | {
+    "thank", "thanks", "everyone", "watching", "please", "subscribe", "channel", "like", "share", "welcome", "hello",
+    "morning", "evening", "afternoon", "ladies", "gentlemen", "very", "much", "today", "video",
+}
 _UNASSESSED = {
     NO_DISCOVERY_LIMITATION,
     "Candidate recording downloads, alignment and source-context assessment were not performed in this fallback.",
@@ -104,6 +110,41 @@ def _context(source: ReportMedia, alignment: Alignment) -> Context:
     ])
 
 
+def _has_surrounding_speech(submitted: Transcript, source: Transcript, alignment: Alignment) -> bool:
+    """Require substantive new speech in validated transcripts, not a copied clip.
+
+    Four words and two new informative words are conservative eligibility
+    heuristics, not a semantic verdict or evidence of an original uploader.
+    Negation remains informative so short corrective qualifiers can qualify.
+    """
+    submitted_words = set(re.findall(r"\w+(?:['’]\w+)?", " ".join(
+        sentence.text for sentence in submitted.sentences
+    ).casefold()))
+    matched_ids = {reference for match in alignment.matches for evidence in match.evidence
+                   for reference in evidence.source_refs}
+    for sentence in source.sentences:
+        if sentence.sentence_id in matched_ids or any(
+            sentence.start_seconds < match.source_end_seconds
+            and sentence.end_seconds > match.source_start_seconds
+            for match in alignment.matches
+        ):
+            continue
+        if not any(sentence.start_seconds < match.source_end_seconds + CONTEXT_PADDING_SECONDS
+                   and sentence.end_seconds > max(0.0, match.source_start_seconds - CONTEXT_PADDING_SECONDS)
+                   for match in alignment.matches):
+            continue
+        words = re.findall(r"\w+(?:['’]\w+)?", sentence.text.casefold())
+        if any(phrase in " ".join(words) for phrase in (
+            "thanks for watching", "thank you for watching", "please subscribe",
+            "like and subscribe", "like and share", "subscribe to",
+        )):
+            continue
+        novel = set(words) - submitted_words - _CONTEXT_NOISE
+        if len(words) >= 4 and len(novel) >= 2:
+            return True
+    return False
+
+
 def _not_assessed(caption: str | None) -> Comparison:
     return Comparison.model_validate({
         "context_assessment": "not_assessed", "caption_assessment": "not_provided" if caption is None else "not_assessed",
@@ -140,6 +181,7 @@ def assess_remote_sources(
     seen = post_identities(result.submitted.post)
     viable: list[tuple[float, str, ReportMedia, Alignment]] = []
     attempted = 0
+    contextless_matches = 0
     for candidate in candidates:
         if attempted >= MAX_SOURCE_CANDIDATES:
             break
@@ -166,6 +208,13 @@ def assess_remote_sources(
             if alignment.status != "verified" or not alignment.matches:
                 warnings.append(f"Source candidate {url} had no distinctive, uniquely located exact speech match in the observed window.")
                 continue
+            if not _has_surrounding_speech(result.submitted.transcript, source.transcript, alignment):
+                contextless_matches += 1
+                warnings.append(
+                    f"Unverified source candidate: {url}. Matching observed speech was found, but no substantial new "
+                    "surrounding speech was observed; this may be a duplicate clip and was not selected as a contextual source."
+                )
+                continue
             alignment.match_quality.confidence.level = ConfidenceLevel.MODERATE
             alignment.match_quality.clip_coverage_ratio = None
             alignment.edit_analysis.status = "not_assessed"
@@ -191,8 +240,13 @@ def assess_remote_sources(
     warnings[:] = [item for item in warnings if item not in _UNASSESSED]
     _clean_stage_limits(result.submitted)
     if not viable:
-        result.summary = (f"Limited transcript analysis: {attempted} source candidate windows were examined; "
-                          "no distinctive unique speech match was verified. Unavailable and unobserved content remains unknown.")
+        if contextless_matches:
+            result.summary = (f"Limited transcript analysis: {attempted} source candidate windows were examined; "
+                              "matching speech was found, but no source with substantial additional observed context was verified. "
+                              "A matching repost alone does not establish the broader source context.")
+        else:
+            result.summary = (f"Limited transcript analysis: {attempted} source candidate windows were examined; "
+                              "no distinctive unique speech match was verified. Unavailable and unobserved content remains unknown.")
         result.limitations = merge_limitations(result.limitations, warnings, _WINDOW_LIMITS)
         return ReportV2.model_validate(sanitize_report(result.model_dump(mode="json")))
     viable.sort(key=lambda item: (-item[0], item[1]))

@@ -169,6 +169,83 @@ def test_candidate_failure_retains_warning_and_second_verified_source(calls, mon
     assert "do-not-display" not in result.model_dump_json()
 
 
+def test_identical_matching_copy_is_only_an_unverified_lead(calls, monkeypatch):
+    monkeypatch.setattr(remote, "build_remote_youtube_report", lambda job_id, url: make_report(url))
+    result = assess(make_report(), [row()], calls)
+
+    assert result.outcome == "no_verified_match"
+    assert result.source is result.alignment is result.context is result.comparison is None
+    assert calls["comparison"] == []
+    assert "matching speech was found" in result.summary
+    assert any(SOURCE in item and "duplicate clip" in item for item in result.limitations)
+    assert result.submitted.post.media.duration_seconds is None
+
+
+@pytest.mark.parametrize("text", [
+    "Thanks!", SPEECH,
+    "Thank you everyone for watching this video today.",
+    "Please subscribe to our channel for more interesting daily videos.",
+])
+def test_copy_with_repeated_speech_or_outro_is_not_a_contextual_source(calls, monkeypatch, text):
+    source = make_report(SOURCE)
+    additional = source.submitted.transcript.sentences[0].model_copy(update={
+        "sentence_id": "outro", "start_seconds": 13.0, "end_seconds": 18.0, "text": text,
+    })
+    source.submitted.transcript.sentences.append(additional)
+    source.submitted.transcript.processed_ranges.append(TimeRange(start_seconds=13.0, end_seconds=18.0))
+    monkeypatch.setattr(remote, "build_remote_youtube_report", lambda *args: source)
+    result = assess(make_report(), [row()], calls)
+
+    assert result.outcome == "no_verified_match"
+    assert result.source is result.context is result.comparison is None
+    assert calls["comparison"] == []
+
+
+def test_short_corrective_qualifier_is_sufficient_observed_context(calls, monkeypatch):
+    source = make_report(SOURCE, source_context=True)
+    source.submitted.transcript.sentences = source.submitted.transcript.sentences[1:]
+    source.submitted.transcript.sentences[-1].text = "Those figures are not accurate."
+    source.submitted.transcript.processed_ranges = source.submitted.transcript.processed_ranges[1:]
+    monkeypatch.setattr(remote, "build_remote_youtube_report", lambda *args: source)
+    result = assess(make_report(), [row()], calls)
+
+    assert result.outcome == "matched"
+    assert result.context.windows[0].sentences[-1].text == "Those figures are not accurate."
+    assert len(calls["comparison"]) == 1
+    assert result.comparison.context_assessment == "uncertain"
+    assert result.comparison.assessment_confidence.level == "low"
+
+
+def test_duplicate_first_candidate_does_not_prevent_second_richer_source(calls, monkeypatch):
+    def native(job_id, url):
+        calls["native"].append((job_id, url))
+        return make_report(url, source_context=url != SOURCE)
+
+    monkeypatch.setattr(remote, "build_remote_youtube_report", native)
+    result = assess(make_report(), [row(SOURCE), row(SECOND, 2), row(THIRD, 3)], calls)
+
+    assert result.outcome == "matched"
+    assert result.source.post.post_url == SECOND
+    assert [url for _, url in calls["native"]] == [SOURCE, SECOND]
+    assert len(calls["comparison"]) == 1
+    assert any(SOURCE in item and "duplicate clip" in item for item in result.limitations)
+
+
+def test_novel_speech_outside_observed_context_padding_does_not_qualify(calls, monkeypatch):
+    source = make_report(SOURCE)
+    additional = source.submitted.transcript.sentences[0].model_copy(update={
+        "sentence_id": "distant_context", "start_seconds": 50.0, "end_seconds": 58.0,
+        "text": "The independent audit has since found substantial errors in these statistics.",
+    })
+    source.submitted.transcript.sentences.append(additional)
+    source.submitted.transcript.processed_ranges.append(TimeRange(start_seconds=50.0, end_seconds=58.0))
+    monkeypatch.setattr(remote, "build_remote_youtube_report", lambda *args: source)
+    result = assess(make_report(), [row()], calls)
+
+    assert result.outcome == "no_verified_match"
+    assert calls["comparison"] == []
+
+
 def test_changed_number_is_not_corrected_into_an_exact_match(calls, monkeypatch):
     submitted = "If all 140 employment figures were accurate we would reconsider this public program."
     candidate = submitted.replace("140", "1400")

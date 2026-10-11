@@ -171,3 +171,32 @@ Rollback: select the previous explicit search provider and deploy the previous
 backend commit. New additive archive/cache tables can remain; do not drop shared
 jobs, posts or reports. Clear private cache snapshots only through an operator
 procedure if a model revision or recording association is found wrong.
+
+
+## 2026-10-10 contextual-source and report readability update
+
+Matching speech alone no longer qualifies a recording as the contextual source.
+Both downloaded and transcript-only candidates must contain additional observed
+speech outside aligned passages and within the context window. The conservative
+eligibility check requires four words and two new informative words, preserves
+negation, and excludes repeated speech and subscription outros. It does not
+establish originality, factual accuracy, or a physical edit. Duplicate-only
+results retain no verified source; another candidate is checked within the
+existing two-candidate remote budget.
+
+The optional lexical query now seeks fuller recordings using an exact spoken
+quote. Unverified full-recording titles and duration hints prioritize inspection,
+never supply verified duration or prove context. Context outside the inspected
+windows can still be missed.
+
+Reports show safe fixed-host YouTube embeds when downloaded playback is absent,
+with an always-visible original link and a visible unavailable state. Analysis
+uses Takeaways, What this means, Reliability, and cited Evidence, readable notes,
+plain body text, and expandable long interpretations. Model speculation remains
+unverified. The public schema and idempotent Tiger boundary are unchanged. Older
+saved reports remain historical results; use a new job to apply the new gate.
+
+Verified locally: 375 backend regression tests and 73 frontend tests passed.
+Frontend TypeScript and scoped ESLint passed. Hosted rollout is a separate step;
+these results do not establish population accuracy or recovery of an original
+full-length recording.
