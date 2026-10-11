@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
-import { createEnrollmentHandler, EnrollmentError, WELCOME_MESSAGE } from "../src/enroll.ts";
+import { createEnrollmentHandler, EnrollmentError, WELCOME_MESSAGE, type WelcomeDiagnostic } from "../src/enroll.ts";
 import { createBridgeServer } from "../src/server.ts";
 
 const projectId = "12345678-1234-4123-8123-123456789abc";
@@ -40,10 +40,12 @@ async function fixture(t: TestContext) {
   t.after(() => rm(directory, { recursive: true, force: true }));
   const calls: { url: string; options: RequestInit }[] = [];
   const sends: { recipient: string; text: string }[] = [];
+  const diagnostics: WelcomeDiagnostic[] = [];
   let listed: unknown = { succeed: true, data: { users: [], total: 0 } };
   let created: unknown = { succeed: true, data: user };
   const options = {
     projectId, projectSecret, deliveryDirectory: directory,
+    diagnostic: (event: WelcomeDiagnostic) => { diagnostics.push(event); },
     fetch: (async (url: string | URL | Request, init?: RequestInit) => {
       calls.push({ url: String(url), options: init! });
       if (init?.method === "GET") return json(listed);
@@ -58,7 +60,7 @@ async function fixture(t: TestContext) {
       return { id: "welcome-message-id" };
     },
   };
-  return { directory, calls, sends, options,
+  return { directory, calls, sends, diagnostics, options,
     setListed: (value: unknown) => { listed = value; }, setCreated: (value: unknown) => { created = value; } };
 }
 
@@ -238,9 +240,134 @@ for (const mode of ["throw", "missing-id", "invalid-id", "timeout"] as const) {
     assert.equal(second.welcome_status, "uncertain");
     assert.equal(second.already_enrolled, true);
     assert.equal(sends, 1);
+    assert.equal(state.diagnostics.length, 1);
+    assert.equal(state.diagnostics[0]!.category, mode === "throw" ? "sdk_exception"
+      : mode === "timeout" ? "send_deadline" : "invalid_message_id");
+    assert.ok(state.diagnostics[0]!.elapsed_ms >= (mode === "timeout" ? 4 : 0));
     assert.equal(JSON.parse(await readFile(join(state.directory, ledgerName()), "utf8")).state, "uncertain");
   });
 }
+
+for (const code of [0, 7, 16, -1, 17, 1.5, "7", NaN, Infinity]) {
+  test(`welcome diagnostics allow only numeric gRPC status ${String(code)} without private data`, async (t) => {
+    const state = await fixture(t);
+    const options = { ...state.options, sendWelcome: async () => {
+      throw Object.assign(new Error(`provider-private-detail ${phone} ${projectSecret}`), {
+        code, details: "PRIVATE_PROVIDER_DETAILS", context: { phone, userId }, projectId,
+      });
+    } };
+    assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "uncertain");
+    assert.equal(state.diagnostics.length, 1);
+    const event = state.diagnostics[0]!;
+    assert.equal(event.category, "sdk_exception");
+    assert.ok(Number.isInteger(event.elapsed_ms) && event.elapsed_ms >= 0);
+    const valid = typeof code === "number" && Number.isInteger(code) && code >= 0 && code <= 16;
+    assert.deepEqual(Object.keys(event).sort(), valid ? ["category", "elapsed_ms", "grpcCode"] : ["category", "elapsed_ms"]);
+    assert.equal(event.grpcCode, valid ? code : undefined);
+    assert.doesNotMatch(JSON.stringify(event), /provider-private|PRIVATE_PROVIDER|15551234567|test-only|aaaaaaaa|12345678/);
+  });
+}
+
+test("native SDK grpcCode is retained without exposing its string code or private context", async (t) => {
+  const state = await fixture(t);
+  const options = { ...state.options, sendWelcome: async () => {
+    throw Object.assign(new Error(`PRIVATE_PROVIDER_DETAILS ${phone}`), {
+      code: "unauthenticated", grpcCode: 16, context: { phone, projectSecret },
+    });
+  } };
+  assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "uncertain");
+  assert.equal(state.diagnostics[0]!.grpcCode, 16);
+  assert.doesNotMatch(JSON.stringify(state.diagnostics), /unauthenticated|PRIVATE_PROVIDER|15551234567|test-only/);
+});
+
+test("an error code getter cannot leak text or break diagnostic handling", async (t) => {
+  const state = await fixture(t);
+  const failure = Object.defineProperty(new Error("PRIVATE_PROVIDER_DETAILS"), "code", {
+    get() { throw new Error("PRIVATE_PROVIDER_DETAILS"); },
+  });
+  const options = { ...state.options, sendWelcome: async () => { throw failure; } };
+  assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "uncertain");
+  assert.equal(state.diagnostics[0]!.category, "sdk_exception");
+  assert.equal(state.diagnostics[0]!.grpcCode, undefined);
+});
+
+test("default console diagnostic contains only the fixed safe fields", async (t) => {
+  const state = await fixture(t);
+  const logged: unknown[][] = [];
+  t.mock.method(console, "warn", (...values: unknown[]) => { logged.push(values); });
+  const options = { ...state.options, diagnostic: undefined, sendWelcome: async () => {
+    throw Object.assign(new Error(`PRIVATE_PROVIDER_DETAILS ${phone} ${projectSecret}`), { code: 7, userId, projectId });
+  } };
+  assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "uncertain");
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0]![0], "Photon welcome diagnostic:");
+  const event = JSON.parse(String(logged[0]![1]));
+  assert.deepEqual(Object.keys(event).sort(), ["category", "elapsed_ms", "grpcCode"]);
+  assert.equal(event.category, "sdk_exception");
+  assert.equal(event.grpcCode, 7);
+  assert.doesNotMatch(JSON.stringify(logged), /PRIVATE_PROVIDER|15551234567|test-only|aaaaaaaa|12345678/);
+});
+
+for (const asynchronous of [false, true]) {
+  test(`${asynchronous ? "async" : "sync"} diagnostic failure cannot break signup or cause resend`, async (t) => {
+    const state = await fixture(t);
+    let sends = 0;
+    const options = { ...state.options, diagnostic: () => {
+      if (asynchronous) return Promise.reject(new Error("PRIVATE_DIAGNOSTIC_FAILURE"));
+      throw new Error("PRIVATE_DIAGNOSTIC_FAILURE");
+    }, sendWelcome: async () => { sends++; throw new Error("PRIVATE_PROVIDER_DETAILS"); } };
+    assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "uncertain");
+    assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "uncertain");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(sends, 1);
+  });
+}
+
+test("late SDK success after the deadline stays uncertain and never sends again", async (t) => {
+  const state = await fixture(t);
+  let resolveSend!: (value: { id: string }) => void;
+  let sends = 0;
+  const options = { ...state.options, sendTimeoutMs: 8, sendWelcome: async () => {
+    sends++;
+    return new Promise<{ id: string }>((resolve) => { resolveSend = resolve; });
+  } };
+  assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "uncertain");
+  assert.equal(state.diagnostics[0]!.category, "send_deadline");
+  assert.ok(state.diagnostics[0]!.elapsed_ms >= 7);
+  resolveSend({ id: "late-provider-accepted-id" });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "uncertain");
+  assert.equal(sends, 1);
+  assert.equal(state.diagnostics.length, 1);
+});
+
+test("cached uncertainty and existing user without a receipt produce no welcome-attempt diagnostic", async (t) => {
+  const state = await fixture(t);
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  assert.equal((await createEnrollmentHandler(state.options)(input, key)).welcome_status, "uncertain");
+  assert.equal((await createEnrollmentHandler(state.options)(input, key)).welcome_status, "uncertain");
+  assert.deepEqual(state.diagnostics, []);
+  assert.equal(state.sends.length, 0);
+});
+
+test("accepted-receipt storage failure is diagnosed separately without a duplicate welcome", async (t) => {
+  const state = await fixture(t);
+  let sends = 0;
+  const path = join(state.directory, ledgerName());
+  const options = { ...state.options, sendWelcome: async () => {
+    sends++;
+    // Simulate a receipt target becoming unwritable after the pending marker.
+    await rm(path);
+    await mkdir(path);
+    return { id: "accepted-before-storage-failed" };
+  } };
+  assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "uncertain");
+  assert.equal(state.diagnostics.length, 1);
+  assert.equal(state.diagnostics[0]!.category, "receipt_storage_failed");
+  assert.equal(state.diagnostics[0]!.grpcCode, undefined);
+  await assert.rejects(createEnrollmentHandler(options)(input, key), hasError(503, "ENROLLMENT_STORAGE_UNAVAILABLE"));
+  assert.equal(sends, 1);
+});
 
 test("stored pending after a crash checks active provider before returning uncertainty", async (t) => {
   const state = await fixture(t);

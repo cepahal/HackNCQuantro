@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { BridgeError, createSummarySender, type SummaryInput } from "../src/summary.ts";
+import { BridgeError, createSummarySender, type SummaryDiagnostic, type SummaryInput } from "../src/summary.ts";
 
 const input: SummaryInput = {
   conversation_id: "imessage-conversation-1",
@@ -333,8 +333,10 @@ test("the same job can deliver separately to distinct conversations", async () =
 test("a missing persisted acknowledgement after provider acceptance never triggers another send", async () => {
   await withDirectory(async (deliveryDirectory) => {
     let sends = 0;
+    const diagnostics: SummaryDiagnostic[] = [];
     const options = {
       deliveryDirectory,
+      diagnostic: (event: SummaryDiagnostic) => { diagnostics.push(event); },
       resolveConversation: async () => ({
         send: async () => {
           sends++;
@@ -349,6 +351,8 @@ test("a missing persisted acknowledgement after provider acceptance never trigge
     await assert.rejects(createSummarySender(options)(input, "storage-after-send"), hasError(503, "DELIVERY_STORAGE_UNAVAILABLE"));
     await assert.rejects(createSummarySender(options)(input, "storage-after-send"), hasError(503, "DELIVERY_STORAGE_UNAVAILABLE"));
     assert.equal(sends, 1);
+    assert.equal(diagnostics.length, 1);
+    assertSafeDiagnostic(diagnostics[0]!, "receipt_storage_failed");
   });
 });
 
@@ -356,13 +360,17 @@ test("invalid provider message IDs leave an ambiguous attempt that cannot resend
   await withDirectory(async (deliveryDirectory) => {
     for (const [index, id] of ["", "x".repeat(513), "id\nprivate"].entries()) {
       let sends = 0;
+      const diagnostics: SummaryDiagnostic[] = [];
       const options = {
         deliveryDirectory,
+        diagnostic: (event: SummaryDiagnostic) => { diagnostics.push(event); },
         resolveConversation: async () => ({ send: async () => { sends++; return { id }; } }),
       };
       await assert.rejects(createSummarySender(options)(input, `bad-id-${index}`), hasError(502, "DELIVERY_UNCERTAIN"));
       await assert.rejects(createSummarySender(options)(input, `bad-id-${index}`), hasError(409, "DELIVERY_UNCERTAIN"));
       assert.equal(sends, 1);
+      assert.equal(diagnostics.length, 1);
+      assertSafeDiagnostic(diagnostics[0]!, "invalid_message_id");
     }
   });
 });
@@ -377,9 +385,11 @@ test("stalled provider sends time out and late success or rejection cannot cause
         fail = reject;
       });
       let sends = 0;
+      const diagnostics: SummaryDiagnostic[] = [];
       const options = {
         deliveryDirectory,
         sendTimeoutMs: 10,
+        diagnostic: (event: SummaryDiagnostic) => { diagnostics.push(event); },
         resolveConversation: async () => ({ send: () => { sends++; return providerResult; } }),
       };
       await assert.rejects(createSummarySender(options)(input, `timeout-${outcome}`), hasError(502, "DELIVERY_UNCERTAIN"));
@@ -390,8 +400,181 @@ test("stalled provider sends time out and late success or rejection cannot cause
       assert.equal(sends, 1);
       const key = createHash("sha256").update(JSON.stringify([input.conversation_id, `timeout-${outcome}`])).digest("hex");
       assert.equal(JSON.parse(await readFile(join(deliveryDirectory, `${key}.json`), "utf8")).state, "failed");
+      assert.equal(diagnostics.length, 1);
+      assertSafeDiagnostic(diagnostics[0]!, "send_deadline");
     }
   });
+});
+
+function assertSafeDiagnostic(event: SummaryDiagnostic, category: SummaryDiagnostic["category"], grpcCode?: number): void {
+  assert.equal(event.category, category);
+  assert.ok(Number.isInteger(event.elapsed_ms) && event.elapsed_ms >= 0);
+  assert.deepEqual(Object.keys(event).sort(), grpcCode === undefined
+    ? ["category", "elapsed_ms"] : ["category", "elapsed_ms", "grpcCode"]);
+  assert.equal(event.grpcCode, grpcCode);
+}
+
+test("SDK diagnostics expose only a fixed category, elapsed time, and allowlisted numeric gRPC code", async () => {
+  await withDirectory(async (deliveryDirectory) => {
+    const diagnostics: SummaryDiagnostic[] = [];
+    let sends = 0;
+    const privateDetail = "private-token-phone-message-content";
+    const options = {
+      deliveryDirectory,
+      diagnostic: (event: SummaryDiagnostic) => { diagnostics.push(event); },
+      resolveConversation: async () => ({ send: async () => {
+        sends++;
+        throw Object.assign(new Error(privateDetail), {
+          code: 7, context: { secret: privateDetail, conversation_id: input.conversation_id },
+          report_url: input.report_url, stack: privateDetail,
+        });
+      } }),
+    };
+    await assert.rejects(createSummarySender(options)(input, "sdk-diagnostic"), (error: unknown) => {
+      assert.ok(hasError(502, "DELIVERY_UNCERTAIN")(error));
+      assert.ok(!JSON.stringify((error as BridgeError).body).includes(privateDetail));
+      return true;
+    });
+    await assert.rejects(createSummarySender(options)(input, "sdk-diagnostic"), hasError(409, "DELIVERY_UNCERTAIN"));
+    assert.equal(sends, 1);
+    assert.equal(diagnostics.length, 1);
+    assertSafeDiagnostic(diagnostics[0]!, "sdk_exception", 7);
+    const log = JSON.stringify(diagnostics);
+    for (const forbidden of [privateDetail, input.conversation_id, input.summary, input.report_url]) {
+      assert.ok(!log.includes(forbidden));
+    }
+  });
+});
+
+test("diagnostics reject arbitrary SDK codes and never invoke error getters", async () => {
+  await withDirectory(async (deliveryDirectory) => {
+    const errors: unknown[] = [
+      ...[-1, 17, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "7", "PERMISSION_DENIED"].map((code) => ({ code })),
+      new Proxy({}, { getOwnPropertyDescriptor: () => { throw new Error("private proxy detail"); } }),
+    ];
+    let getterReads = 0;
+    errors.push(Object.defineProperty({}, "code", { get: () => { getterReads++; throw new Error("private getter detail"); } }));
+    for (const [index, error] of errors.entries()) {
+      const diagnostics: SummaryDiagnostic[] = [];
+      const send = createSummarySender({
+        deliveryDirectory,
+        diagnostic: (event) => { diagnostics.push(event); },
+        resolveConversation: async () => ({ send: async () => { throw error; } }),
+      });
+      await assert.rejects(send(input, `unsafe-code-${index}`), hasError(502, "DELIVERY_UNCERTAIN"));
+      assert.equal(diagnostics.length, 1);
+      assertSafeDiagnostic(diagnostics[0]!, "sdk_exception");
+    }
+    assert.equal(getterReads, 0);
+  });
+});
+
+test("native Advanced iMessage diagnostics prefer numeric grpcCode without exposing string SDK codes", async () => {
+  await withDirectory(async (deliveryDirectory) => {
+    for (const [index, error] of [
+      { code: "MESSAGE_SEND_FAILED", grpcCode: 7 },
+      { code: 14, grpcCode: 0 },
+      { code: 14, grpcCode: "private-native-status" },
+    ].entries()) {
+      const diagnostics: SummaryDiagnostic[] = [];
+      const send = createSummarySender({
+        deliveryDirectory,
+        diagnostic: (event) => { diagnostics.push(event); },
+        resolveConversation: async () => ({ send: async () => { throw error; } }),
+      });
+      await assert.rejects(send(input, `native-grpc-${index}`), hasError(502, "DELIVERY_UNCERTAIN"));
+      assert.equal(diagnostics.length, 1);
+      assertSafeDiagnostic(diagnostics[0]!, "sdk_exception", [7, 0, 14][index]);
+      assert.ok(!JSON.stringify(diagnostics).includes("MESSAGE_SEND_FAILED"));
+      assert.ok(!JSON.stringify(diagnostics).includes("private-native-status"));
+    }
+    let getterReads = 0;
+    const nativeError = Object.defineProperty({ code: 14 }, "grpcCode", {
+      get: () => { getterReads++; throw new Error("private getter detail"); },
+    });
+    const diagnostics: SummaryDiagnostic[] = [];
+    await assert.rejects(createSummarySender({
+      deliveryDirectory,
+      diagnostic: (event) => { diagnostics.push(event); },
+      resolveConversation: async () => ({ send: async () => { throw nativeError; } }),
+    })(input, "native-getter"), hasError(502, "DELIVERY_UNCERTAIN"));
+    assert.equal(getterReads, 0);
+    assertSafeDiagnostic(diagnostics[0]!, "sdk_exception", 14);
+  });
+});
+
+test("pre-send diagnostic categories preserve safe retry and public errors", async () => {
+  await withDirectory(async (deliveryDirectory) => {
+    for (const stage of ["resolution", "preparation"] as const) {
+      const previousReceipts = await readdir(deliveryDirectory);
+      const diagnostics: SummaryDiagnostic[] = [];
+      let sends = 0;
+      let fail = true;
+      const options = {
+        deliveryDirectory,
+        diagnostic: (event: SummaryDiagnostic) => { diagnostics.push(event); },
+        resolveConversation: async () => {
+          if (stage === "resolution" && fail) throw new Error("private resolver details");
+          return { send: async () => { sends++; return { id: "safe-retry" }; } };
+        },
+        prepareReport: async () => {
+          if (stage === "preparation" && fail) throw new Error("private preparation details");
+        },
+      };
+      await assert.rejects(createSummarySender(options)(input, `diagnostic-${stage}`), (error: unknown) => {
+        assert.ok(error instanceof BridgeError);
+        assert.equal(error.status, 503);
+        assert.equal(error.body.error.code, stage === "resolution" ? "CONVERSATION_UNAVAILABLE" : "DELIVERY_STORAGE_UNAVAILABLE");
+        assert.equal(error.body.error.retryable, stage === "resolution");
+        assert.ok(!JSON.stringify(error.body).includes("private"));
+        return true;
+      });
+      assert.equal(sends, 0);
+      assert.deepEqual(await readdir(deliveryDirectory), previousReceipts);
+      assert.equal(diagnostics.length, 1);
+      assertSafeDiagnostic(diagnostics[0]!, stage === "resolution" ? "conversation_resolution_failed" : "report_preparation_failed");
+      fail = false;
+      assert.equal((await createSummarySender(options)(input, `diagnostic-${stage}`)).status, "accepted");
+      assert.equal(sends, 1);
+      assert.equal(diagnostics.length, 1);
+    }
+  });
+});
+
+test("diagnostic callback failures never alter ambiguous delivery state or allow resending", async () => {
+  await withDirectory(async (deliveryDirectory) => {
+    for (const kind of ["throw", "reject"] as const) {
+      let sends = 0;
+      const options = {
+        deliveryDirectory,
+        diagnostic: () => {
+          if (kind === "throw") throw new Error("private logging failure");
+          return Promise.reject(new Error("private logging rejection"));
+        },
+        resolveConversation: async () => ({ send: async () => { sends++; throw new Error("private send failure"); } }),
+      };
+      await assert.rejects(createSummarySender(options)(input, `logging-${kind}`), hasError(502, "DELIVERY_UNCERTAIN"));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      await assert.rejects(createSummarySender(options)(input, `logging-${kind}`), hasError(409, "DELIVERY_UNCERTAIN"));
+      assert.equal(sends, 1);
+    }
+  });
+});
+
+test("default diagnostics log only the fixed safe event", async (context) => {
+  const logged: unknown[][] = [];
+  context.mock.method(console, "warn", (...values: unknown[]) => { logged.push(values); });
+  await withDirectory(async (deliveryDirectory) => {
+    const send = createSummarySender({
+      deliveryDirectory,
+      resolveConversation: async () => ({ send: async () => { throw Object.assign(new Error("private SDK detail"), { code: 14 }); } }),
+    });
+    await assert.rejects(send(input, "default-diagnostic"), hasError(502, "DELIVERY_UNCERTAIN"));
+  });
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0]![0], "Photon summary diagnostic:");
+  assertSafeDiagnostic(JSON.parse(logged[0]![1] as string) as SummaryDiagnostic, "sdk_exception", 14);
+  assert.ok(!JSON.stringify(logged).includes("private SDK detail"));
 });
 
 test("provider send deadline configuration rejects values outside 1–12000 integer milliseconds", async () => {

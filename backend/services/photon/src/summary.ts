@@ -14,6 +14,16 @@ export interface SummaryAccepted {
   status: "accepted";
 }
 
+export interface SummaryDiagnostic {
+  category: "sdk_exception" | "send_deadline" | "invalid_message_id" | "receipt_storage_failed"
+    | "conversation_resolution_failed" | "report_preparation_failed";
+  elapsed_ms: number;
+  grpcCode?: number;
+}
+
+class SummaryDeadlineError extends Error {}
+class SummaryMessageIdError extends Error {}
+
 export class BridgeError extends Error {
   readonly status: number;
   readonly body: {
@@ -40,6 +50,7 @@ interface SummarySenderOptions {
   deliveryDirectory: string;
   sendTimeoutMs?: number;
   prepareReport?: (input: SummaryInput, jobId: string) => Promise<void>;
+  diagnostic?: (event: SummaryDiagnostic) => void;
 }
 
 interface DeliveryRecord {
@@ -131,7 +142,7 @@ async function withSendDeadline<T>(send: Promise<T>, timeoutMs: number): Promise
     return await Promise.race([
       send,
       new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(uncertainDelivery()), timeoutMs);
+        timer = setTimeout(() => reject(new SummaryDeadlineError()), timeoutMs);
       }),
     ]);
   } finally {
@@ -146,6 +157,29 @@ export function createSummarySender(options: SummarySenderOptions) {
   }
   const directory = resolve(options.deliveryDirectory);
   const inFlight = new Map<string, { fingerprint: string; promise: Promise<SummaryAccepted> }>();
+
+  function diagnose(category: SummaryDiagnostic["category"], started: number, error?: unknown): void {
+    // Never log provider text, stack, identifiers, or arbitrary enumerable fields.
+    const event: SummaryDiagnostic = { category, elapsed_ms: Math.max(0, Math.round(performance.now() - started)) };
+    try {
+      if (category === "sdk_exception" && typeof error === "object" && error !== null) {
+        for (const key of ["grpcCode", "code"] as const) {
+          const code = Object.getOwnPropertyDescriptor(error, key)?.value;
+          if (typeof code === "number" && Number.isInteger(code) && code >= 0 && code <= 16) {
+            event.grpcCode = code;
+            break;
+          }
+        }
+      }
+    } catch { /* Untrusted getters/proxies cannot disrupt delivery or diagnostics. */ }
+    try {
+      if (options.diagnostic) {
+        void Promise.resolve(options.diagnostic(event)).catch(() => undefined);
+      } else {
+        console.warn("Photon summary diagnostic:", JSON.stringify(event));
+      }
+    } catch { /* Diagnostics must never change delivery state or the bridge response. */ }
+  }
 
   async function deliver(input: SummaryInput, jobId: string, key: string, fingerprint: string): Promise<SummaryAccepted> {
     const path = resolve(directory, `${key}.json`);
@@ -174,9 +208,11 @@ export function createSummarySender(options: SummarySenderOptions) {
     }
 
     let conversation: Awaited<ReturnType<SummarySenderOptions["resolveConversation"]>>;
+    const resolutionStarted = performance.now();
     try {
       conversation = await options.resolveConversation(input.conversation_id);
     } catch (error) {
+      diagnose("conversation_resolution_failed", resolutionStarted);
       // This sender owns the exclusive marker, and no send has been attempted.
       try {
         await unlink(path);
@@ -187,9 +223,11 @@ export function createSummarySender(options: SummarySenderOptions) {
       throw new BridgeError(503, "CONVERSATION_UNAVAILABLE", "The conversation could not be resolved. Retry when it becomes available.", true);
     }
 
+    const preparationStarted = performance.now();
     try {
       await options.prepareReport?.(input, jobId);
     } catch {
+      diagnose("report_preparation_failed", preparationStarted);
       // Preparation has not sent anything; allow a safe retry of this same job.
       try {
         await unlink(path);
@@ -200,20 +238,24 @@ export function createSummarySender(options: SummarySenderOptions) {
     }
 
     let messageId: string;
+    const sendStarted = performance.now();
     try {
       // A timeout cannot cancel provider delivery; its ledger must remain ambiguous.
       const sent = await withSendDeadline(
         conversation.send(`${input.summary}\n\nFull report: ${input.report_url}`), sendTimeoutMs,
       );
-      if (!validMessageId(sent?.id)) throw uncertainDelivery();
+      if (!validMessageId(sent?.id)) throw new SummaryMessageIdError();
       messageId = sent.id;
-    } catch {
+    } catch (error) {
+      diagnose(error instanceof SummaryDeadlineError ? "send_deadline"
+        : error instanceof SummaryMessageIdError ? "invalid_message_id" : "sdk_exception", sendStarted, error);
       await replaceRecord(path, { ...pending, state: "failed" }).catch(() => undefined);
       throw new BridgeError(502, "DELIVERY_UNCERTAIN", "Photon did not confirm a message ID. Verify delivery before requesting another send.");
     }
     try {
       await replaceRecord(path, { ...pending, state: "accepted", message_id: messageId });
     } catch {
+      diagnose("receipt_storage_failed", sendStarted);
       throw storageError();
     }
     return { conversation_id: input.conversation_id, message_id: messageId, status: "accepted" };

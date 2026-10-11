@@ -109,6 +109,11 @@ Stable API, then shows that user's assigned Photon number and an Open Messages
 link. The user replies with a public video URL to enter the existing analysis
 flow. No frontend files or analysis functions are involved in signup.
 
+Scanning the QR opens the form; it does not register a phone automatically.
+Each tester must submit their own number and then use the assigned line returned
+by signup. An accepted welcome is not proof of receipt. If replies do not arrive,
+check the phone versus Apple Account email sender setting in Messages.
+
 The existing plan permits 100 registered users, including existing project
 users. Photon enforces capacity; this integration never upgrades the plan or
 buys a line. Different people can receive different assigned numbers. Posting
@@ -249,6 +254,13 @@ may have sent a message; it must be reconciled before another send. Never bypass
 changing the job ID or deleting its delivery record to force a retry. Errors use
 `{error: {code, stage: "send_summary", message, retryable}}` with safe fixed messages.
 Provider sends have a 12-second deadline; a timeout remains an uncertain outcome.
+
+Render logs distinguish welcome and summary failures with fixed diagnostic
+categories for SDK exceptions, deadlines, missing message IDs, and receipt-storage
+failures. Summary diagnostics also distinguish conversation resolution and report
+preparation. Events contain elapsed milliseconds and, when available, a numeric
+gRPC status only. They omit provider text, credentials, phone numbers and message
+content. Preserve uncertain delivery markers; diagnostics do not authorize a resend.
 
 Persist `.data/photon` on the deployment host; keep it private and share its delivery directory
 if more than one bridge instance is used. Do not expose the bridge port publicly. The service

@@ -14,6 +14,15 @@ export interface EnrollmentResult {
   already_enrolled: boolean;
 }
 
+export interface WelcomeDiagnostic {
+  category: "sdk_exception" | "send_deadline" | "invalid_message_id" | "receipt_storage_failed";
+  elapsed_ms: number;
+  grpcCode?: number;
+}
+
+class WelcomeDeadlineError extends Error {}
+class WelcomeMessageIdError extends Error {}
+
 export class EnrollmentError extends Error {
   readonly status: number;
   readonly body: { error: { code: string; stage: "enroll"; message: string; retryable: boolean } };
@@ -34,6 +43,7 @@ interface EnrollmentOptions {
   fetch?: typeof globalThis.fetch;
   requestTimeoutMs?: number;
   sendTimeoutMs?: number;
+  diagnostic?: (event: WelcomeDiagnostic) => void;
 }
 
 interface WelcomeRecord {
@@ -153,7 +163,7 @@ async function withDeadline<T>(operation: Promise<T>, timeoutMs: number): Promis
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([operation, new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(unavailable()), timeoutMs);
+      timer = setTimeout(() => reject(new WelcomeDeadlineError()), timeoutMs);
     })]);
   } finally {
     if (timer !== undefined) clearTimeout(timer);
@@ -171,6 +181,29 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
   const endpoint = `https://spectrum.photon.codes/projects/${options.projectId}/users/`;
   const authorization = `Basic ${Buffer.from(`${options.projectId}:${options.projectSecret}`, "utf8").toString("base64")}`;
   const inFlight = new Map<string, Promise<EnrollmentResult>>();
+
+  function diagnose(category: WelcomeDiagnostic["category"], started: number, error?: unknown): void {
+    // Never log provider text, stack, identifiers, or arbitrary enumerable fields.
+    const event: WelcomeDiagnostic = { category, elapsed_ms: Math.max(0, Math.round(performance.now() - started)) };
+    try {
+      if (category === "sdk_exception" && typeof error === "object" && error !== null) {
+        for (const field of ["grpcCode", "code"]) {
+          const code = Object.getOwnPropertyDescriptor(error, field)?.value;
+          if (typeof code === "number" && Number.isInteger(code) && code >= 0 && code <= 16) {
+            event.grpcCode = code;
+            break;
+          }
+        }
+      }
+    } catch { /* Untrusted getters/proxies cannot disrupt enrollment or diagnostics. */ }
+    try {
+      if (options.diagnostic) {
+        void Promise.resolve(options.diagnostic(event)).catch(() => undefined);
+      } else {
+        console.warn("Photon welcome diagnostic:", JSON.stringify(event));
+      }
+    } catch { /* Diagnostics must never change delivery state or the signup response. */ }
+  }
 
   async function request(url: string, method: "GET" | "POST", phone: string): Promise<Record<string, unknown>> {
     try {
@@ -229,11 +262,14 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
     // before a redeploy. Do not turn lost receipt history into another message.
     if (alreadyEnrolled) return result(pending, true);
     let sent: { id: string } | undefined;
+    const started = performance.now();
     try {
       // A timeout cannot cancel delivery. Keep pending/uncertain forever rather than resend.
       sent = await withDeadline(options.sendWelcome(phone, WELCOME_MESSAGE), sendTimeoutMs);
-      if (!validMessageId(sent?.id)) throw unavailable();
-    } catch {
+      if (!validMessageId(sent?.id)) throw new WelcomeMessageIdError();
+    } catch (error) {
+      diagnose(error instanceof WelcomeDeadlineError ? "send_deadline"
+        : error instanceof WelcomeMessageIdError ? "invalid_message_id" : "sdk_exception", started, error);
       await replaceRecord(path, { ...pending, state: "uncertain" }).catch(() => undefined);
       return result(pending, alreadyEnrolled);
     }
@@ -242,6 +278,7 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
       await replaceRecord(path, accepted);
     } catch {
       // Sending happened; the original pending marker still prevents another attempt.
+      diagnose("receipt_storage_failed", started);
       return result(pending, alreadyEnrolled);
     }
     return result(accepted, alreadyEnrolled);
