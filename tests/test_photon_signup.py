@@ -3,6 +3,8 @@
 import hashlib
 import io
 import json
+import shutil
+import subprocess
 from unittest.mock import Mock
 from urllib.error import HTTPError, URLError
 
@@ -88,7 +90,80 @@ async def test_signup_uses_zoomout_branding_and_clear_mobile_steps_without_exter
     assert "Registration alone does not confirm delivery" in html
     assert "Your number is shared with our messaging provider" in html
     assert "<script src=" not in html and "<link " not in html
-    assert "https://" not in html and "http://" not in html
+    assert html.count("https://") == 1
+    assert 'href="https://support.apple.com/en-us/101744"' in html
+    assert "http://" not in html
+
+
+@pytest.mark.asyncio
+async def test_signup_explains_qr_registration_assigned_number_and_unconfirmed_delivery(client):
+    html = (await client.get("/imessage")).text
+    assert "Scanning only opens this form" in html
+    assert "tap Register for iMessage to finish registration" in html
+    assert 'id="result" hidden aria-labelledby="result-heading"' in html
+    assert 'id="result-heading">Next: open Messages.</h2>' in html
+    assert "You can start without waiting for a welcome message" in html
+    assert "not a number copied from a friend" in html
+    assert 'id="messages" class="messages" aria-describedby="assigned"' in html
+    assert "body.assigned_phone_number" in html and "body.open_messages_url" in html
+    assert "receipt is not confirmed" in html
+    assert "Welcome delivery is unconfirmed" in html
+    assert "Settings &gt; Apps &gt; Messages &gt; Send &amp; Receive" in html
+    assert "Start New Conversations From" in html
+    assert "rather than an Apple Account email address, then start a new conversation" in html
+    assert 'target="_blank" rel="noopener noreferrer"' in html
+
+
+def test_actual_signup_script_normalizes_formatted_numbers_before_sending_strict_json():
+    """Execute the page's real submit handler with a local DOM/fetch double, not a second normalizer."""
+    script = signup._HTML.split("<script>", 1)[1].split("</script>", 1)[0]
+    cases = [
+        {"input": "+1 (919) 555-0123", "expected": "+19195550123"},
+        {"input": "919-555-0123", "expected": "+19195550123"},
+        {"input": "9195550123", "expected": "+19195550123"},
+        {"input": "  +44 (20) 7946 0958  ", "expected": "+442079460958"},
+        {"input": "+683 1234", "expected": "+6831234"},
+        *({"input": value, "expected": None} for value in (
+            "", "19195550123", "00442079460958", "++19195550123", "+01995550123",
+            "+123", "+19195550123 ext 5", "９１９５５５０１２３", "919<script>5550123",
+        )),
+    ]
+    harness = """
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+const {script,cases,response}=JSON.parse(readFileSync(0,'utf8'));
+const results=[];
+for(const item of cases){
+  const handlers={},requests=[];
+  const elements=Object.fromEntries(['signup','submit','status','result','phone','consent','assigned','messages'].map(id=>[id,{textContent:'',hidden:true,disabled:false,attributes:{},addEventListener(name,handler){handlers[name]=handler;},setAttribute(name,value){this.attributes[name]=value;},removeAttribute(name){delete this.attributes[name];},focus(){this.focused=true;}}]));
+  elements.phone.value=item.input;elements.consent.checked=true;
+  vm.runInNewContext(script,{document:{getElementById:id=>elements[id]},fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>response};}},{timeout:1000});
+  await handlers.submit({preventDefault(){}});
+  results.push({requests,status:elements.status.textContent,invalid:elements.phone.attributes['aria-invalid'],hidden:elements.result.hidden,disabled:elements.submit.disabled,phone:elements.phone.value});
+}
+process.stdout.write(JSON.stringify(results));
+"""
+    node = shutil.which("node")
+    assert node, "Node is required to verify the real signup browser script."
+    executed = subprocess.run(
+        [node, "--input-type=module", "-e", harness],
+        input=json.dumps({"script": script, "cases": cases, "response": RESULT}),
+        text=True, encoding="utf-8", capture_output=True, check=True, timeout=10,
+    )
+    results = json.loads(executed.stdout)
+    for case, actual in zip(cases, results, strict=True):
+        assert actual["disabled"] is False
+        if case["expected"] is None:
+            assert actual["requests"] == [], case
+            assert actual["invalid"] == "true"
+            assert "include + and the country code" in actual["status"]
+            assert actual["hidden"] is True
+        else:
+            assert actual["requests"] == [{"url": "/imessage/signup", "body": {"phone_number": case["expected"], "consent": True}}], case
+            assert actual["phone"] == case["expected"]
+            assert actual["hidden"] is False
+    assert 'pattern=' not in signup._HTML.split('<input id="phone"', 1)[1].split('>', 1)[0]
+    assert "US/Canada: enter 10 digits and we add +1" in signup._HTML
 
 
 @pytest.mark.asyncio

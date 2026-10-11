@@ -49,6 +49,7 @@ button{width:100%;margin:20px 0 14px;cursor:pointer}button:disabled{opacity:.5;c
 button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--red);outline-offset:3px}.privacy,small{font-size:12px;color:var(--body)}
 #status{white-space:pre-line;font-size:14px;overflow-wrap:anywhere;border-left:3px solid var(--red);padding-left:12px;margin:18px 0 0}#status:empty{display:none}
 #result{padding:20px;margin-top:20px;border:1px solid var(--line);background:#fafafa}#result[hidden]{display:none}#assigned{font-size:14px;font-weight:600;overflow-wrap:anywhere}.messages{background:#fff;color:var(--ink);border-color:#c9c9ce;margin:0 0 14px}.messages:hover{background:#f1f1f3}
+.result-copy{font-size:14px;color:var(--body)}#result .messages{width:100%}.troubleshooting{border-top:1px solid var(--line);margin-top:24px;padding-top:18px;font-size:13px;color:var(--body)}.troubleshooting summary{cursor:pointer;font-weight:600;color:var(--ink)}.troubleshooting ol{padding-left:20px;margin:12px 0}.troubleshooting li{margin-bottom:10px}.troubleshooting a{text-underline-offset:3px}
 .qr{margin-top:28px;border-top:1px solid var(--line);padding-top:24px;display:grid;grid-template-columns:112px 1fr;align-items:center;gap:20px}.qr img{display:block;width:112px;height:112px}.qr h2{font-size:20px}.qr p{font-size:13px;color:var(--body);margin:0}
 footer{border-top:1px solid var(--line);padding-block:22px;color:var(--body);font-size:12px}.footer-inner{display:flex;justify-content:space-between;gap:20px}
 @media(max-width:720px){.navbar{height:64px}.layout{grid-template-columns:1fr;gap:32px;padding-block:36px}.intro{font-size:17px}.steps{gap:16px;margin-top:24px}.signup-card{padding:24px}.brand{font-size:28px}.footer-inner{flex-wrap:wrap}}
@@ -56,27 +57,36 @@ footer{border-top:1px solid var(--line);padding-block:22px;color:var(--body);fon
 </style></head><body><header class="navbar"><div class="wrap nav-inner"><span class="brand" aria-label="Zoomout">zoomout</span><span class="nav-note">iMessage signup</span></div></header>
 <main class="wrap layout"><section aria-labelledby="signup-heading"><p class="eyebrow">The bigger picture</p><h1 id="signup-heading">Context.<br>In iMessage.</h1>
 <p class="intro">Send a public video link. Review the available source and surrounding context, right from Messages.</p>
-<ol class="steps" aria-label="How to get started"><li><div><strong>Register</strong><span>Add your own iMessage phone number below.</span></div></li><li><div><strong>Open Messages</strong><span>Start a conversation with your assigned number.</span></div></li><li><div><strong>Send a video</strong><span>Paste a public video link to request an analysis.</span></div></li></ol></section>
+<ol class="steps" aria-label="How to get started"><li><div><strong>Register</strong><span>Enter your own iMessage number and tap Register for iMessage.</span></div></li><li><div><strong>Open Messages</strong><span>Use the number assigned to you after registration.</span></div></li><li><div><strong>Send a video</strong><span>Paste a public video link to request an analysis.</span></div></li></ol></section>
 <div><section class="signup-card" aria-labelledby="register-heading"><h2 id="register-heading">Your next step: register.</h2><p class="card-copy">Use the number you send iMessages from, including its country code.</p>
-<form id="signup" method="post" action="/imessage/signup"><label for="phone">Your phone number, including country code</label>
-<input id="phone" name="phone_number" type="tel" autocomplete="tel" placeholder="+19195551234" maxlength="16" required pattern="\\+[1-9][0-9]{6,14}">
+<form id="signup" method="post" action="/imessage/signup"><label for="phone">Your iMessage phone number</label>
+<input id="phone" name="phone_number" type="tel" inputmode="tel" autocomplete="tel" placeholder="(919) 555-1234" maxlength="40" required aria-describedby="phone-help">
+<p id="phone-help" class="privacy">US/Canada: enter 10 digits and we add +1. For international numbers, include + and the country code. Spaces, parentheses and dashes are okay.</p>
 <label class="consent"><input id="consent" type="checkbox" required> I own this number and agree to receive Zoomout iMessages, including a welcome and replies to links I send.</label>
 <button id="submit" type="submit">Register for iMessage</button></form>
 <p class="privacy">Your number is shared with our messaging provider for registration. Only register a number you own.</p>
-<p id="status" role="status" aria-live="polite"></p><section id="result" hidden>
-<p id="assigned"></p><a id="messages" class="messages">Open Messages</a>
+<p id="status" role="status" aria-live="polite"></p><section id="result" hidden aria-labelledby="result-heading">
+<h2 id="result-heading">Next: open Messages.</h2><p class="result-copy">Send a public video link to the number below. You can start without waiting for a welcome message.</p>
+<p id="assigned"></p><a id="messages" class="messages" aria-describedby="assigned">Open Messages</a>
+<p class="result-copy">Your messaging line is assigned during registration. Use the number shown here, not a number copied from a friend.</p>
 <p><small>Sending and receiving a message verifies the connection. Registration alone does not confirm delivery.</small></p></section></section>
 <section class="qr"><a href="/imessage/qr.svg"><img src="/imessage/qr.svg" alt="QR code linking to Zoomout iMessage signup"></a><div><h2>On your computer?</h2>
-<p>Scan to open signup on your iPhone.</p></div></section></div></main>
+<p>Scanning only opens this form. Enter your number and tap Register for iMessage to finish registration.</p></div></section>
+<details class="troubleshooting"><summary>No reply in Messages?</summary><ol><li>Check that you registered the phone number you send iMessages from.</li>
+<li>On your iPhone, open Settings &gt; Apps &gt; Messages &gt; Send &amp; Receive. Under Start New Conversations From, select your registered phone number rather than an Apple Account email address, then start a new conversation.</li>
+<li>Send the link to your assigned number shown after registration. A saved registration or accepted welcome does not confirm message delivery.</li></ol>
+<a href="https://support.apple.com/en-us/101744" target="_blank" rel="noopener noreferrer">Apple's guide to your Messages sender address</a></details></div></main>
 <footer><div class="wrap footer-inner"><span>The full record, in context.</span><span>Zoomout · Built at HackNC</span></div></footer>
 <script>
 const form=document.getElementById('signup'),button=document.getElementById('submit'),status=document.getElementById('status'),result=document.getElementById('result');
-form.addEventListener('submit',async(event)=>{event.preventDefault();button.disabled=true;result.hidden=true;status.textContent='Registering your number…';
-try{const response=await fetch('/imessage/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone_number:document.getElementById('phone').value.trim(),consent:document.getElementById('consent').checked})});
+function normalizePhone(value){const text=value.trim();if(!/^[+0-9 ().-]+$/.test(text))return null;const compact=text.replace(/[ ().-]/g,'');if(/^\\+[1-9][0-9]{6,14}$/.test(compact))return compact;if(/^[0-9]{10}$/.test(compact))return '+1'+compact;return null;}
+form.addEventListener('submit',async(event)=>{event.preventDefault();result.hidden=true;const phone=document.getElementById('phone'),normalized=normalizePhone(phone.value);
+if(!normalized){phone.setAttribute('aria-invalid','true');status.textContent='Enter a US/Canada 10-digit number, or include + and the country code for an international number.';phone.focus();return;}phone.removeAttribute('aria-invalid');phone.value=normalized;button.disabled=true;status.textContent='Registering your number…';
+try{const response=await fetch('/imessage/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone_number:normalized,consent:document.getElementById('consent').checked})});
 const body=await response.json();if(!response.ok)throw new Error(body.error?.message||'Signup is temporarily unavailable.');
 document.getElementById('assigned').textContent='Your assigned Zoomout number: '+body.assigned_phone_number;
 document.getElementById('messages').href=body.open_messages_url;result.hidden=false;
-status.textContent=(body.already_enrolled?'Your number is already registered. ':'Your number is registered. ')+(body.welcome_status==='accepted'?'A welcome message was accepted for sending. Check Messages or use the link below.':'Welcome delivery is unconfirmed. Use Open Messages to start.');
+status.textContent=(body.already_enrolled?'Your number is already registered. ':'Your number is registered. ')+(body.welcome_status==='accepted'?'A welcome message was accepted for sending; receipt is not confirmed. Tap Open Messages below, then send a public video link.':'Welcome delivery is unconfirmed. Tap Open Messages below, then send a public video link.');
 }catch(error){status.textContent=error instanceof Error?error.message:'Signup is temporarily unavailable.';}finally{button.disabled=false;}});
 </script></body></html>"""
 
