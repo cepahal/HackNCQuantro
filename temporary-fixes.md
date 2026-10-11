@@ -539,3 +539,13 @@ words inside an aligned sentence. Exact distinctive blocks and the existing
 novelty threshold remain required; internal differences and outro boilerplate
 are excluded. Final affected checks: 609 backend tests, Ruff and scoped mypy
 passed. Frontend files remain untouched by this release.
+
+Final hosted check, backend 175d7c0: user-submitted yJzjyYL8l5Y returned matched
+in 18.821 seconds. GET of report_job_obama_dnc_locator_20261010_v2 returned200
+and all eight schema/content/sanitization checks passed. The source is C-SPAN
+eWynt87PaJ0 with observed context requested from726seconds. Source-match
+confidence is moderate; semantic assessment remains uncertain with low
+confidence, and three evidence-cited observations were produced. The deployed
+Vercel page visibly renders both recordings, both transcripts, matching times,
+context and findings. This proves recovery for this example, not universal
+accuracy, earliest-upload identity, media authenticity or full-video coverage.

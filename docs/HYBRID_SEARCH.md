@@ -295,3 +295,11 @@ provider groups it into the same sentence as the match. Internal transcription
 differences, copied speech and boilerplate do not count. No word timestamps are
 invented. Final affected regression suite: 609 passed; Ruff and scoped mypy
 passed.
+
+Hosted result on backend175d7c0: yJzjyYL8l5Y matched C-SPAN eWynt87PaJ0
+at the located context window beginning726seconds. The end-to-end run took
+18.821seconds; analysis and saved-report GET returned200. Eight checks passed
+and the Vercel report rendered both videos, both transcripts and three cited
+observations. Match confidence is moderate; semantic assessment is uncertain
+with low confidence. No earliest-upload, full-context or accuracy guarantee
+is implied. Report: report_job_obama_dnc_locator_20261010_v2.
