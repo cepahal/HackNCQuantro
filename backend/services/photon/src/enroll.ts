@@ -240,11 +240,15 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
     if (matching.length > 1) throw unavailable();
     const alreadyEnrolled = matching.length === 1;
     const user = providerUser(alreadyEnrolled ? matching[0] : await request(endpoint, "POST", phone), phone);
-    // A deleted and explicitly recreated enrollment has a new provider user ID.
-    // Its independent receipt permits one fresh welcome without deleting old history.
+    // Photon may restore an earlier user ID after deletion. Keep its welcome
+    // history, but use this lookup to describe the current registration.
     const path = resolve(directory, `${digest(`${options.projectId}:${phone}:${user.id}`)}.json`);
+    const reconciledResult = (record: WelcomeRecord): EnrollmentResult => result({
+      ...record, assigned_phone_number: user.assignedPhoneNumber,
+      state: alreadyEnrolled ? record.state : "uncertain",
+    }, alreadyEnrolled);
     const existing = await existingRecord(path);
-    if (existing) return result({ ...existing, assigned_phone_number: user.assignedPhoneNumber }, true);
+    if (existing) return reconciledResult(existing);
     const pending: WelcomeRecord = { version: 1, state: alreadyEnrolled ? "uncertain" : "pending",
       assigned_phone_number: user.assignedPhoneNumber };
     try {
@@ -254,7 +258,7 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "EEXIST") {
         const concurrent = await existingRecord(path);
-        if (concurrent) return result({ ...concurrent, assigned_phone_number: user.assignedPhoneNumber }, true);
+        if (concurrent) return reconciledResult(concurrent);
       }
       throw storageError();
     }

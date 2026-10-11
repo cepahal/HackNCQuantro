@@ -142,6 +142,31 @@ test("revoked cached enrollment is recreated with one fresh welcome for its new 
   assert.equal((await readdir(state.directory)).length, 2);
 });
 
+for (const receiptState of ["accepted", "uncertain"] as const) {
+  test(`restored same-ID enrollment with ${receiptState} history uses current registration without resend`, async (t) => {
+    const state = await fixture(t);
+    const receipt = JSON.stringify({ version: 1, state: receiptState, assigned_phone_number: assigned,
+      ...(receiptState === "accepted" ? { message_id: "historical-welcome" } : {}) });
+    await writeFile(join(state.directory, ledgerName()), receipt);
+    const newAssigned = "+15559876543";
+    state.setCreated({ succeed: true, data: { ...user, assignedPhoneNumber: newAssigned } });
+    const enroll = createEnrollmentHandler(state.options);
+    const results = await Promise.all(Array.from({ length: 8 }, () => enroll(input, key)));
+    assert.ok(results.every((result) => result.already_enrolled === false
+      && result.welcome_status === "uncertain" && result.assigned_phone_number === newAssigned));
+    assert.equal(results[0]!.open_messages_url, `sms:${newAssigned}&body=Hi%20Quantro`);
+    assert.deepEqual(state.calls.map((call) => call.options.method), ["GET", "POST"]);
+    assert.equal(state.sends.length, 0);
+    assert.deepEqual(state.diagnostics, []);
+    assert.equal(await readFile(join(state.directory, ledgerName()), "utf8"), receipt);
+    const retry = await createEnrollmentHandler(state.options)(input, key);
+    assert.equal(retry.already_enrolled, true);
+    assert.equal(retry.welcome_status, receiptState);
+    assert.equal(state.sends.length, 0);
+    assert.equal(await readFile(join(state.directory, ledgerName()), "utf8"), receipt);
+  });
+}
+
 test("cached success fails closed if current provider lookup is unavailable", async (t) => {
   const state = await fixture(t);
   await createEnrollmentHandler(state.options)(input, key);

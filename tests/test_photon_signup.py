@@ -137,7 +137,7 @@ for(const item of cases){
   const handlers={},requests=[];
   const elements=Object.fromEntries(['signup','submit','status','result','phone','consent','assigned','messages'].map(id=>[id,{textContent:'',hidden:true,disabled:false,attributes:{},addEventListener(name,handler){handlers[name]=handler;},setAttribute(name,value){this.attributes[name]=value;},removeAttribute(name){delete this.attributes[name];},focus(){this.focused=true;}}]));
   elements.phone.value=item.input;elements.consent.checked=true;
-  vm.runInNewContext(script,{document:{getElementById:id=>elements[id]},fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>response};}},{timeout:1000});
+  vm.runInNewContext(script,{window:{addEventListener(){}},document:{getElementById:id=>elements[id]},fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>response};}},{timeout:1000});
   await handlers.submit({preventDefault(){}});
   results.push({requests,status:elements.status.textContent,invalid:elements.phone.attributes['aria-invalid'],hidden:elements.result.hidden,disabled:elements.submit.disabled,phone:elements.phone.value});
 }
@@ -164,6 +164,48 @@ process.stdout.write(JSON.stringify(results));
             assert actual["hidden"] is False
     assert 'pattern=' not in signup._HTML.split('<input id="phone"', 1)[1].split('>', 1)[0]
     assert "US/Canada: enter 10 digits and we add +1" in signup._HTML
+
+
+def test_actual_signup_script_clears_restored_confirmation_and_ignores_late_results():
+    script = signup._HTML.split("<script>", 1)[1].split("</script>", 1)[0]
+    harness = """
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const {script,response}=JSON.parse(readFileSync(0,'utf8'));
+for(const reset of ['pageshow','input']){
+  const handlers={},windowHandlers={},requests=[];
+  const elements=Object.fromEntries(['signup','submit','status','result','phone','consent','assigned','messages'].map(id=>[id,{textContent:'',hidden:true,disabled:false,attributes:{},addEventListener(name,handler){handlers[id+':'+name]=handler;},setAttribute(name,value){this.attributes[name]=value;},removeAttribute(name){delete this.attributes[name];delete this[name];},focus(){}}]));
+  elements.phone.value='9195550123';elements.consent.checked=true;
+  let release,entered;
+  let bodyReady=new Promise(resolve=>{entered=resolve;});
+  vm.runInNewContext(script,{window:{addEventListener(name,handler){windowHandlers[name]=handler;}},document:{getElementById:id=>elements[id]},fetch:async(url,options)=>{requests.push({url,cache:options.cache});return {ok:true,json:async()=>new Promise(resolve=>{release=()=>resolve(response);entered();})};}},{timeout:1000});
+  assert.equal(requests.length,0);
+  const first=handlers['signup:submit']({preventDefault(){}});
+  await bodyReady;
+  release();await first;
+  assert.equal(elements.result.hidden,false);
+  assert.match(elements.status.textContent,/Registration checked just now/);
+  const trigger=()=>reset==='pageshow'?windowHandlers.pageshow({persisted:true}):handlers['phone:input']();
+  trigger();
+  assert.equal(elements.result.hidden,true);assert.equal(elements.status.textContent,'');
+  assert.equal(elements.messages.href,undefined);assert.equal(elements.assigned.textContent,'');
+  bodyReady=new Promise(resolve=>{entered=resolve;});
+  const second=handlers['signup:submit']({preventDefault(){}});
+  await bodyReady;
+  trigger();release();await second;
+  assert.equal(elements.result.hidden,true);assert.equal(elements.status.textContent,'');
+  assert.equal(elements.submit.disabled,false);
+  assert.equal(requests.length,2);assert.ok(requests.every(request=>request.cache==='no-store'));
+}
+process.stdout.write('restored and late signup results cleared');
+"""
+    executed = subprocess.run(
+        [shutil.which("node"), "--input-type=module", "-e", harness],
+        input=json.dumps({"script": script, "response": {**RESULT, "already_enrolled": True}}),
+        text=True, encoding="utf-8", capture_output=True, check=True, timeout=10,
+    )
+    assert executed.stdout == "restored and late signup results cleared"
 
 
 @pytest.mark.asyncio

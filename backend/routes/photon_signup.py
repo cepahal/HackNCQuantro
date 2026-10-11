@@ -79,15 +79,19 @@ footer{border-top:1px solid var(--line);padding-block:22px;color:var(--body);fon
 <footer><div class="wrap footer-inner"><span>The full record, in context.</span><span>Zoomout · Built at HackNC</span></div></footer>
 <script>
 const form=document.getElementById('signup'),button=document.getElementById('submit'),status=document.getElementById('status'),result=document.getElementById('result');
+let requestGeneration=0;
+function clearConfirmation(){requestGeneration++;status.textContent='';result.hidden=true;document.getElementById('assigned').textContent='';document.getElementById('messages').removeAttribute('href');button.disabled=false;}
+window.addEventListener('pageshow',event=>{if(event.persisted)clearConfirmation();});
+document.getElementById('phone').addEventListener('input',clearConfirmation);
 function normalizePhone(value){const text=value.trim();if(!/^[+0-9 ().-]+$/.test(text))return null;const compact=text.replace(/[ ().-]/g,'');if(/^\\+[1-9][0-9]{6,14}$/.test(compact))return compact;if(/^[0-9]{10}$/.test(compact))return '+1'+compact;return null;}
-form.addEventListener('submit',async(event)=>{event.preventDefault();result.hidden=true;const phone=document.getElementById('phone'),normalized=normalizePhone(phone.value);
+form.addEventListener('submit',async(event)=>{event.preventDefault();clearConfirmation();const generation=requestGeneration;const phone=document.getElementById('phone'),normalized=normalizePhone(phone.value);
 if(!normalized){phone.setAttribute('aria-invalid','true');status.textContent='Enter a US/Canada 10-digit number, or include + and the country code for an international number.';phone.focus();return;}phone.removeAttribute('aria-invalid');phone.value=normalized;button.disabled=true;status.textContent='Registering your number…';
-try{const response=await fetch('/imessage/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone_number:normalized,consent:document.getElementById('consent').checked})});
-const body=await response.json();if(!response.ok)throw new Error(body.error?.message||'Signup is temporarily unavailable.');
+try{const response=await fetch('/imessage/signup',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone_number:normalized,consent:document.getElementById('consent').checked})});
+const body=await response.json();if(generation!==requestGeneration)return;if(!response.ok)throw new Error(body.error?.message||'Signup is temporarily unavailable.');
 document.getElementById('assigned').textContent='Your assigned Zoomout number: '+body.assigned_phone_number;
 document.getElementById('messages').href=body.open_messages_url;result.hidden=false;
-status.textContent=(body.already_enrolled?'Your number is already registered. ':'Your number is registered. ')+(body.welcome_status==='accepted'?'A welcome message was accepted for sending; receipt is not confirmed. Tap Open Messages below, then send a public video link.':'Welcome delivery is unconfirmed. Tap Open Messages below, then send a public video link.');
-}catch(error){status.textContent=error instanceof Error?error.message:'Signup is temporarily unavailable.';}finally{button.disabled=false;}});
+status.textContent='Registration checked just now. '+(body.welcome_status==='accepted'?'A welcome message was accepted for sending; receipt is not confirmed. Tap Open Messages below, then send a public video link.':'Welcome delivery is unconfirmed. Tap Open Messages below, then send a public video link.');
+}catch(error){if(generation===requestGeneration)status.textContent=error instanceof Error?error.message:'Signup is temporarily unavailable.';}finally{if(generation===requestGeneration)button.disabled=false;}});
 </script></body></html>"""
 
 
