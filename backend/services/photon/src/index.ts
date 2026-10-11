@@ -13,7 +13,7 @@ import { createDemoResponder } from "./demo.ts";
 
 async function main(): Promise<void> {
   const config = readConfig(process.env, process.argv.slice(2));
-  if (config.cloud) await assertBackendReady(config.backendPort);
+  if (config.cloud && !config.demoReplies) await assertBackendReady(config.backendPort);
   const prepareReport = config.publicReportsFile
     ? await createPublicReportPreparer({ directory: config.directory, file: config.publicReportsFile, reportBaseUrl: config.reportBaseUrl })
     : undefined;
