@@ -29,7 +29,7 @@ services:
       - key: TRANSCRIPTION_PROVIDER
         value: groq
       - key: SEARCH_PROVIDER
-        value: youtube
+        value: exa
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_LLM_MODEL

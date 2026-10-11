@@ -78,7 +78,7 @@ def blocked(monkeypatch, tmp_path):
         lambda *a, **k: pytest.fail("No Gemini fallback permitted"),
     )
     monkeypatch.setattr(
-        candidates, "AsyncGroq", lambda *a, **k: pytest.fail("No Groq call permitted")
+        candidates, "AsyncGroq", lambda *a, **k: pytest.fail("No Groq call permitted"), raising=False
     )
     original_client = httpx.Client
 

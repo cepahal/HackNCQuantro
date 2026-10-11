@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ReportV2 } from "../lib/api-types.ts";
 import type { ReportDiagnostics } from "../lib/report-diagnostics.ts";
-import { derive, sentenceLookup, reportDataMarkers, reportTimelineMarkers } from "../lib/view-model.ts";
+import { contextTimeline, derive, sentenceLookup, reportDataMarkers, reportTimelineMarkers } from "../lib/view-model.ts";
 import { reportFixture } from "./fixtures/report_v2.ts";
 
 test("derive reports measured source gaps and passage coverage for an aligned report", () => {
@@ -92,6 +92,23 @@ test("timeline markers bind passages to both recordings and omit invalid ranges"
   assert.ok(markers.some(m => m.kind === "context" && m.path === "context.windows[0]"));
   value.alignment!.matches[0]!.clip_end_seconds = -1;
   assert.ok(!reportTimelineMarkers(value).some(m => m.id === "clip-m1"));
+});
+
+test("context timeline splits only a recorded export selection around the matched passage", () => {
+  const value = fixture();
+  assert.deepEqual(contextTimeline(value), [], "no generated video");
+  value.context_video = { ...value.source!.post.media, media_id: "context_test" };
+  assert.deepEqual(contextTimeline(value), [], "no recorded selection");
+  value.context_selection = { start_seconds: 95, end_seconds: 112 };
+  assert.deepEqual(contextTimeline(value).map(s => [s.kind, s.startSeconds, s.endSeconds]),
+    [["before", 95, 101], ["match", 101, 104.5], ["after", 104.5, 112]]);
+  value.context_selection = { start_seconds: 101, end_seconds: 104.5 };
+  assert.deepEqual(contextTimeline(value).map(s => s.kind), ["match"]);
+  value.context_selection = { start_seconds: "95", end_seconds: 112 };
+  assert.deepEqual(contextTimeline(value), []);
+  value.context_selection = { start_seconds: 95, end_seconds: 112 };
+  value.alignment!.match_quality.confidence = { ...value.alignment!.match_quality.confidence, level: "low" };
+  assert.deepEqual(contextTimeline(value), []);
 });
 
 test("old reports and mismatched diagnostics never invent provider usage or timing", () => {

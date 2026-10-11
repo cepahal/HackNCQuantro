@@ -37,7 +37,12 @@ from ..shared.types import AnalysisResult, Comparison, IngestResult, Post, Repor
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from . import context_video
 from .alignment import build_alignment, build_context
-from .analysis import _extractive_context_summary, compare_clip, interpret_clip
+from .analysis import (
+    _extractive_clip_summary,
+    _extractive_context_summary,
+    compare_clip,
+    interpret_clip,
+)
 from .candidates import CandidateSearchError, check_source_video, find_source_video
 from .diagnostics import DiagnosticCapture, media_snapshot, record
 from .download import MediaDownloadError
@@ -370,7 +375,20 @@ async def _build(job_id: str, url: str, store: TigerStore, *, source_url: str | 
                 })
                 record(stage.value, "unavailable", {"reason": "language_assessment_unavailable",
                        "code": exc.code.value, "stage": exc.stage.value, "retryable": exc.retryable}, started=started)
-        summary = comparison.summary if comparison else interpret_clip(post, features)
+        if comparison:
+            summary = comparison.summary
+        else:
+            try:
+                summary = interpret_clip(post, features)
+            except QuantroError as exc:
+                if exc.code != ErrorCode.PROCESSING_FAILED or exc.stage != stage:
+                    raise
+                warnings.append("Automated explanation was unavailable; the submitted speech and source search results are retained.")
+                summary = _extractive_clip_summary(features)
+                record(stage.value, "unavailable", {
+                    "reason": "language_assessment_unavailable", "code": exc.code.value,
+                    "stage": exc.stage.value, "retryable": exc.retryable,
+                }, started=started)
         record(stage.value, "completed", {"comparison": comparison.model_dump(mode="json") if comparison else None, "summary": summary}, started=started)
         stage = Stage.BUILD_REPORT
         started = time.monotonic()

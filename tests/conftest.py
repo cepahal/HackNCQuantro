@@ -7,8 +7,9 @@ def _default_search_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     # Existing offline tests do not fetch/encode a new source recording.
     # Context integration tests explicitly enable and exercise the new stage.
     monkeypatch.setenv("CONTEXT_VIDEO_ENABLED", "false")
-    # Source-search tests enable and mock Groq explicitly; never spend live
-    # provider credits because a developer's ignored credentials were loaded.
+    # Source-search tests explicitly configure mocked providers; never spend
+    # live credits because a developer's ignored credentials were loaded.
+    monkeypatch.setenv("EXA_API_KEY", "")
     monkeypatch.setenv("GROQ_SOURCE_SEARCH", "false")
     monkeypatch.delenv("SEARCH_PROVIDER", raising=False)
     monkeypatch.delenv("SEARCH_FALLBACK_PROVIDER", raising=False)

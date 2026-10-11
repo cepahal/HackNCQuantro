@@ -14,6 +14,7 @@ test("analytics use source confidence, exact token counts, and recorded context 
   assert.deepEqual(data.metrics.contextWindows, [{ start: 71, end: 134.5 }]);
   assert.equal(data.metrics.generationSeconds, null);
   assert.equal(data.wafer.sourceGaps, 0);
+  assert.equal(data.wafer.clipCoverage, 0.5);
 });
 
 test("generation time uses completed job elapsed time, never the sum of overlapping stage times", () => {
@@ -48,6 +49,7 @@ for (const problem of ["no_match", "wrong_source", "wrong_clip", "low_confidence
     const data = reportAnalytics(value);
     assert.equal(data.isVideoDetected, false);
     assert.equal(data.wafer.wordMatches, null);
+    assert.equal(data.wafer.clipCoverage, null);
     assert.deepEqual(data.metrics.contextWindows, []);
     assert.equal(data.wafer.sourceGaps, null);
   });

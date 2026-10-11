@@ -60,7 +60,7 @@ def test_language_failure_preserves_source_and_saved_report(store, wired, monkey
 
 
 def test_actual_missing_key_keeps_verified_source(store, wired, monkeypatch):
-    monkeypatch.delenv('GROQ_API_KEY', raising=False)
+    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     monkeypatch.setenv('CONTEXT_VIDEO_ENABLED', 'false')
     monkeypatch.setattr(run, 'compare_clip', analysis.compare_clip)
     result = run.run_analysis('job_actual_missing_key', CLIP, store=store)

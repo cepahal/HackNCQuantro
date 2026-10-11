@@ -89,7 +89,7 @@ def comparison():
             "caption_assessment": "not_provided",
             "assessment_confidence": {
                 "level": "moderate",
-                "method": "groq_transcript_context",
+                "method": "gemini_transcript_context",
                 "basis": ["Cited speech agrees"],
                 "limitations": [],
             },

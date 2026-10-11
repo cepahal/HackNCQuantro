@@ -433,42 +433,18 @@ async def test_metadata_preserves_clean_title_query_and_heuristic_verbatim_ancho
 
 
 @pytest.mark.asyncio
-async def test_fabricated_llm_anchor_is_replaced_but_event_is_preserved(monkeypatch):
+async def test_metadata_uses_local_observed_anchor_even_with_groq_configured(monkeypatch):
+    from unittest.mock import Mock
+
     monkeypatch.setenv("GROQ_API_KEY", "offline-test-placeholder")
-    received = {}
-
-    class FakeGroq:
-        def __init__(self, **kwargs):
-            self.http_client = kwargs["http_client"]
-            self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *_):
-            await self.http_client.aclose()
-
-        async def create(self, **kwargs):
-            received.update(kwargs)
-            return SimpleNamespace(
-                choices=[
-                    SimpleNamespace(
-                        message=SimpleNamespace(
-                            content=(
-                                '{"speaker_and_event":"Astronomy symposium 2020",'
-                                '"unique_phrase":"I invented these seven words for searching"}'
-                            )
-                        )
-                    )
-                ]
-            )
-
-    monkeypatch.setattr(candidates, "AsyncGroq", FakeGroq)
+    provider = Mock(side_effect=AssertionError("Metadata must use local evidence only"))
+    monkeypatch.setattr(candidates, "AsyncGroq", provider, raising=False)
     result = await candidates.extract_search_metadata(PASSAGE, "Telescope research")
-    assert result["speaker_and_event"] == "Astronomy symposium 2020"
-    assert result["unique_phrase"] in candidates.normalize_text(PASSAGE)
-    assert "invented" not in result["unique_phrase"]
-    assert received["response_format"] == {"type": "json_object"}
+    assert result["speaker_and_event"] == result["title_query"] == "telescope research"
+    assert f' {result["unique_phrase"]} ' in f' {candidates.normalize_text(PASSAGE)} '
+    assert 6 <= len(result["unique_phrase"].split()) <= 8
+    assert result["query"] == f'"telescope research" "{result["unique_phrase"]}"'
+    provider.assert_not_called()
 
 
 @pytest.mark.asyncio

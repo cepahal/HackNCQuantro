@@ -9,6 +9,7 @@ export interface AnalyticsMetrics {
 }
 export interface WaferData {
   confidence: string;
+  clipCoverage: number | null;
   wordMatches: { matched: number; total: number } | null;
   sourceGaps: number | null;
   limitations: string[];
@@ -66,6 +67,8 @@ export function reportAnalytics(report: ReportV2, diagnostics?: ReportDiagnostic
       summary: clipDisplayText(concise?.takeaways || meaning?.paragraphs[0] || report.comparison?.summary || "No written summary was recorded.", report.submitted.post.media.media_id, report.source?.post.media.media_id), contextWindows: windows },
     wafer: {
       confidence: isVideoDetected ? ({ high: "High", moderate: "Moderate", low: "Low", not_assessed: "Not assessed" }[alignment!.match_quality.confidence.level]) : "Not assessed",
+      clipCoverage: isVideoDetected && Number.isFinite(alignment?.match_quality.clip_coverage_ratio)
+        ? Math.max(0, Math.min(1, alignment!.match_quality.clip_coverage_ratio!)) : null,
       wordMatches,
       sourceGaps: isVideoDetected && alignment?.edit_analysis.status === "assessed" ? alignment.edit_analysis.counts.source_gaps : null,
       limitations: [...new Set([...report.limitations, ...(alignment?.limitations ?? []),

@@ -246,7 +246,8 @@ test("diagnostic mode preserves old panels in a hidden container and shows every
   const before = JSON.stringify(value);
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: model, diagnostics }));
   assert.match(html, /<div hidden=""[^>]*data-testid="preserved-report-panels"/);
-  assert.match(html, /<div hidden=""[^>]*data-testid="error-diagnostics"/);
+  assert.match(html, /<details hidden=""[^>]*data-testid="error-diagnostics"><summary>Technical details<\/summary>/);
+  assert.doesNotMatch(html, /<details[^>]*\bopen(?:=|\s|>)[^>]*data-testid="error-diagnostics"/);
   assert.match(html, /Analysis terminal|Copy output|Download \.txt/);
   assert.match(html, /Available data markers/);
   assert.match(html, /Data available for bars, labels and markers/);
@@ -265,8 +266,11 @@ test("diagnostic mode preserves old panels in a hidden container and shows every
 test("stored context video appears alongside submitted and matched recordings", () => {
   const value = report();
   value.context_video = {media_id:"context_test",mime_type:"video/mp4",playback_url:"https://api.example/media/context_test",duration_seconds:79,width:640,height:360,fps:30,has_audio:true};
+  value.context_selection = {start_seconds:95,end_seconds:112};
   const html = renderToStaticMarkup(createElement(ReportContent, {report:value,display:display(value)}));
   const visible = html.split('aria-label="Analysis diagnostic output"')[0]!;
+  assert.match(visible, /Before clip<\/strong><span>1:35–1:41/);
+  assert.match(visible, /Matched excerpt<\/strong><span>1:41–1:45/);
   assert.match(visible, /aria-label="Submitted excerpt"/);
   assert.match(visible, /aria-label="Matched source recording"/);
   assert.match(visible, /aria-label="Spliced context video"/);
@@ -324,6 +328,8 @@ test("missing generated context stays hidden while submitted and matched recordi
   assert.equal((primary.match(/<video/g) ?? []).length, 2);
   assert.doesNotMatch(primary, /Splice assessment|Generation time/);
   assert.match(primary, /data-testid="evidence-wafer"/);
+  assert.equal((primary.match(/aria-controls="evidence-layer-/g) ?? []).length, 3, "three discs without splice assessment");
+  assert.match(primary, /Excerpt aligned/);
 });
 
 test("evidence wafer stays visible and static without a loaded generated MP4", () => {
