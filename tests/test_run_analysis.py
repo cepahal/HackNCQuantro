@@ -4,9 +4,9 @@ from unittest.mock import Mock
 import pytest
 from fastapi.testclient import TestClient
 
+import backend.routes.analyze as analyze_routes
 import backend.services.pipeline.run_ingest as ingest_module
 import backend.services.reporting.run_analysis as analysis_module
-import backend.routes.analyze as analyze_routes
 import backend.services.reporting.send_summary as send_summary_module
 from backend.main import app
 from backend.routes.common import get_tiger_store
@@ -723,7 +723,8 @@ def test_first_saved_report_controls_delivery_and_result(client, store, upstream
     assert result.outcome.value == canonical["outcome"] == "matched"
     assert provider.sent == [(
         "conv_concurrent",
-        f"{canonical['summary']} View the evidence: {result.report_url}",
+        ("Context before: Not available in the source transcript.\n\n"
+         f"Context after: The repairs are expected to finish by summer. View the evidence: {result.report_url}"),
     )]
     assert store.get_report("report_job_first_save") == canonical
 
