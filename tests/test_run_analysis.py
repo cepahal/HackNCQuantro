@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 
 import backend.services.pipeline.run_ingest as ingest_module
 import backend.services.reporting.run_analysis as analysis_module
-import backend.routes.analyze as analyze_routes
 import backend.services.reporting.send_summary as send_summary_module
 from backend.main import app
 from backend.routes.common import get_tiger_store
@@ -30,9 +29,6 @@ def store(tmp_path):
 @pytest.fixture
 def client(store, monkeypatch):
     monkeypatch.setenv("REPORT_BASE_URL", "https://quantro.test")
-    # These tests retain the legacy modular pipeline's compatibility coverage.
-    # The active Groq route is exercised by test_resolution_pipeline.py.
-    monkeypatch.setattr(analyze_routes, "run_analysis", analysis_module.run_analysis)
     app.dependency_overrides[get_tiger_store] = lambda: store
     yield TestClient(app)
     app.dependency_overrides.clear()

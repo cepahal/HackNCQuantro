@@ -20,7 +20,7 @@ import os
 import logging
 
 # Emit only our timing logs; do not enable verbose provider/HTTP logging.
-for _timing_module in ("backend.services.reporting.run_analysis", "backend.services.specialist.transcription", "backend.services.resolution"):
+for _timing_module in ("backend.services.reporting.run_analysis", "backend.services.specialist.transcription"):
     _timing_logger = logging.getLogger(_timing_module)
     if not _timing_logger.handlers:
         _handler = logging.StreamHandler()
@@ -50,7 +50,7 @@ _CONTRACT_FUNCTION_PATHS = {
     "save_report_and_complete_job": "backend.services.reporting.save_report",
     "display_report": "backend.services.reporting.display_report",
     "send_summary": "backend.services.reporting.send_summary",
-    "run_analysis": "backend.services.resolution.run",
+    "run_analysis": "backend.services.reporting.run_analysis",
 }
 
 

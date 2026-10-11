@@ -14,8 +14,3 @@ pytesseract==0.3.13
 pillow==12.3.0
 faster-whisper==1.2.1
 av==16.1.0
-groq==1.7.0
-rapidfuzz==3.14.6
-youtube-transcript-api==1.2.4
-curl_cffi==0.16.3
-google-api-python-client==2.201.0

@@ -58,7 +58,6 @@ interface DeliveryRecord {
   fingerprint: string;
   state: "pending" | "failed" | "accepted";
   message_id?: string;
-  message_ids?: string[];
 }
 
 const digest = (value: string): string => createHash("sha256").update(value).digest("hex");
@@ -83,7 +82,6 @@ function validateInput(input: unknown, jobId: string): SummaryInput {
     typeof conversation_id !== "string" || conversation_id.length > 512 || !conversation_id.trim()
     || /[\u0000-\u001f\u007f]/.test(conversation_id)
     || typeof summary !== "string" || summary.length > 2000 || !summary.trim()
-    || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(summary)
     || typeof report_url !== "string" || !report_url.trim() || report_url.length > 4096
     || /[\u0000-\u001f\u007f]/.test(report_url)
   ) throw invalidInput();
@@ -101,35 +99,6 @@ function validMessageId(id: unknown): id is string {
   return typeof id === "string" && id.length <= 512 && id.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(id);
 }
 
-function plainText(value: string): string {
-  return value.replace(/\*\*/g, "").replace(/\s*\u2014\s*/g, ", ").replace(/\s+/g, " ").trim();
-}
-
-function shortExplanation(value: string): string {
-  const text = plainText(value);
-  if (text.length <= 650) return text;
-  const prefix = text.slice(0, 650);
-  const end = [...prefix.matchAll(/[.!?](?=\s|$)/g)].at(-1)?.index;
-  return end === undefined
-    ? "The analysis is longer than a text. Open the report for the full explanation."
-    : prefix.slice(0, end + 1);
-}
-
-/** Use supplied report wording; formatting never infers truth, intent, or authenticity. */
-export function formatSummaryMessages(input: SummaryInput): readonly [string, string, string] {
-  const parsed = input.summary.trim().match(/^Takeaways:\s*([\s\S]+?)\n\s*\nWhat this means:\s*([\s\S]+?)\n\s*\nReliability:\s*([\s\S]+)$/);
-  const sections = parsed?.slice(1).every(section => section.trim()) ? parsed : null;
-  const reliability = sections ? plainText(sections[3]!) : "Reliability is unconfirmed from this summary alone.";
-  // Do not cut off a qualification in the reliability statement.
-  const lead = reliability.length <= 240 ? reliability
-    : "The evidence does not establish overall accuracy. Open the report for the assessment and its limits.";
-  return [
-    `TL;DR: ${lead}`,
-    shortExplanation(sections ? `${sections[1]} ${sections[2]}` : input.summary),
-    `Full report:\n${input.report_url}`,
-  ];
-}
-
 function parseRecord(raw: string): DeliveryRecord {
   const record: unknown = JSON.parse(raw);
   if (typeof record !== "object" || record === null) throw storageError();
@@ -138,17 +107,12 @@ function parseRecord(raw: string): DeliveryRecord {
     value.version !== 1 || typeof value.fingerprint !== "string" || !/^[a-f0-9]{64}$/.test(value.fingerprint)
     || (value.state !== "pending" && value.state !== "failed" && value.state !== "accepted")
     || (value.state === "accepted" && !validMessageId(value.message_id))
-    || (value.message_ids !== undefined && (!Array.isArray(value.message_ids)
-      || value.message_ids.length > 3 || !value.message_ids.every(validMessageId)))
-    || (value.state === "accepted" && Array.isArray(value.message_ids)
-      && (value.message_ids.length !== 3 || value.message_ids[2] !== value.message_id))
   ) throw storageError();
   return {
     version: 1,
     fingerprint: value.fingerprint,
     state: value.state,
     ...(validMessageId(value.message_id) ? { message_id: value.message_id } : {}),
-    ...(Array.isArray(value.message_ids) ? { message_ids: value.message_ids as string[] } : {}),
   };
 }
 
@@ -219,7 +183,7 @@ export function createSummarySender(options: SummarySenderOptions) {
 
   async function deliver(input: SummaryInput, jobId: string, key: string, fingerprint: string): Promise<SummaryAccepted> {
     const path = resolve(directory, `${key}.json`);
-    let pending: DeliveryRecord = { version: 1, fingerprint, state: "pending" };
+    const pending: DeliveryRecord = { version: 1, fingerprint, state: "pending" };
     try {
       await mkdir(directory, { recursive: true });
     } catch {
@@ -273,31 +237,20 @@ export function createSummarySender(options: SummarySenderOptions) {
       throw storageError();
     }
 
-    let messageId = "";
+    let messageId: string;
     const sendStarted = performance.now();
-    // All three texts share the existing send deadline. An uncertain part stops
-    // the sequence; neither accepted nor attempted parts may automatically replay.
-    for (const message of formatSummaryMessages(input)) {
-      try {
-        const remainingMs = sendTimeoutMs - (performance.now() - sendStarted);
-        if (remainingMs <= 0) throw new SummaryDeadlineError();
-        const sent = await withSendDeadline(conversation.send(message), remainingMs);
-        if (!validMessageId(sent?.id)) throw new SummaryMessageIdError();
-        messageId = sent.id;
-      } catch (error) {
-        diagnose(error instanceof SummaryDeadlineError ? "send_deadline"
-          : error instanceof SummaryMessageIdError ? "invalid_message_id" : "sdk_exception", sendStarted, error);
-        await replaceRecord(path, { ...pending, state: "failed" }).catch(() => undefined);
-        throw new BridgeError(502, "DELIVERY_UNCERTAIN", "Photon did not confirm all message IDs. Verify delivery before requesting another send.");
-      }
-      pending = { ...pending, message_ids: [...(pending.message_ids ?? []), messageId] };
-      try {
-        // Persist each provider acceptance before interacting with it again.
-        await replaceRecord(path, pending);
-      } catch {
-        diagnose("receipt_storage_failed", sendStarted);
-        throw storageError();
-      }
+    try {
+      // A timeout cannot cancel provider delivery; its ledger must remain ambiguous.
+      const sent = await withSendDeadline(
+        conversation.send(`${input.summary}\n\nFull report: ${input.report_url}`), sendTimeoutMs,
+      );
+      if (!validMessageId(sent?.id)) throw new SummaryMessageIdError();
+      messageId = sent.id;
+    } catch (error) {
+      diagnose(error instanceof SummaryDeadlineError ? "send_deadline"
+        : error instanceof SummaryMessageIdError ? "invalid_message_id" : "sdk_exception", sendStarted, error);
+      await replaceRecord(path, { ...pending, state: "failed" }).catch(() => undefined);
+      throw new BridgeError(502, "DELIVERY_UNCERTAIN", "Photon did not confirm a message ID. Verify delivery before requesting another send.");
     }
     try {
       await replaceRecord(path, { ...pending, state: "accepted", message_id: messageId });

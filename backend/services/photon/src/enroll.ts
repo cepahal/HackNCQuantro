@@ -245,26 +245,10 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
     const path = resolve(directory, `${digest(`${options.projectId}:${phone}:${user.id}`)}.json`);
     const reconciledResult = (record: WelcomeRecord): EnrollmentResult => result({
       ...record, assigned_phone_number: user.assignedPhoneNumber,
-      state: alreadyEnrolled && record.assigned_phone_number === user.assignedPhoneNumber
-        ? record.state : "uncertain",
+      state: alreadyEnrolled ? record.state : "uncertain",
     }, alreadyEnrolled);
-    // A removed-and-restored user can retain the same provider ID. Keep its
-    // historical receipt, but never revive that welcome on the next signup.
-    const reconciliationPath = `${path}.reconciled.json`;
-    const historical = await existingRecord(path);
-    const reconciled = await existingRecord(reconciliationPath);
-    const existing = reconciled ?? historical;
-    if (existing) {
-      if (!alreadyEnrolled || existing.assigned_phone_number !== user.assignedPhoneNumber) {
-        const uncertain: WelcomeRecord = { version: 1, state: "uncertain",
-          assigned_phone_number: user.assignedPhoneNumber };
-        try {
-          await replaceRecord(reconciliationPath, uncertain);
-        } catch { throw storageError(); }
-        return result(uncertain, alreadyEnrolled);
-      }
-      return reconciledResult(existing);
-    }
+    const existing = await existingRecord(path);
+    if (existing) return reconciledResult(existing);
     const pending: WelcomeRecord = { version: 1, state: alreadyEnrolled ? "uncertain" : "pending",
       assigned_phone_number: user.assignedPhoneNumber };
     try {

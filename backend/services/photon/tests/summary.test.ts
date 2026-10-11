@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { BridgeError, createSummarySender, formatSummaryMessages, type SummaryDiagnostic, type SummaryInput } from "../src/summary.ts";
+import { BridgeError, createSummarySender, type SummaryDiagnostic, type SummaryInput } from "../src/summary.ts";
 
 const input: SummaryInput = {
   conversation_id: "imessage-conversation-1",
@@ -45,7 +45,7 @@ test("accepted delivery persists before success and is reused after restart", as
         return {
           send: async (text: string) => {
             sends++;
-            assert.equal(text, formatSummaryMessages(input)[sends - 1]);
+            assert.equal(text, `${input.summary}\n\nFull report: ${input.report_url}`);
             return { id: "provider-message-1" };
           },
         };
@@ -54,12 +54,11 @@ test("accepted delivery persists before success and is reused after restart", as
     const expected = { conversation_id: input.conversation_id, message_id: "provider-message-1", status: "accepted" };
     assert.deepEqual(await createSummarySender(options)(input, "job_1"), expected);
     assert.deepEqual(await createSummarySender(options)(input, "job_1"), expected);
-    assert.equal(sends, 3);
+    assert.equal(sends, 1);
     const [file] = await readdir(deliveryDirectory);
     assert.match(file!, /^[a-f0-9]{64}\.json$/);
     const ledger = await readFile(join(deliveryDirectory, file!), "utf8");
     assert.equal(JSON.parse(ledger).state, "accepted");
-    assert.equal(JSON.parse(ledger).message_ids.length, 3);
     assert.ok(!ledger.includes(input.summary));
     assert.ok(!ledger.includes(input.report_url));
     assert.ok(!ledger.includes(input.conversation_id));
@@ -74,8 +73,8 @@ test("concurrent calls on one sender share one provider attempt", async () => {
       resolveConversation: async () => ({ send: async () => ({ id: `message-${++sends}` }) }),
     });
     const results = await Promise.all(Array.from({ length: 12 }, () => send(input, "job-2")));
-    assert.equal(sends, 3);
-    assert.ok(results.every((result) => result.message_id === "message-3"));
+    assert.equal(sends, 1);
+    assert.ok(results.every((result) => result.message_id === "message-1"));
   });
 });
 
@@ -105,7 +104,7 @@ test("exclusive ledger suppresses a second independent sender while delivery is 
       release();
     }
     await first;
-    assert.equal(sends, 3);
+    assert.equal(sends, 1);
   });
 });
 
@@ -176,7 +175,7 @@ test("a conversation preflight failure preserves its error and allows the same j
     assert.equal((await createSummarySender(options)(input, "preflight-retry")).message_id, "now-available");
     assert.equal((await createSummarySender(options)(input, "preflight-retry")).message_id, "now-available");
     assert.equal(resolutions, 2);
-    assert.equal(sends, 3);
+    assert.equal(sends, 1);
   });
 });
 
@@ -231,7 +230,7 @@ test("report preparation runs after preflight, fails without sending, and safely
     assert.equal((await createSummarySender(options)(input, "prepare-job")).message_id, "prepared-message");
     assert.equal((await createSummarySender(options)(input, "prepare-job")).message_id, "prepared-message");
     assert.equal(preparations, 2);
-    assert.equal(sends, 3);
+    assert.equal(sends, 1);
   });
 });
 
@@ -280,7 +279,6 @@ test("invalid inputs fail before resolving or creating a delivery ledger", async
     for (const invalid of [
       null, {}, { ...input, conversation_id: "" }, { ...input, conversation_id: "x".repeat(513) },
       { ...input, summary: " " }, { ...input, summary: "x".repeat(2001) },
-      { ...input, summary: "invalid\u0000text" },
       { ...input, report_url: "file:///private" }, { ...input, report_url: "https://user:secret@example.com" },
       { ...input, report_url: "https://example.com\n/private" },
     ]) {
@@ -328,7 +326,7 @@ test("the same job can deliver separately to distinct conversations", async () =
     });
     await send(input, "shared-job");
     await send({ ...input, conversation_id: "other-conversation" }, "shared-job");
-    assert.equal(sends, 6);
+    assert.equal(sends, 2);
   });
 });
 
@@ -537,7 +535,7 @@ test("pre-send diagnostic categories preserve safe retry and public errors", asy
       assertSafeDiagnostic(diagnostics[0]!, stage === "resolution" ? "conversation_resolution_failed" : "report_preparation_failed");
       fail = false;
       assert.equal((await createSummarySender(options)(input, `diagnostic-${stage}`)).status, "accepted");
-      assert.equal(sends, 3);
+      assert.equal(sends, 1);
       assert.equal(diagnostics.length, 1);
     }
   });
@@ -589,131 +587,5 @@ test("provider send deadline configuration rejects values outside 1–12000 inte
       }), hasError(500, "INVALID_SEND_TIMEOUT"));
     }
     assert.deepEqual(await readdir(deliveryDirectory), []);
-  });
-});
-
-const structuredInput: SummaryInput = {
-  ...input,
-  summary: "Takeaways: The excerpt includes a conditional promise.\n\nWhat this means: The qualifier changes how the post claim reads.\n\nReliability: A source comparison is available, but factual accuracy and intent remain unestablished.",
-};
-
-test("three concise messages put reliability first, explanation second, and the report link last", () => {
-  const messages = formatSummaryMessages(structuredInput);
-  assert.deepEqual(messages, [
-    "TL;DR: A source comparison is available, but factual accuracy and intent remain unestablished.",
-    "The excerpt includes a conditional promise. The qualifier changes how the post claim reads.",
-    `Full report:\n${input.report_url}`,
-  ]);
-  assert.ok(messages[0].length <= 247);
-  assert.ok(messages[1].length <= 650);
-  assert.ok(messages.slice(0, 2).every(text => !text.includes(input.report_url)));
-  assert.ok(messages.every(text => !text.includes("\u2014")));
-});
-
-test("legacy source-match wording does not become a true, false, or authenticity claim", () => {
-  const messages = formatSummaryMessages({ ...input, summary: "Matching speech was found in another recording." });
-  assert.equal(messages[0], "TL;DR: Reliability is unconfirmed from this summary alone.");
-  assert.equal(messages[1], "Matching speech was found in another recording.");
-  assert.doesNotMatch(messages.join(" "), /clip is (true|false|accurate|authentic)|delivered|100%/i);
-});
-
-test("uncertain source wording remains explicit rather than becoming a negative verdict", () => {
-  const messages = formatSummaryMessages({ ...input, summary:
-    "Takeaways: The speaker discusses a policy.\n\nWhat this means: The post attributes the speech to a public figure.\n\nReliability: No verified source was found. Context and authenticity remain unassessed." });
-  assert.equal(messages[0], "TL;DR: No verified source was found. Context and authenticity remain unassessed.");
-  assert.doesNotMatch(messages.join(" "), /misleading|fake|false|fabricated|lying/i);
-});
-
-test("text formatting removes em dashes and markup without adding interpretations", () => {
-  const messages = formatSummaryMessages({ ...input, summary:
-    "Takeaways: A **conditional** claim — with a qualifier.\n\nWhat this means:  Read the condition.\n\nReliability: The source matches — the full event remains unknown." });
-  assert.equal(messages[0], "TL;DR: The source matches, the full event remains unknown.");
-  assert.equal(messages[1], "A conditional claim, with a qualifier. Read the condition.");
-  assert.doesNotMatch(messages.join(" "), /\u2014|\*\*/);
-});
-
-test("long explanations stop at complete sentences and long reliability uses a whole neutral fallback", () => {
-  const messages = formatSummaryMessages({ ...input, summary:
-    `Takeaways: A complete short sentence. ${"longword ".repeat(80)}\n\nWhat this means: See the condition.\n\nReliability: ${"qualified evidence ".repeat(18)}` });
-  assert.ok(messages[0].length <= 247);
-  assert.equal(messages[0], "TL;DR: The evidence does not establish overall accuracy. Open the report for the assessment and its limits.");
-  assert.equal(messages[1], "A complete short sentence.");
-  const unbroken = formatSummaryMessages({ ...input, summary: "x".repeat(1000) });
-  assert.equal(unbroken[1], "The analysis is longer than a text. Open the report for the full explanation.");
-});
-
-test("each multipart acceptance is durably stored before the next provider send", async () => {
-  await withDirectory(async deliveryDirectory => {
-    const texts: string[] = [];
-    const options = { deliveryDirectory, resolveConversation: async () => ({ send: async (text: string) => {
-      const [file] = await readdir(deliveryDirectory);
-      const ledger = JSON.parse(await readFile(join(deliveryDirectory, file!), "utf8"));
-      assert.equal(ledger.state, "pending");
-      assert.deepEqual(ledger.message_ids ?? [], texts.map((_text, index) => `part-${index + 1}`));
-      texts.push(text);
-      return { id: `part-${texts.length}` };
-    } }) };
-    const result = await createSummarySender(options)(structuredInput, "multipart-order");
-    assert.deepEqual(texts, formatSummaryMessages(structuredInput));
-    assert.deepEqual(result, { conversation_id: input.conversation_id, message_id: "part-3", status: "accepted" });
-    assert.deepEqual(await createSummarySender(options)(structuredInput, "multipart-order"), result);
-    assert.equal(texts.length, 3);
-    const [file] = await readdir(deliveryDirectory);
-    const ledger = JSON.parse(await readFile(join(deliveryDirectory, file!), "utf8"));
-    assert.deepEqual(ledger.message_ids, ["part-1", "part-2", "part-3"]);
-    assert.equal(ledger.state, "accepted");
-  });
-});
-
-test("a failure in any multipart message stops the sequence and retries never duplicate parts", async () => {
-  await withDirectory(async deliveryDirectory => {
-    for (const kind of ["throw", "missing-id"] as const) for (const failurePart of [1, 2, 3]) {
-      const texts: string[] = [];
-      const options = { deliveryDirectory, diagnostic: () => undefined, resolveConversation: async () => ({ send: async (text: string) => {
-        texts.push(text);
-        if (texts.length === failurePart) {
-          if (kind === "throw") throw new Error("provider detail");
-          return undefined;
-        }
-        return { id: `part-${texts.length}` };
-      } }) };
-      const job = `multipart-${kind}-${failurePart}`;
-      await assert.rejects(createSummarySender(options)(structuredInput, job), hasError(502, "DELIVERY_UNCERTAIN"));
-      await assert.rejects(createSummarySender(options)(structuredInput, job), hasError(409, "DELIVERY_UNCERTAIN"));
-      assert.deepEqual(texts, formatSummaryMessages(structuredInput).slice(0, failurePart));
-      const key = createHash("sha256").update(JSON.stringify([input.conversation_id, job])).digest("hex");
-      const ledger = JSON.parse(await readFile(join(deliveryDirectory, `${key}.json`), "utf8"));
-      assert.equal(ledger.state, "failed");
-      assert.equal((ledger.message_ids ?? []).length, failurePart - 1);
-    }
-  });
-});
-
-test("a stalled second message never sends the report link after late provider success", async () => {
-  await withDirectory(async deliveryDirectory => {
-    let complete!: (value: { id: string }) => void;
-    const stalled = new Promise<{ id: string }>(resolve => { complete = resolve; });
-    const texts: string[] = [];
-    const options = { deliveryDirectory, sendTimeoutMs: 100, diagnostic: () => undefined,
-      resolveConversation: async () => ({ send: async (text: string) => {
-        texts.push(text);
-        return texts.length === 1 ? { id: "first-accepted" } : stalled;
-      } }) };
-    await assert.rejects(createSummarySender(options)(structuredInput, "multipart-stalled"), hasError(502, "DELIVERY_UNCERTAIN"));
-    complete({ id: "second-too-late" });
-    await new Promise<void>(resolve => setImmediate(resolve));
-    await assert.rejects(createSummarySender(options)(structuredInput, "multipart-stalled"), hasError(409, "DELIVERY_UNCERTAIN"));
-    assert.deepEqual(texts, formatSummaryMessages(structuredInput).slice(0, 2));
-  });
-});
-
-test("existing accepted single-message receipts remain valid and never replay as multipart", async () => {
-  await withDirectory(async deliveryDirectory => {
-    const job = "legacy-accepted";
-    const key = createHash("sha256").update(JSON.stringify([input.conversation_id, job])).digest("hex");
-    await writeFile(join(deliveryDirectory, `${key}.json`), JSON.stringify({ version: 1,
-      fingerprint: createHash("sha256").update(JSON.stringify(input)).digest("hex"), state: "accepted", message_id: "old-provider-id" }));
-    const send = createSummarySender({ deliveryDirectory, resolveConversation: async () => { throw new Error("Must not resolve or send."); } });
-    assert.deepEqual(await send(input, job), { conversation_id: input.conversation_id, message_id: "old-provider-id", status: "accepted" });
   });
 });

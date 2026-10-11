@@ -90,7 +90,7 @@ try{const response=await fetch('/imessage/signup',{method:'POST',cache:'no-store
 const body=await response.json();if(generation!==requestGeneration)return;if(!response.ok)throw new Error(body.error?.message||'Signup is temporarily unavailable.');
 document.getElementById('assigned').textContent='Your assigned Zoomout number: '+body.assigned_phone_number;
 document.getElementById('messages').href=body.open_messages_url;result.hidden=false;
-status.textContent='Registration checked just now. '+(body.already_enrolled?'Your registration is active. ':'Your number is registered. ')+(body.welcome_status==='accepted'?'A welcome message was accepted for sending; receipt is not confirmed. Tap Open Messages below, then send a public video link.':'Welcome delivery is unconfirmed. Tap Open Messages below, then send a public video link.');
+status.textContent='Registration checked just now. '+(body.welcome_status==='accepted'?'A welcome message was accepted for sending; receipt is not confirmed. Tap Open Messages below, then send a public video link.':'Welcome delivery is unconfirmed. Tap Open Messages below, then send a public video link.');
 }catch(error){if(generation===requestGeneration)status.textContent=error instanceof Error?error.message:'Signup is temporarily unavailable.';}finally{if(generation===requestGeneration)button.disabled=false;}});
 </script></body></html>"""
 
@@ -184,7 +184,7 @@ def signup_qr():
         return _error(503, "PHOTON_DISABLED", "iMessage signup is not enabled.")
     if not _QR_PATH.is_file():
         return _error(404, "QR_UNAVAILABLE", "The signup QR code is unavailable.")
-    return FileResponse(_QR_PATH, media_type="image/svg+xml", headers=_HEADERS)
+    return FileResponse(_QR_PATH, media_type="image/svg+xml", headers={"X-Content-Type-Options": "nosniff"})
 
 
 @router.post("/imessage/signup")

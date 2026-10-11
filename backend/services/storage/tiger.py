@@ -207,11 +207,9 @@ class TigerStore:
         statement = self._insert(self.jobs).values(
             id=job_id, url=url, status="running", error_code=None, error_stage=None,
             created_at=now, updated_at=now,
-        ).on_conflict_do_nothing(index_elements=[self.jobs.c.id]).returning(self.jobs.c.id)
+        ).on_conflict_do_nothing(index_elements=[self.jobs.c.id])
         with self._engine.begin() as connection:
-            # psycopg3 can report rowcount=-1 for INSERT. RETURNING identifies
-            # the reservation owner consistently on Postgres and SQLite.
-            return connection.execute(statement).scalar_one_or_none() == job_id
+            return connection.execute(statement).rowcount == 1
 
     def upsert_job(
         self,

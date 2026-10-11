@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from backend.routes.common import get_tiger_store, quantro_error_response
 from backend.services.external_apis.retrieve_post import _validate_url
-from backend.services.resolution.run import run_ingest
+from backend.services.pipeline.run_ingest import run_ingest
 from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.storage.tiger import TigerStore
 

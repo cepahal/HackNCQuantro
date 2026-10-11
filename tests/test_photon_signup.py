@@ -366,8 +366,6 @@ async def test_qr_only_serves_the_fixed_svg(client, monkeypatch, tmp_path):
     response = await client.get("/imessage/qr.svg")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("image/svg+xml")
-    assert response.headers["cache-control"] == "no-store"
-    assert response.headers["referrer-policy"] == "no-referrer"
     assert response.text == svg.read_text()
     assert (await client.get("/imessage/qr.svg/../../.env")).status_code == 404
 
