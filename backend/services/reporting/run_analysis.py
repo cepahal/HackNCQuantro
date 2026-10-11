@@ -347,7 +347,7 @@ def _analyze(
             compare_context_and_caption,
             submitted_features.model_dump(mode="json"),
             context.model_dump(mode="json"),
-            chosen.post.caption,
+            submitted_post.caption,
         )
         comparison = parse_stage_output(Comparison, raw_comparison, Stage.COMPARE_CONTEXT_AND_CAPTION)
 

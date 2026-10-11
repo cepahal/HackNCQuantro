@@ -224,3 +224,51 @@ Render first deployment is live at https://quantro-backend.onrender.com on
 `bececa9`; private Tiger/provider settings and CA were explicitly approved.
 The reconciled commit must be deployed next. Vercel backend URL/rebuild and a
 hosted real analysis/report/playback test remain acceptance gates.
+
+
+### Public Render/Vercel connection and submitted-caption correction (2026-10-10)
+
+Both production services deployed reconciled source `9098a05`: Render at
+https://quantro-backend.onrender.com and Vercel at https://quantro-ten.vercel.app.
+Vercel's production API and display-model base URLs now point at Render;
+Render's report/CORS origins point at Vercel. Tiger TLS and provider credentials
+remain private. Vercel was deployed using the approved CLI because this project
+is not connected to the team's GitHub repository. Render automatic deployment
+is intentionally disabled while the tested revision is frozen.
+
+Verified through the public website: submission, asynchronous status recovery,
+saved report loading, three separate confidence blocks, null metadata display,
+and actual video playback from Render. A real W3Schools MP4 completed in 74.9
+seconds, persisted to Tiger, returned schema 2.1, contained no private path/key
+markers, and reused the same report ID with exactly one report row on retry.
+Media HEAD and byte-range requests returned 200 and 206 respectively. Two
+additional browser submissions completed and loaded their saved reports.
+These music-only samples produced no speech sentences and no verified source;
+they do not establish fresh matched-source transcription quality.
+
+Fixed the comparison input, with explicit user approval: assess the submitted
+caption against recovered source context, while retaining the source caption
+as metadata. Regression cases cover different captions, a null submitted
+caption, and an empty submitted caption. No function signature or schema changed.
+
+The homepage demo now links to `report_job_demo_caption_v2_20261010`, reassessed
+by the live Gemini comparison service using the saved submitted caption,
+transcript and context. The unrelated caption correctly remains not assessed.
+The prior report was preserved unchanged; the refreshed report is a new job
+with one immutable report row. Its limitations disclose that media/transcripts
+were reused and no fresh cloud download occurred. Source confidence was not
+inflated or changed.
+
+Remaining gates: fresh YouTube retrieval on Render returns YouTube's
+"Sign in to confirm you're not a bot" rejection; cloud source-candidate downloads
+also failed. This needs an authorized retrieval provider/egress solution.
+The Node Photon bridge is still separate from the Python Docker service, and
+hosted iMessage delivery is not verified by these web tests. No capacity/load
+test was performed. Release uses a manual Render deployment of the tested
+commit and the approved Vercel CLI deployment; automatic deployments stay off.
+
+Caption-fix verification: 945 backend tests passed, 7 explicitly skipped,
+45 subtests passed; 104 focused pipeline/report/contract tests passed. All 40
+frontend tests, frontend lint/typecheck, Ruff F/E9 and diff checks passed.
+Render served the refreshed demo with HTTP 200 and schema 2.1; sanitization
+passed, source confidence stayed moderate, and the original report was unchanged.

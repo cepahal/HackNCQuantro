@@ -123,7 +123,7 @@ def upstream(monkeypatch):
     }
 
     def fake_retrieve_post(url):
-        return _post("clip_media", url, followers=state.get("clip_followers"), caption="The bridge is closed forever.")
+        return _post("clip_media", url, followers=state.get("clip_followers"), caption=state.get("clip_caption", "The bridge is closed forever."))
 
     def fake_extract(media, options):
         media = media.model_dump(mode="json") if hasattr(media, "model_dump") else media
@@ -183,7 +183,7 @@ def test_matched_end_to_end(client, store, upstream):
     assert report["context"]["windows"][0]["sentences"][-1]["text"].startswith("The repairs")
     assert report["summary"] == "The clip omits that the closure is temporary."
     assert store.get_job("job_match")["status"] == "completed"
-    assert upstream["compare_calls"] == [None]
+    assert upstream["compare_calls"] == ["The bridge is closed forever."]
     assert upstream["provider"].sent == [
         ("conv_1", ("The clip omits that the closure is temporary. "
                    "View the evidence: https://quantro.test/reports/report_job_match"))
@@ -682,10 +682,16 @@ def test_status_only_returns_safe_job_fields(client, store):
     assert response.json()["error"]["code"] == "SEARCH_FAILED"
     assert "url" not in response.json()
     assert client.get("/analyze/job_missing/status").status_code == 404
-def test_comparison_uses_selected_source_caption(client, upstream):
-    upstream["source_caption"] = "Actual source caption."
-    assert _run(client, "job_source_caption", conversation_id=None).status_code == 200
-    assert upstream["compare_calls"] == ["Actual source caption."]
+@pytest.mark.parametrize("caption", ["The bridge is closed forever.", None, ""])
+def test_comparison_assesses_submitted_caption_without_source_fallback(client, upstream, caption):
+    upstream["clip_caption"] = caption
+    upstream["source_caption"] = "The bridge will reopen tomorrow."
+    response = _run(client, "job_submitted_caption", conversation_id=None)
+    assert response.status_code == 200
+    report = client.get(f"/reports/{response.json()['report_id']}").json()
+    assert report["submitted"]["post"]["caption"] == caption
+    assert report["source"]["post"]["caption"] == upstream["source_caption"]
+    assert upstream["compare_calls"] == [report["submitted"]["post"]["caption"]]
 
 
 def test_untyped_delivery_failure_after_save_is_normalized(client, store, upstream, monkeypatch):

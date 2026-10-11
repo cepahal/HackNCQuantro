@@ -79,6 +79,6 @@ report_live_jpeg_22868a08f9 | live_jpeg_22868a08f9 | 2026-10-10 19:12:05.730624+
 
 GET returned HTTP 200; saved report has no /tmp/ or local_path. The initial POST included duplicate upstream warnings; final code deduplicates these, verified by regression tests.
 
-Prompt 4 explicitly passes source_post.caption to comparison; this differs from the earlier submitted-caption flow and is implemented as requested.
+Caption input correction (2026-10-10, explicitly approved by the user): comparison now assesses submitted_post.caption against recovered source context. The source caption remains source metadata. Null and empty submitted captions never fall back to the source caption. Earlier verification below reflects the original Prompt 4 implementation.
 
 Final verification: pytest tests/test_run_analysis.py -v => 24 passed; related orchestration/save/smoke suite => 39 passed before the final added warning-dedup regression. Ruff, git diff --check and secret scan passed.

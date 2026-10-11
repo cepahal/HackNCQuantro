@@ -276,3 +276,24 @@ Verify Tiger TLS, a full analysis, and large-media playback on the chosen host.
   running, and change hostname on restart. The existing read-only report gateway
   does not accept analysis submissions; exposing the full API requires separate
   access and long-request testing.
+
+
+## Current production connection (2026-10-10)
+
+- Frontend: https://quantro-ten.vercel.app
+- API: https://quantro-backend.onrender.com
+- Vercel Production: `NEXT_PUBLIC_API_BASE_URL` and
+  `NEXT_PUBLIC_REPORT_API_BASE_URL` both use the API origin above.
+- Render: `FRONTEND_ORIGIN` and `REPORT_BASE_URL` use the frontend origin above.
+  Tiger/provider settings and the Tiger CA are configured privately.
+- Render uses the approved 1 CPU / 2 GB service. Deploy the tested commit
+  manually; automatic deployment is currently disabled to avoid untested pushes.
+- The Vercel project is linked locally to the approved CLI account. From the
+  repository root, run `vercel deploy --prod --yes --scope bhrigu-s-projects1`;
+  this includes only the frontend via `.vercelignore`. The project is not yet
+  Git-connected. Never upload local environment files.
+
+The public MP4 form/report/media flow passed. Fresh YouTube retrieval is blocked
+by cloud-IP bot verification, so the homepage uses a labeled saved report whose
+limitations disclose reused transcripts. This connection does not host the
+separate Node Photon listener. See `temporary-fixes.md` for remaining demo gates.
