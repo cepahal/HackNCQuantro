@@ -20,6 +20,7 @@ from backend.services.external_apis.photon import _NoRedirect, _read_json
 
 router = APIRouter()
 _PHONE = re.compile(r"\+[1-9][0-9]{6,14}")
+_WELCOME_REQUEST_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", re.IGNORECASE)
 _BODY_LIMIT = 2_048
 _MAX_THROTTLE_KEYS = 4_096
 _IP_LIMIT = 30
@@ -57,21 +58,21 @@ footer{border-top:1px solid var(--line);padding-block:22px;color:var(--body);fon
 </style></head><body><header class="navbar"><div class="wrap nav-inner"><span class="brand" aria-label="Zoomout">zoomout</span><span class="nav-note">iMessage signup</span></div></header>
 <main class="wrap layout"><section aria-labelledby="signup-heading"><p class="eyebrow">The bigger picture</p><h1 id="signup-heading">Context.<br>In iMessage.</h1>
 <p class="intro">Send a public video link. Review the available source and surrounding context, right from Messages.</p>
-<ol class="steps" aria-label="How to get started"><li><div><strong>Register</strong><span>Enter your own iMessage number and tap Register for iMessage.</span></div></li><li><div><strong>Open Messages</strong><span>Use the number assigned to you after registration.</span></div></li><li><div><strong>Send a video</strong><span>Paste a public video link to request an analysis.</span></div></li></ol></section>
+<ol class="steps" aria-label="How to get started"><li><div><strong>Register</strong><span>Enter your own iMessage number and tap Register and send welcome.</span></div></li><li><div><strong>Open Messages</strong><span>Use the number assigned to you after registration.</span></div></li><li><div><strong>Send a video</strong><span>Paste a public video link to request an analysis.</span></div></li></ol></section>
 <div><section class="signup-card" aria-labelledby="register-heading"><h2 id="register-heading">Your next step: register.</h2><p class="card-copy">Use the number you send iMessages from, including its country code.</p>
 <form id="signup" method="post" action="/imessage/signup"><label for="phone">Your iMessage phone number</label>
 <input id="phone" name="phone_number" type="tel" inputmode="tel" autocomplete="tel" placeholder="(919) 555-1234" maxlength="40" required aria-describedby="phone-help">
-<p id="phone-help" class="privacy">US/Canada: enter 10 digits and we add +1. For international numbers, include + and the country code. Spaces, parentheses and dashes are okay.</p>
+<p id="phone-help" class="privacy">US/Canada: enter 10 digits and we add +1, or enter 1 followed by 10 digits. For international numbers, include + and the country code. Spaces, parentheses and dashes are okay.</p>
 <label class="consent"><input id="consent" type="checkbox" required> I own this number and agree to receive Zoomout iMessages, including a welcome and replies to links I send.</label>
-<button id="submit" type="submit">Register for iMessage</button></form>
+<button id="submit" type="submit">Register and send welcome</button></form>
 <p class="privacy">Your number is shared with our messaging provider for registration. Only register a number you own.</p>
 <p id="status" role="status" aria-live="polite"></p><section id="result" hidden aria-labelledby="result-heading">
-<h2 id="result-heading">Next: open Messages.</h2><p class="result-copy">Send a public video link to the number below. You can start without waiting for a welcome message.</p>
+<h2 id="result-heading">Check Messages for your welcome.</h2><p class="result-copy">Your registration requested a welcome message. You do not need to start the conversation. If it has not arrived, you can open Messages using your assigned number below.</p>
 <p id="assigned"></p><a id="messages" class="messages" aria-describedby="assigned">Open Messages</a>
 <p class="result-copy">Your messaging line is assigned during registration. Use the number shown here, not a number copied from a friend.</p>
 <p><small>Sending and receiving a message verifies the connection. Registration alone does not confirm delivery.</small></p></section></section>
-<section class="qr"><a href="/imessage/qr.svg"><img src="/imessage/qr.svg" alt="QR code linking to Zoomout iMessage signup"></a><div><h2>On your computer?</h2>
-<p>Scanning only opens this form. Enter your number and tap Register for iMessage to finish registration.</p></div></section>
+<section class="qr"><a href="/imessage"><img src="/imessage/qr.svg" alt="QR code linking to Zoomout iMessage signup"></a><div><h2>On your computer?</h2>
+<p>Scanning only opens this form. Enter your number and tap Register and send welcome to finish registration. <a href="/imessage">Open the registration form</a>.</p></div></section>
 <details class="troubleshooting"><summary>No reply in Messages?</summary><ol><li>Check that you registered the phone number you send iMessages from.</li>
 <li>On your iPhone, open Settings &gt; Apps &gt; Messages &gt; Send &amp; Receive. Under Start New Conversations From, select your registered phone number rather than an Apple Account email address, then start a new conversation.</li>
 <li>Send the link to your assigned number shown after registration. A saved registration or accepted welcome does not confirm message delivery.</li></ol>
@@ -79,19 +80,24 @@ footer{border-top:1px solid var(--line);padding-block:22px;color:var(--body);fon
 <footer><div class="wrap footer-inner"><span>The full record, in context.</span><span>Zoomout · Built at HackNC</span></div></footer>
 <script>
 const form=document.getElementById('signup'),button=document.getElementById('submit'),status=document.getElementById('status'),result=document.getElementById('result');
-let requestGeneration=0;
-function clearConfirmation(){requestGeneration++;status.textContent='';result.hidden=true;document.getElementById('assigned').textContent='';document.getElementById('messages').removeAttribute('href');button.disabled=false;}
+let requestGeneration=0,activeRequest=null;
+const welcomeRequests=new Map();
+function clearConfirmation(){requestGeneration++;activeRequest?.abort();activeRequest=null;status.textContent='';result.hidden=true;document.getElementById('assigned').textContent='';document.getElementById('messages').removeAttribute('href');button.disabled=false;}
 window.addEventListener('pageshow',event=>{if(event.persisted)clearConfirmation();});
 document.getElementById('phone').addEventListener('input',clearConfirmation);
-function normalizePhone(value){const text=value.trim();if(!/^[+0-9 ().-]+$/.test(text))return null;const compact=text.replace(/[ ().-]/g,'');if(/^\\+[1-9][0-9]{6,14}$/.test(compact))return compact;if(/^[0-9]{10}$/.test(compact))return '+1'+compact;return null;}
+function normalizePhone(value){const text=value.trim();if(!/^[+0-9 ().-]+$/.test(text))return null;const compact=text.replace(/[ ().-]/g,'');if(/^\\+[1-9][0-9]{6,14}$/.test(compact))return compact;if(/^[0-9]{10}$/.test(compact))return '+1'+compact;if(/^1[0-9]{10}$/.test(compact))return '+'+compact;return null;}
 form.addEventListener('submit',async(event)=>{event.preventDefault();clearConfirmation();const generation=requestGeneration;const phone=document.getElementById('phone'),normalized=normalizePhone(phone.value);
 if(!normalized){phone.setAttribute('aria-invalid','true');status.textContent='Enter a US/Canada 10-digit number, or include + and the country code for an international number.';phone.focus();return;}phone.removeAttribute('aria-invalid');phone.value=normalized;button.disabled=true;status.textContent='Registering your number…';
-try{const response=await fetch('/imessage/signup',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone_number:normalized,consent:document.getElementById('consent').checked})});
-const body=await response.json();if(generation!==requestGeneration)return;if(!response.ok)throw new Error(body.error?.message||'Signup is temporarily unavailable.');
+const controller=new AbortController();activeRequest=controller;let timer;
+const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{reject(new Error('Registration is taking too long. Your number may already be registered; check again to retrieve your assigned number. Message delivery is unconfirmed.'));controller.abort();},35000);controller.signal.addEventListener('abort',()=>{clearTimeout(timer);reject(new Error('Registration request canceled.'));},{once:true});});
+try{if(!welcomeRequests.has(normalized))welcomeRequests.set(normalized,crypto.randomUUID());const welcomeRequestId=welcomeRequests.get(normalized);
+const body=await Promise.race([deadline,(async()=>{const response=await fetch('/imessage/signup',{method:'POST',cache:'no-store',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({phone_number:normalized,consent:document.getElementById('consent').checked,welcome_request_id:welcomeRequestId})});
+let body;try{body=await response.json();}catch{throw new Error('Signup returned an unreadable response. Your number may already be registered; check again to retrieve your assigned number.');}
+if(!response.ok)throw new Error(typeof body?.error?.message==='string'?body.error.message:'Signup is temporarily unavailable. Please try again later.');return body;})()]);if(generation!==requestGeneration)return;
 document.getElementById('assigned').textContent='Your assigned Zoomout number: '+body.assigned_phone_number;
 document.getElementById('messages').href=body.open_messages_url;result.hidden=false;
-status.textContent='Registration checked just now. '+(body.already_enrolled?'Your registration is active. ':'Your number is registered. ')+(body.welcome_status==='accepted'?'A welcome message was accepted for sending; receipt is not confirmed. Tap Open Messages below, then send a public video link.':'Welcome delivery is unconfirmed. Tap Open Messages below, then send a public video link.');
-}catch(error){if(generation===requestGeneration)status.textContent=error instanceof Error?error.message:'Signup is temporarily unavailable.';}finally{if(generation===requestGeneration)button.disabled=false;}});
+status.textContent='Registration checked just now. '+(body.already_enrolled?'Your registration is active. ':'Your number is registered. ')+(body.welcome_status==='accepted'?'A welcome message was accepted for sending; receipt is not confirmed. Check Messages for your welcome.':'A welcome was requested, but its delivery is unconfirmed. Check Messages, or use Open Messages below if needed.');
+}catch(error){if(generation===requestGeneration)status.textContent=error instanceof Error&&error.name!=='TypeError'?error.message:'Could not reach signup. Your number may already be registered; check your connection, then check registration again.';}finally{clearTimeout(timer);if(generation===requestGeneration){activeRequest=null;button.disabled=false;}}});
 </script></body></html>"""
 
 
@@ -105,9 +111,9 @@ def _error(status: int, code: str, message: str, *, retryable: bool = False) -> 
     }})
 
 
-def _allow_attempt(key: str, limit: int, period: float) -> bool:
+def _allow_attempt(key: str, limit: int, period: float, *, timestamp: float | None = None) -> bool:
     """Bound local abuse state; hashes avoid retaining raw phone numbers or IPs."""
-    now = time.monotonic()
+    now = time.monotonic() if timestamp is None else timestamp
     with _attempt_lock:
         stale = [name for name, attempts in _attempts.items() if not attempts or attempts[-1] <= now - 3_600]
         for name in stale:
@@ -125,7 +131,20 @@ def _allow_attempt(key: str, limit: int, period: float) -> bool:
         return True
 
 
-def _enroll(phone: str) -> JSONResponse:
+def _release_attempt(key: str, timestamp: float) -> None:
+    """Release only a failed request's reservation; concurrent attempts remain counted."""
+    with _attempt_lock:
+        attempts = _attempts.get(key)
+        if attempts is not None:
+            try:
+                attempts.remove(timestamp)
+            except ValueError:
+                pass
+            if not attempts:
+                del _attempts[key]
+
+
+def _enroll(phone: str, welcome_request_id: str | None = None) -> JSONResponse:
     token = os.getenv("PHOTON_BRIDGE_TOKEN", "").strip()
     port = os.getenv("PHOTON_BRIDGE_PORT", "8766").strip() or "8766"
     def unavailable():
@@ -133,11 +152,15 @@ def _enroll(phone: str) -> JSONResponse:
     if (not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", token)
             or not re.fullmatch(r"[0-9]{1,5}", port) or not 1_024 <= int(port) <= 65_535):
         return unavailable()
+    payload = {"phone_number": phone, "consent": True}
+    if welcome_request_id is not None:
+        payload["welcome_request_id"] = welcome_request_id
+    identity = phone if welcome_request_id is None else phone + ":" + welcome_request_id
     request = BridgeRequest(
         f"http://127.0.0.1:{int(port)}/enroll", method="POST",
-        data=json.dumps({"phone_number": phone, "consent": True}).encode(),
+        data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}",
-                 "Idempotency-Key": "enroll_" + hashlib.sha256(phone.encode()).hexdigest()},
+                 "Idempotency-Key": "enroll_" + hashlib.sha256(identity.encode()).hexdigest()},
     )
     try:
         with build_opener(ProxyHandler({}), _NoRedirect()).open(request, timeout=30) as response:
@@ -205,12 +228,24 @@ async def signup(request: Request):
         payload = json.loads(raw)
     except (ValueError, UnicodeError, RecursionError):
         return _error(400, "INVALID_SIGNUP", "Provide a phone number in international format and explicit consent.")
-    if (not isinstance(payload, dict) or set(payload) != {"phone_number", "consent"}
+    if (not isinstance(payload, dict) or set(payload) not in ({"phone_number", "consent"}, {"phone_number", "consent", "welcome_request_id"})
             or not isinstance(payload["phone_number"], str) or _PHONE.fullmatch(payload["phone_number"]) is None):
         return _error(400, "INVALID_SIGNUP", "Provide a phone number in international format, such as +19195551234.")
     phone = payload["phone_number"]
-    if not _allow_attempt("phone:" + hashlib.sha256(phone.encode()).hexdigest(), _PHONE_LIMIT, 3_600):
-        return _error(429, "SIGNUP_RATE_LIMITED", "Too many signup attempts for this number. Please wait before trying again.", retryable=True)
     if payload["consent"] is not True:
         return _error(400, "CONSENT_REQUIRED", "Confirm that you own this number and consent to Quantro iMessages.")
-    return await run_in_threadpool(_enroll, phone)
+    welcome_request_id = payload.get("welcome_request_id")
+    if "welcome_request_id" in payload and (not isinstance(welcome_request_id, str) or _WELCOME_REQUEST_ID.fullmatch(welcome_request_id) is None):
+        return _error(400, "INVALID_SIGNUP", "Provide a valid welcome request identifier.")
+    if welcome_request_id is not None:
+        welcome_request_id = welcome_request_id.lower()
+    phone_key = "phone:" + hashlib.sha256(phone.encode()).hexdigest()
+    attempted_at = time.monotonic()
+    if not _allow_attempt(phone_key, _PHONE_LIMIT, 3_600, timestamp=attempted_at):
+        return _error(429, "SIGNUP_RATE_LIMITED", "Too many signup attempts for this number. Please wait before trying again.", retryable=True)
+    response = await run_in_threadpool(_enroll, phone, welcome_request_id)
+    if response.status_code == 503:
+        # Infrastructure failures should not lock a genuine tester out for an hour.
+        # The IP limit and pending phone reservations still bound repeated requests.
+        _release_attempt(phone_key, attempted_at)
+    return response
