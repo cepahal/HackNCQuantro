@@ -77,7 +77,7 @@ export function ReportContent({ report, display, diagnostics }: { report: Report
      {verifiedSource ? "Verified speech match" : "Unverified lead"}
     </span>}
    </div>
-   {verifiedSource ? <div className={styles.primaryVideo}><ReportPlayer key={verifiedSource.post.media.media_id} media={verifiedSource} label="Matched source recording"/></div>
+   {verifiedSource ? <div className={styles.primaryVideo}><ReportPlayer key={verifiedSource.post.media.media_id} media={report.context_video ? {...verifiedSource, post: {...verifiedSource.post, media: report.context_video}} : verifiedSource} label={report.context_video ? "Your clip in context" : "Matched source recording"}/></div>
     : primaryLead ? <div className={styles.candidatePlayer}>
      <iframe src={primaryLead.preview} title={`Unverified source candidate: ${primaryLead.title}`} loading="lazy"
       referrerPolicy="strict-origin-when-cross-origin"

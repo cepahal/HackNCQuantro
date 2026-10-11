@@ -46,7 +46,7 @@ EXPECTED_FIELDS = {
     t.Comparison: {"context_assessment", "caption_assessment", "assessment_confidence",
                    "summary", "findings", "limitations"},
     t.ReportV2: {"schema_version", "job_id", "outcome", "submitted", "source", "alignment",
-                 "context", "comparison", "summary", "limitations"},
+                 "context", "comparison", "summary", "limitations", "context_video", "context_selection"},
 }
 
 EXPECTED_ENUMS = {

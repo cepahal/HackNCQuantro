@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 from datetime import UTC, datetime
@@ -33,6 +34,7 @@ from .analysis import compare_clip, interpret_clip
 from .candidates import CandidateSearchError, find_source_video
 from .diagnostics import DiagnosticCapture, media_snapshot, record
 from .media import resolve_media
+from . import context_video
 
 logger = logging.getLogger(__name__)
 
@@ -287,6 +289,22 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
                         ensure_ascii=False,
                     )
                 )
+        context_asset, context_selection = None, None
+        if chosen and os.getenv('CONTEXT_VIDEO_ENABLED', 'true').lower() == 'true':
+            try:
+                selected_context, context_selection = await asyncio.to_thread(context_video.select, chosen[2], chosen[1])
+                chosen = (*chosen[:3], selected_context, chosen[4])
+                record('sentence_context', 'completed', context_selection)
+            except Exception:
+                warnings.append('Sentence-based context selection was unavailable; the existing source context is shown.')
+            if context_selection is not None:
+                try:
+                    store.touch_job(job_id)
+                    context_asset = await context_video.export(chosen[0],chosen[2],context_selection)
+                    record('context_video', 'completed', context_asset.model_dump(mode='json'))
+                except Exception:
+                    warnings.append('The labeled context video could not be exported or stored; the original source remains available.')
+                    record('context_video', 'unavailable', {'reason': 'Export or storage unavailable; original source retained.'})
         stage = Stage.COMPARE_CONTEXT_AND_CAPTION
         started = time.monotonic()
         comparison = compare_clip(post, features, chosen[3]) if chosen else None
@@ -306,6 +324,8 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
             extra_limitations=warnings,
         )
         report.summary = summary
+        report.context_video = context_asset
+        report.context_selection = context_selection
         record(stage.value, "completed", {"report": report.model_dump(mode="json")}, started=started)
         return ReportV2.model_validate(report.model_dump(mode="json"))
     except CandidateSearchError:

@@ -398,3 +398,31 @@ def test_invalid_citation_gets_one_repair_without_relaxing_checks(monkeypatch):
     result = analysis.compare_clip(post, clip, context)
     assert result.findings[0].evidence[0].quote == WORDS
     assert len(calls) == 2 and "preceding attempt failed validation" in calls[1]
+
+
+def test_context_video_is_saved_in_report_and_reused(store, wired, monkeypatch):
+    from backend.services.shared.types import PublicMediaAsset
+    monkeypatch.setenv('CONTEXT_VIDEO_ENABLED','true')
+    monkeypatch.setattr(run.context_video.sentence_context, 'model_counts', lambda *args:(1,1))
+    asset = PublicMediaAsset(media_id='context_test',mime_type='video/mp4',duration_seconds=125.,width=640,height=360,has_audio=True)
+    exporter = AsyncMock(return_value=asset)
+    monkeypatch.setattr(run.context_video,'export',exporter)
+    result = run.run_analysis('job_context',CLIP,store=store)
+    report = store.get_report(result.report_id)
+    assert report['context_video']['media_id']=='context_test'
+    assert report['context_selection']['before_method']=='sentences'
+    assert report['context']['windows'][0]['requested_end_seconds']==135
+    assert 'local_path' not in json.dumps(report)
+    run.run_analysis('job_context',CLIP,store=store)
+    assert exporter.await_count==1
+
+
+def test_context_export_failure_keeps_source_report(store, wired, monkeypatch):
+    monkeypatch.setenv('CONTEXT_VIDEO_ENABLED','true')
+    monkeypatch.setattr(run.context_video.sentence_context,'model_counts',lambda *args:None)
+    monkeypatch.setattr(run.context_video,'export',AsyncMock(side_effect=RuntimeError('private diagnostics')))
+    result=run.run_analysis('job_failed_export',CLIP,store=store)
+    report=store.get_report(result.report_id)
+    assert report['outcome']=='matched' and report['context_video'] is None
+    assert any('could not be exported' in s for s in report['limitations'])
+    assert 'private diagnostics' not in json.dumps(report)

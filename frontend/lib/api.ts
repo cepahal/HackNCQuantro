@@ -110,7 +110,11 @@ function assertReport(data: unknown): ReportV2 {
       || !isRecord(data.submitted) || !isRecord(data.submitted.post) || !isRecord(data.submitted.transcript)
       || !isRecordOrNull(data.source) || !isRecordOrNull(data.alignment) || !isRecordOrNull(data.context)
       || !isRecordOrNull(data.comparison) || !(data.summary === null || typeof data.summary === "string")
-      || !Array.isArray(data.limitations)) {
+      || !Array.isArray(data.limitations)
+      || (data.context_video != null && (!isRecord(data.context_video)
+          || typeof data.context_video.media_id !== "string" || !IDENTIFIER.test(data.context_video.media_id)
+          || data.context_video.mime_type !== "video/mp4"))
+      || (data.context_selection != null && !isRecord(data.context_selection))) {
     throw new Error("The analysis service returned an invalid report.");
   }
   return data as unknown as ReportV2;

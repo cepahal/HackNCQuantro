@@ -313,6 +313,8 @@ export type ReportMedia = {
 };
 
 export type ReportV2 = {
+  context_video?: PublicMediaAsset | null;
+  context_selection?: Record<string, unknown> | null;
   schema_version: "2.1";
   job_id: string;
   outcome: Outcome;

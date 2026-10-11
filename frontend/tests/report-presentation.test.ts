@@ -235,3 +235,12 @@ test("diagnostic mode preserves old panels in a hidden container and shows every
   assert.equal((terminal.match(/complete diagnostic text /g) ?? []).length, 300);
   assert.equal(JSON.stringify(value), before);
 });
+
+test("stored context video replaces source playback without changing source attribution", () => {
+  const value = report();
+  value.context_video = {media_id:"context_test",mime_type:"video/mp4",playback_url:"https://api.example/media/context_test",duration_seconds:79,width:640,height:360,fps:30,has_audio:true};
+  const html = renderToStaticMarkup(createElement(ReportContent, {report:value,display:display(value)}));
+  assert.match(html,/Your clip in context/);
+  assert.match(html,/https:\/\/api.example\/media\/context_test/);
+  assert.ok(html.includes(value.source!.post.post_url.replaceAll("&", "&amp;")));
+});

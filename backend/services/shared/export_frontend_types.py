@@ -20,9 +20,9 @@ def render(schema, name=None):
     kind = schema.get("type")
     if kind == "object":
         if "properties" in schema:
-            # TranscriptSentence's wrap serializer omits empty word timings.
+            # Word timings can be omitted; context-video extensions may be absent in older saved reports.
             return "{\n" + "".join(
-                f"  {key}{'?' if name == 'TranscriptSentence' and key == 'words' else ''}: {render(value)};\n"
+                f"  {key}{'?' if (name == 'TranscriptSentence' and key == 'words') or (name == 'ReportV2' and key in {'context_video', 'context_selection'}) else ''}: {render(value)};\n"
                 for key, value in schema["properties"].items()
             ) + "}"
         return "Record<string, unknown>"

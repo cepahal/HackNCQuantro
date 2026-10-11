@@ -18,7 +18,7 @@ CONTRACT_FIELDS = [
     ("verify_and_align", shared.Alignment, {"status", "clip_media_id", "source_media_id", "matches", "match_quality", "edit_analysis", "limitations"}),
     ("select_surrounding_context", shared.Context, {"source_media_id", "windows", "limitations"}),
     ("compare_context_and_caption", shared.Comparison, {"context_assessment", "caption_assessment", "assessment_confidence", "summary", "findings", "limitations"}),
-    ("build_report", shared.ReportV2, {"schema_version", "job_id", "outcome", "submitted", "source", "alignment", "context", "comparison", "summary", "limitations"}),
+    ("build_report", shared.ReportV2, {"schema_version", "job_id", "outcome", "submitted", "source", "alignment", "context", "comparison", "summary", "limitations", "context_video", "context_selection"}),
     ("save_report_and_complete_job", shared.JobCompletionResult, {"job_id", "status", "report_id", "report_url", "completed_at"}),
     ("display_report", shared.DisplayModel, {"source_match", "clip_coverage", "context_assessment", "confidence_note", "no_source_message", "context_unavailable_message", "submitted_panel", "source_panel", "poster_info", "matches", "edit_analysis", "findings", "limitations"}),
     ("send_summary", shared.DeliveryResult, {"conversation_id", "message_id", "status"}),

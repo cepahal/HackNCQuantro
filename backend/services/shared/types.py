@@ -343,6 +343,8 @@ class ReportMedia(ContractModel):
 
 
 class ReportV2(ContractModel):
+    context_video: PublicMediaAsset | None = None
+    context_selection: dict[str, Any] | None = None
     schema_version: Literal["2.1"] = "2.1"
     job_id: str
     outcome: Outcome
