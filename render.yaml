@@ -11,6 +11,15 @@ services:
     # Served only after startup has connected to Tiger; no database query per probe.
     healthCheckPath: /openapi.json
     envVars:
+      # Opt in privately after configuring existing Spectrum credentials.
+      - key: PHOTON_ENABLED
+        sync: false
+      - key: SPECTRUM_PROJECT_ID
+        sync: false
+      - key: SPECTRUM_PROJECT_SECRET
+        sync: false
+      - key: PHOTON_DATA_DIR
+        sync: false
       - key: APP_ENV
         value: production
       - key: PHOTON_WEBHOOK_SECRET

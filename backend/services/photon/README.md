@@ -61,7 +61,68 @@ add each genuine tester's exact iMessage phone/email handle to project **Users**
 pool assigns the sender number automatically. This integration targets shared-pool DMs;
 dedicated multi-line routing and group workflows need a separate contract.
 
+### Shared-number rejection
+
+Photon's "This number didn't recognize yours" reply is sent before Quantro receives
+the message. Free/Pro shared lines route by the registered sender and assigned line.
+Register the tester under Users, disable the optional email invite unless requested,
+and have them text their assigned number. A shared number cannot be made open to
+unknown senders by changing a webhook or disabling an application check. A public
+dedicated number requires Photon Business. No plan upgrade is needed for registered
+demo testers, and this integration never provisions or purchases lines.
+
+### Existing Render service
+
+The Docker image includes the existing Node 24 Spectrum listener. API-only startup
+remains the default. Set `PHOTON_ENABLED=true` in the service's private environment,
+alongside the existing `SPECTRUM_PROJECT_ID`, `SPECTRUM_PROJECT_SECRET` and matching
+`PHOTON_BRIDGE_TOKEN`. The runtime starts the API first, waits for its existing routes,
+then starts Spectrum. `PHOTON_BACKEND_PORT` follows Render's `PORT`; the summary
+bridge remains private on `127.0.0.1:8766`. Keep one service instance and stop any
+old listener for this project before enabling the hosted one.
+
+No public webhook is required by Spectrum. `scripts/photon_listen.py` starts only
+the separate HTTP-webhook API and does not start the supported Spectrum receiver.
+Successful hosting requires a `Quantro Photon (iMessage) ready` log, then an actual
+inbound message, acknowledgment and report-link receipt. API health alone is not
+proof that iMessage works.
+
+Set `PHOTON_DATA_DIR` to an existing persistent mount when available. Without one,
+intake and delivery markers live only for that container and are lost on a deploy.
+Saved Tiger jobs/reports survive, but transport deduplication across deployments is
+not guaranteed. Do not replay old requests or resend uncertain deliveries. This
+change does not buy storage, add services, enable saved-request replay or change the
+analysis algorithm, report schema or frontend.
+
 `GET http://127.0.0.1:8766/health` checks the bridge process only, not iMessage delivery.
+
+### QR signup for the existing Pro plan
+
+Share `https://quantro-backend.onrender.com/imessage` or display its QR code at
+`https://quantro-backend.onrender.com/imessage/qr.svg`. The checked-in QR encodes
+that signup URL, with a four-module quiet zone and medium error correction. If
+the backend hostname changes, regenerate the QR before sharing it.
+
+The standalone backend page asks for an international phone number and consent
+to a welcome iMessage. It enrolls a shared user through Photon's documented
+Stable API, then shows that user's assigned Photon number and an Open Messages
+link. The user replies with a public video URL to enter the existing analysis
+flow. No frontend files or analysis functions are involved in signup.
+
+The existing plan permits 100 registered users, including existing project
+users. Photon enforces capacity; this integration never upgrades the plan or
+buys a line. Different people can receive different assigned numbers. Posting
+one person's assigned number publicly does not register other senders.
+
+Signup has input/body bounds, per-process throttling and private bridge
+authentication. Welcome attempts are recorded before sending; repeated signup
+does not resend an accepted or uncertain welcome while that ledger exists.
+Without a persistent mount, these markers and throttle counters reset on a
+deploy. Entering a number is consent to contact, not proof of phone ownership
+or authentication to private reports. An accepted send is not a delivery receipt.
+
+Official enrollment contract:
+[Create user](https://photon.codes/docs/api-reference/users/create-user).
 
 ## Incoming submission boundary
 

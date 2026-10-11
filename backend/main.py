@@ -86,6 +86,7 @@ from backend.routes.common import (
 )
 from backend.routes.ingest import router as ingest_router
 from backend.routes.media import router as media_router
+from backend.routes.photon_signup import router as photon_signup_router
 from backend.routes.photon_webhook import router as photon_webhook_router
 from backend.routes.request_limits import RequestLimitsMiddleware
 from backend.services.external_apis.tigerdata_storage import TigerDataPostPool
@@ -176,3 +177,4 @@ app.include_router(analyze_router)
 app.include_router(ingest_router)
 app.include_router(media_router)
 app.include_router(photon_webhook_router)
+app.include_router(photon_signup_router)

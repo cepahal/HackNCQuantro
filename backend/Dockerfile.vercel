@@ -1,9 +1,18 @@
-FROM python:3.12-slim
+FROM node:24-bookworm-slim AS photon
+WORKDIR /photon
+COPY services/photon/package.json services/photon/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+
+FROM python:3.12-slim-bookworm
 
 # ffmpeg/ffprobe: media preprocessing. ca-certificates: Tiger Postgres uses sslmode=verify-full.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg ca-certificates libgomp1 \
+    && apt-get install -y --no-install-recommends ffmpeg ca-certificates libgomp1 libstdc++6 libatomic1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Matching Debian releases keep the official Node binary's runtime ABI compatible.
+COPY --from=photon /usr/local/bin/node /usr/local/bin/node
+RUN node --version
 
 # Every module imports through the `backend.` package, and main.py puts its parent
 # directory on sys.path, so the service root must live at /app/backend.
@@ -22,8 +31,9 @@ RUN if [ "$INSTALL_WHISPER" = "1" ]; then python -c "from faster_whisper.utils i
 ENV WHISPER_MODEL=/opt/quantro/whisper
 
 COPY . .
+COPY --from=photon /photon/node_modules ./services/photon/node_modules
 
 ENV PYTHONUNBUFFERED=1
 # Hosts pass the listen port in $PORT (Render sets it; Vercel defaults to 80).
 EXPOSE 80
-CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-80}"]
+CMD ["python", "scripts/start_photon_backend.py"]

@@ -8,6 +8,7 @@ import { createBridgeServer } from "./server.ts";
 import { BridgeError, createSummarySender } from "./summary.ts";
 import { assertBackendReady, BACKEND_NOT_READY_MESSAGE, createAnalysisDispatcher } from "./analysis.ts";
 import { createPublicReportPreparer } from "./public-reports.ts";
+import { createEnrollmentHandler } from "./enroll.ts";
 
 async function main(): Promise<void> {
   const config = readConfig(process.env, process.argv.slice(2));
@@ -43,7 +44,17 @@ async function main(): Promise<void> {
     prepareReport,
     resolveConversation,
   });
-  const server = createBridgeServer({ token: config.token, sendSummary });
+  const enroll = cloudApp ? createEnrollmentHandler({
+    projectId: config.projectId,
+    projectSecret: config.projectSecret,
+    deliveryDirectory: join(config.directory, "welcome-deliveries"),
+    sendWelcome: async (phone, text) => {
+      const im = imessage(cloudApp);
+      const dm = await im.space.create(await im.user(phone));
+      return dm.send(text);
+    },
+  }) : undefined;
+  const server = createBridgeServer({ token: config.token, sendSummary, enroll });
   let stopping = false;
   const stop = (): void => {
     if (stopping) return;

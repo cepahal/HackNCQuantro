@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { BridgeError } from "./summary.ts";
+import { EnrollmentError, type EnrollmentResult } from "./enroll.ts";
 
 const MAX_BODY_BYTES = 16 * 1_024;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -14,6 +15,7 @@ type SummaryResult = {
 type BridgeOptions = {
   token: string;
   sendSummary: (input: unknown, jobId: string) => Promise<SummaryResult>;
+  enroll?: (input: unknown, key: string) => Promise<EnrollmentResult>;
 };
 
 function respond(response: ServerResponse, status: number, body: unknown): void {
@@ -24,7 +26,7 @@ function respond(response: ServerResponse, status: number, body: unknown): void 
   response.end(JSON.stringify(body));
 }
 
-function rejectRequest(request: IncomingMessage, response: ServerResponse, error: BridgeError): void {
+function rejectRequest(request: IncomingMessage, response: ServerResponse, error: BridgeError | EnrollmentError): void {
   request.pause();
   response.setHeader("Connection", "close");
   response.once("finish", () => request.socket.destroySoon());
@@ -82,7 +84,7 @@ function readJson(request: IncomingMessage): Promise<unknown> {
   });
 }
 
-export function createBridgeServer({ token, sendSummary }: BridgeOptions): Server {
+export function createBridgeServer({ token, sendSummary, enroll }: BridgeOptions): Server {
   if (!token.trim()) throw new Error("A bridge authentication token is required.");
   const expectedAuthorization = Buffer.from(`Bearer ${token}`, "utf8");
 
@@ -93,7 +95,8 @@ export function createBridgeServer({ token, sendSummary }: BridgeOptions): Serve
         respond(response, 200, { status: "ok", service: "quantro-photon" });
         return;
       }
-      if (request.method !== "POST" || request.url !== "/send-summary") {
+      const enrollment = request.url === "/enroll" && enroll !== undefined;
+      if (request.method !== "POST" || (request.url !== "/send-summary" && !enrollment)) {
         rejectRequest(request, response, new BridgeError(404, "NOT_FOUND", "The requested route was not found."));
         return;
       }
@@ -116,12 +119,13 @@ export function createBridgeServer({ token, sendSummary }: BridgeOptions): Serve
 
       try {
         const input = await readJson(request);
-        const result = await sendSummary(input, jobId);
+        const result = enrollment && enroll ? await enroll(input, jobId) : await sendSummary(input, jobId);
         respond(response, 200, result);
       } catch (error) {
-        const safeError = error instanceof BridgeError && Number.isInteger(error.status) && error.status >= 400 && error.status <= 599
+        const safeError = (error instanceof BridgeError || error instanceof EnrollmentError) && Number.isInteger(error.status) && error.status >= 400 && error.status <= 599
           ? error
-          : new BridgeError(500, "MESSAGE_SEND_FAILED", "The message could not be sent.");
+          : enrollment ? new EnrollmentError(500, "ENROLLMENT_FAILED", "Phone enrollment could not be completed.")
+            : new BridgeError(500, "MESSAGE_SEND_FAILED", "The message could not be sent.");
         if (!response.destroyed) rejectRequest(request, response, safeError);
       }
     })();
