@@ -73,3 +73,23 @@
 .mobile-player-toggle [aria-pressed="true"],.mobile-transcript-toggle [aria-pressed="true"]{background:var(--black);color:#fff}
 @media(min-width:601px){.transcript-grid .transcript-panel{display:block}}
 @media(max-width:600px){.mobile-player-toggle,.mobile-transcript-toggle{display:flex;gap:8px;margin-bottom:12px}.transcript-grid .transcript-panel:not(.active){display:none}}
+
+/* Report loading transition and analysis card finish. */
+.analysis-loading{position:fixed;inset:0;z-index:120;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;opacity:1;transition:opacity .52s ease}
+.analysis-loading.is-fading{opacity:0;pointer-events:none}
+.analysis-loading__sphere{position:absolute;left:50%;top:41%;width:clamp(250px,34vw,360px);aspect-ratio:1;transform:translate(-50%,-50%) scale(1);opacity:1;transition:transform .78s cubic-bezier(.56,.03,.85,.36),opacity .68s ease}
+.analysis-loading__sphere canvas{display:block;width:100%;height:100%}
+.analysis-loading__sphere.is-collapsing{transform:translate(-50%,-50%) scale(.015) rotate(90deg);opacity:0}
+.analysis-loading__plaque{position:absolute;left:50%;bottom:clamp(28px,7vh,64px);width:min(560px,calc(100vw - 36px));padding:18px 22px 16px;transform:translateX(-50%);border:1px solid #e5e5e8;border-radius:8px;background:#fff;box-shadow:0 10px 32px #1111160b;transition:opacity .28s ease,transform .38s ease}
+.analysis-loading__plaque.is-leaving{opacity:0;transform:translate(-50%,18px)}
+.analysis-loading__eyebrow{margin:0 0 5px;color:var(--muted);font-size:10px;letter-spacing:.12em}
+.analysis-loading__plaque h2{margin:0;font-size:22px;font-weight:400;letter-spacing:-.03em}
+.analysis-loading__copy{margin:5px 0 13px;color:var(--body);font-size:13px}
+.analysis-loading__plaque ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px;list-style:none;margin:0;padding:0}
+.analysis-loading__plaque li{display:flex;align-items:center;gap:7px;color:var(--body);font-size:11px;white-space:nowrap}
+.analysis-loading__plaque li span{display:grid;place-items:center;flex:0 0 19px;height:19px;border:1px solid #f2b3bf;border-radius:50%;color:var(--red);font-size:9px}
+.instrument,.claim-box,.poster,.transcript,.evidence-details,.selection-card,.video-frame,.media-slot,.map-frame .panel,.player-wrap .panel,.error-card{border-radius:6px;box-shadow:0 3px 14px #1011160a}
+.instrument,.claim-box,.poster,.transcript,.video-frame,.media-slot{overflow:hidden}
+.instrument-head{border-radius:5px 5px 0 0}
+@media(max-width:600px){.analysis-loading__sphere{top:36%;width:min(68vw,300px)}.analysis-loading__plaque{bottom:calc(18px + env(safe-area-inset-bottom));padding:15px}.analysis-loading__plaque ol{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.analysis-loading__plaque li{font-size:10px;white-space:normal}}
+@media(prefers-reduced-motion:reduce){.analysis-loading,.analysis-loading__sphere,.analysis-loading__plaque{transition-duration:.01ms!important}}
