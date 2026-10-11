@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import math
 import os
@@ -142,9 +143,33 @@ async def resolve_media(
             warnings.append(
                 "YouTube playback uses the original recording; the video file was not downloaded."
             )
-        transcript = await _transcript_for_media(
-            url, download["file_path"] if download else None, known_info=info or None
-        )
+        try:
+            transcript = await _transcript_for_media(
+                url, download["file_path"] if download else None, known_info=info or None
+            )
+        except QuantroError as error:
+            if not (error.code == ErrorCode.MEDIA_UNAVAILABLE
+                    and getattr(error, "platform_challenge", False)):
+                raise
+            # Reuse the bounded reader only after a classified automation block.
+            # Continue normal discovery rather than returning its standalone report.
+            from ..reporting.remote_youtube import build_remote_youtube_report
+            try:
+                remote = await asyncio.to_thread(build_remote_youtube_report, "retrieval_fallback", url)
+            except QuantroError:
+                raise error from error.__cause__
+            speech = remote.submitted.transcript.sentences
+            if not speech:
+                raise
+            warnings.extend([
+                "YouTube blocked native retrieval; Gemini supplied a partial transcript from the first 60 seconds.",
+                "Gemini transcript words and timestamps are estimates; audio and visual authenticity were not assessed.",
+            ])
+            transcript = {"transcript": " ".join(s.text for s in speech),
+                          "segments": [{"text": s.text, "start": s.start_seconds,
+                                        "end": s.end_seconds} for s in speech],
+                          "source": "gemini_native_youtube_transcript", "coverage": "partial",
+                          "duration_known": False, "title": remote.submitted.post.title}
         if not info.get("title") and not transcript.get("title"):
             try:
                 info = {**(await fetch_youtube_oembed(url)), **info}

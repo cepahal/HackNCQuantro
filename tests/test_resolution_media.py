@@ -1,5 +1,6 @@
 """Offline checks for the handover media port and its honest timing contract."""
 
+import asyncio
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -25,8 +26,43 @@ RESULT = {
 }
 
 
+def test_bot_block_uses_bounded_reader_and_retains_partial_evidence(monkeypatch):
+    from backend.services.reporting import remote_youtube
+    error = QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST)
+    error.platform_challenge = True
+    monkeypatch.setattr(media, "detect_platform", lambda url: "youtube")
+    monkeypatch.setattr(media, "_transcript_for_media", AsyncMock(side_effect=error))
+    sentence = SimpleNamespace(text="Actual available speech", start_seconds=1.0, end_seconds=4.0)
+    remote = SimpleNamespace(submitted=SimpleNamespace(
+        transcript=SimpleNamespace(sentences=[sentence]), post=SimpleNamespace(title="Public clip")))
+    calls = []
+    monkeypatch.setattr(remote_youtube, "build_remote_youtube_report",
+                        lambda job, url: calls.append(url) or remote)
+    post, features = asyncio.run(media.resolve_media(URL))
+    assert calls == [URL]
+    assert features.transcript.status == TranscriptStatus.PARTIAL
+    assert post.media.duration_seconds is None
+    assert features.transcript.sentences[0].text == sentence.text
+    assert "Gemini" in " ".join(features.warnings)
+
+
+def test_unavailable_video_does_not_invoke_remote_reader(monkeypatch):
+    from backend.services.reporting import remote_youtube
+    error = QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST)
+    monkeypatch.setattr(media, "detect_platform", lambda url: "youtube")
+    monkeypatch.setattr(media, "_transcript_for_media", AsyncMock(side_effect=error))
+    monkeypatch.setattr(remote_youtube, "build_remote_youtube_report",
+                        lambda *args: pytest.fail("Unavailable is not a bot challenge"))
+    with pytest.raises(QuantroError):
+        asyncio.run(media.resolve_media(URL))
+
+
 @pytest.fixture(autouse=True)
 def isolated_cache(monkeypatch, tmp_path):
+    from backend.services.reporting import remote_youtube
+    def unavailable(*args):
+        raise QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST)
+    monkeypatch.setattr(remote_youtube, "build_remote_youtube_report", unavailable)
     monkeypatch.setattr(transcribe, "_CAPTION_CACHE_DIR", tmp_path / "captions")
     monkeypatch.setattr(download, "DOWNLOADS_DIR", tmp_path / "downloads")
     monkeypatch.setattr(transcribe, "_transcript_api_blocked_until", 0.0)
