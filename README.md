@@ -156,3 +156,9 @@ The frontend polls the backend while an analysis is running and displays a progr
 | Source discovery | Exa, YouTube keyword search | Semantic and keyword-based retrieval |
 | Media processing | `yt-dlp`, FFmpeg | Media retrieval and processing |
 | Messaging | Photon Spectrum, TypeScript | iMessage interaction and report delivery
+
+
+## Credit to AI
+1. AI tools supported brainstorming, coding, debugging, and iterative refinement throughout ZoomOut's development.
+2. We used AI as a development partner while making architectural decisions, integrating services, evaluating trade-offs, and improving the product.
+3. AI helped us move faster and learn along the way, while we worked as a team to shape the idea, make technical decisions, and bring ZoomOut to life.
