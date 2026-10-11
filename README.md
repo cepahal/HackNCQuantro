@@ -2,6 +2,8 @@
 ### Team Quantro @ HackNC
 ### Members: Abdullah Siddique, Bhrigu Uppal, Grant Andrews, Jason Kasnicki 
 
+
+
 ### Problem
 
 ZoomOut helps people investigate viral political speech clips by finding potential longer recordings, locating matching passages, and showing what was said before and after the clip.
@@ -11,6 +13,8 @@ Submit a clip through the web app or send it through iMessage. ZoomOut searches 
 **Our principle:** Show the evidence. Communicate uncertainty. Never claim more than the evidence supports.
 
 **Live demo:** https://quantro-ten.vercel.app
+
+
 
 ---
 
@@ -32,6 +36,8 @@ Submit a clip through the web app or send it through iMessage. ZoomOut searches 
 
 ---
 
+
+
 ## Why ZoomOut?
 
 Short political clips can spread rapidly without the context needed to interpret them accurately. A few seconds of speech may omit the preceding question, a qualification, or the statement that explains what a speaker meant.
@@ -39,6 +45,8 @@ Short political clips can spread rapidly without the context needed to interpret
 Finding the original recording and manually comparing transcripts is time-consuming. ZoomOut makes that investigation easier by turning a submitted clip into a structured report with potential source recordings, matched passages, surrounding context, and explicit limitations.
 
 ZoomOut is an investigative aid, not an automated truth detector.
+
+
 
 ## What It Does
 
@@ -48,6 +56,8 @@ ZoomOut is an investigative aid, not an automated truth detector.
 - **Recover context:** Examine approximately 30 seconds before and after the matched passage when sufficient source material is available.
 - **Generate an evidence report:** Present source links, matched passages, timestamps, contextual analysis, and a rule-based confidence rating.
 - **Access results easily:** View the full report on the web or receive its link through iMessage.
+
+
 
 ## How It Works
 
@@ -85,6 +95,8 @@ ZoomOut is an investigative aid, not an automated truth detector.
 
    The finished report is stored in Tiger Data PostgreSQL and made available through the report endpoint.
 
+
+
 ### Architecture Diagram
 
 ```mermaid
@@ -111,6 +123,8 @@ flowchart TD
     B --> L[Reply with Report Link]
 ```
 
+
+
 ## Technical Architecture
 
 ZoomOut separates the user-facing interfaces, analysis pipeline, messaging integration, and persistent storage.
@@ -127,6 +141,8 @@ ZoomOut separates the user-facing interfaces, analysis pipeline, messaging integ
 | Tiger Data PostgreSQL | Persist reports and media-analysis features |
 
 The frontend polls the backend while an analysis is running and displays a progress state such as **“Finding the source…”** until the result is ready.
+
+
 
 ## Tech Stack
 
