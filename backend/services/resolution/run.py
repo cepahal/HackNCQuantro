@@ -29,12 +29,12 @@ from ..shared.errors import (
 from ..shared.post_identity import ensure_distinct_source, normalized_post_url
 from ..shared.types import AnalysisResult, IngestResult, Post, ReportV2
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
+from . import context_video
 from .alignment import build_alignment, build_context
 from .analysis import compare_clip, interpret_clip
-from .candidates import CandidateSearchError, find_source_video
+from .candidates import CandidateSearchError, check_source_video, find_source_video
 from .diagnostics import DiagnosticCapture, media_snapshot, record
 from .media import resolve_media
-from . import context_video
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +177,7 @@ def run_ingest(
             store.close()
 
 
-async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
+async def _build(job_id: str, url: str, store: TigerStore, *, source_url: str | None = None) -> ReportV2:
     stage = Stage.RETRIEVE_POST
     try:
         started = time.monotonic()
@@ -196,7 +196,7 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
         short_text = getattr(features, "full_transcript_text", None) or " ".join(
             sentence.text for sentence in features.transcript.sentences
         )
-        discovered = await find_source_video(
+        discovered = await check_source_video(short_text, source_url) if source_url else await find_source_video(
             short_text,
             title=post.title or post.caption,
             exclude_ids=[identity] if (identity := _id(url)) else [],
@@ -295,14 +295,14 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
                 selected_context, context_selection = await asyncio.to_thread(context_video.select, chosen[2], chosen[1])
                 chosen = (*chosen[:3], selected_context, chosen[4])
                 record('sentence_context', 'completed', context_selection)
-            except Exception:
+            except Exception:  # noqa: BLE001 - Optional context selection cannot discard the verified source.
                 warnings.append('Sentence-based context selection was unavailable; the existing source context is shown.')
             if context_selection is not None:
                 try:
                     store.touch_job(job_id)
                     context_asset = await context_video.export(chosen[0],chosen[2],context_selection)
                     record('context_video', 'completed', context_asset.model_dump(mode='json'))
-                except Exception:
+                except Exception:  # noqa: BLE001 - Export failure retains the source recording and saved analysis.
                     warnings.append('The labeled context video could not be exported or stored; the original source remains available.')
                     record('context_video', 'unavailable', {'reason': 'Export or storage unavailable; original source retained.'})
         stage = Stage.COMPARE_CONTEXT_AND_CAPTION
@@ -344,6 +344,7 @@ def run_analysis(
     store: TigerStore | None = None,
     provider: MessagingProvider | None = None,
     tracker: DeliveryTracker | None = None,
+    source_url: str | None = None,
 ) -> AnalysisResult:
     """Use the handover resolver as the public analysis path, without replaying jobs."""
     _validate(job_id, url)
@@ -391,7 +392,7 @@ def run_analysis(
         capture = DiagnosticCapture(job_id, store)
         with capture.bind():
             record(Stage.RUN_ANALYSIS.value, "started", {"job_id": job_id, "url": url})
-            report = asyncio.run(_build(job_id, url, store))
+            report = asyncio.run(_build(job_id, url, store, source_url=source_url)) if source_url else asyncio.run(_build(job_id, url, store))
             started = time.monotonic()
             save_report_and_complete_job(
                 job_id,

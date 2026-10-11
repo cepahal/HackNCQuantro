@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  analysisInFlight, getDisplayModel, getReport, getReportDiagnostics, ingest, mediaUrl, publicUrl, QuantroApiError, ReportNotFoundError, runAnalysis, startAnalysis, waitForReport,
+  analysisInFlight, getDisplayModel, getReport, getReportDiagnostics, getReportInterpretation, recheckReportSource, ingest, mediaUrl, publicUrl, QuantroApiError, ReportNotFoundError, runAnalysis, startAnalysis, waitForReport,
 } from "../lib/api.ts";
 import type { ReportV2 } from "../lib/api-types.ts";
 import { reportFixture } from "./fixtures/report_v2.ts";
@@ -285,4 +285,31 @@ test("saved-report polling reports a bounded timeout", async (t) => {
   t.mock.method(globalThis, "setTimeout", ((callback: () => void) => { queueMicrotask(callback); return 0; }) as unknown as typeof setTimeout);
   t.mock.method(globalThis, "fetch", async () => Response.json({ job_id: "job_saved", status: "running", report_id: null, error: null }));
   await assert.rejects(waitForReport("job_saved"), /taking longer than expected/);
+});
+
+test("Gemini interpretation requests coalesce and use the write API with a validated response", async (t) => {
+  const response = { report_id: "report_insight_cached", status: "ready", context_gap: "The full sentence adds a qualification.",
+    summary: "The speaker explains a condition.", reliability: "Transcript evidence only.", references: [{media_id:"source",sentence_id:"s1"}],
+    provider: "gemini", model: "gemini-test", generated_at: "2026-10-11T08:00:00Z" };
+  const fetch = t.mock.method(globalThis, "fetch", async () => Response.json(response));
+  const results = await Promise.all([getReportInterpretation(response.report_id), getReportInterpretation(response.report_id)]);
+  assert.deepEqual(results, [response, response]);
+  assert.equal(fetch.mock.calls.length, 1);
+  assert.match(String(fetch.mock.calls[0]!.arguments[0]), /\/reports\/report_insight_cached\/interpretation$/);
+  assert.equal((fetch.mock.calls[0]!.arguments[1] as RequestInit).method, "POST");
+});
+
+test("interpretation rejects wrong reports and malformed references without swallowing errors", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({ report_id: "report_wrong", status: "ready" }));
+  await assert.rejects(getReportInterpretation("report_bad_insight"), /invalid interpretation/);
+});
+
+test("candidate recheck preserves the submitted report identity and sends the selected URL separately", async (t) => {
+  const result = { job_id: "job_recheck", report_id: "report_job_recheck", report_url: "https://example.test/reports/report_job_recheck",
+    outcome: "no_verified_match", delivery_status: "skipped", delivery_warning: null, warnings: [] };
+  const fetch = t.mock.method(globalThis, "fetch", async () => Response.json(result));
+  assert.deepEqual(await recheckReportSource("report_original", "https://www.youtube.com/watch?v=12345678901", "job_recheck"), result);
+  assert.match(String(fetch.mock.calls[0]!.arguments[0]), /\/reports\/report_original\/source$/);
+  assert.deepEqual(JSON.parse(String((fetch.mock.calls[0]!.arguments[1] as RequestInit).body)),
+    { url: "https://www.youtube.com/watch?v=12345678901", job_id: "job_recheck" });
 });

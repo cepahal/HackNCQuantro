@@ -85,6 +85,12 @@ function section(id: string, title: string, text: string): SummarySection {
 }
 
 /** Only the backend's exact, framed summary format is split. Other prose stays intact. */
+export function conciseSummary(report: ReportV2): { takeaways: string; meaning: string; reliability: string } | null {
+  const text = report.summary?.trim() || report.comparison?.summary.trim() || "";
+  const match = text.match(/^Takeaways:\s*([\s\S]+?)\n\s*\nWhat this means:\s*([\s\S]+?)\n\s*\nReliability:\s*([\s\S]+)$/);
+  return match ? { takeaways: match[1].trim(), meaning: match[2].trim(), reliability: match[3].trim() } : null;
+}
+
 export function buildReportSummary(report: ReportV2): ReadableSummary {
   const text = reportSummary(report);
   const partialTranscript = report.submitted.transcript.status === "partial"

@@ -10,9 +10,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.routes.common import get_tiger_store, not_found, quantro_error_response
 from backend.services.reporting.build_report import sanitize_report
 from backend.services.reporting.display_report import display_report
+from backend.services.reporting.report_interpretation import report_interpretation
 from backend.services.reporting.save_report import report_id_for_job
 from backend.services.resolution.diagnostics import diagnostic_response
 from backend.services.resolution.run import run_analysis
+from backend.services.resolution.transcribe import extract_youtube_id
 from backend.services.shared.errors import (
     RETRYABLE_CODES,
     ErrorCode,
@@ -34,6 +36,12 @@ class AnalyzeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     url: str = Field(min_length=1, max_length=8192)
     conversation_id: str | None = Field(default=None, min_length=1, max_length=256)
+
+
+class SourceRecheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    url: str = Field(min_length=1, max_length=8192)
+    job_id: str = Field(pattern=r"^job_[A-Za-z0-9_-]{1,120}$")
 
 
 @router.post("/analyze/{job_id}/run")
@@ -124,5 +132,45 @@ def get_display_model(report_id: ReportId, store: TigerDependency) -> JSONRespon
     try:
         model = display_report(json.loads(bytes(response.body)))
         return JSONResponse(content=model.model_dump(mode="json"))
+    except QuantroError as error:
+        return quantro_error_response(error)
+
+
+@router.post("/reports/{report_id}/interpretation")
+def interpret_report(report_id: ReportId, store: TigerDependency) -> JSONResponse:
+    response = get_report(report_id, store)
+    if response.status_code != 200:
+        return response
+    try:
+        report = ReportV2.model_validate_json(bytes(response.body))
+        result = report_interpretation(report_id, report, store)
+        return JSONResponse(content=result.model_dump(mode="json"))
+    except Exception:  # noqa: BLE001 - Never return provider or connection details.
+        return quantro_error_response(QuantroError(ErrorCode.STORAGE_FAILED, Stage.DISPLAY_REPORT, retryable=True))
+
+
+@router.post("/reports/{report_id}/source")
+def recheck_source(report_id: ReportId, body: SourceRecheckRequest, store: TigerDependency) -> JSONResponse:
+    response = get_report(report_id, store)
+    if response.status_code != 200:
+        return response
+    report = ReportV2.model_validate_json(bytes(response.body))
+    identity = extract_youtube_id(body.url)
+    # Only already-discovered public YouTube leads can be selected. Never fetch an
+    # arbitrary client-provided host or replace the submitted clip with its source.
+    allowed = set()
+    for note in [*report.limitations, *report.submitted.post.retrieval.warnings]:
+        if note.startswith("Unverified source candidate: "):
+            allowed.add(extract_youtube_id(note.removeprefix("Unverified source candidate: ")))
+    if report.source:
+        allowed.add(extract_youtube_id(report.source.post.post_url))
+    if identity is None or identity not in allowed or identity == extract_youtube_id(report.submitted.post.post_url):
+        return quantro_error_response(QuantroError(ErrorCode.INVALID_URL, Stage.SEARCH_CANDIDATES,
+                                                  "Choose a candidate recorded in this report."))
+    # A caller-generated ID makes HTTP retries idempotent; the old report stays intact.
+    try:
+        result = run_analysis(body.job_id, report.submitted.post.post_url, store=store,
+                              source_url=f"https://www.youtube.com/watch?v={identity}")
+        return JSONResponse(content=result.model_dump(mode="json"))
     except QuantroError as error:
         return quantro_error_response(error)

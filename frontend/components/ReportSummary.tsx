@@ -1,5 +1,6 @@
 import type { ReportV2 } from "../lib/api-types";
-import { buildReportSummary, summaryQuoteLabel, summaryTakeaways, summaryText } from "../lib/report-summary";
+import { buildReportSummary, conciseSummary, summaryQuoteLabel, summaryTakeaways, summaryText } from "../lib/report-summary";
+export { conciseSummary } from "../lib/report-summary";
 import styles from "./ReportSummary.module.css";
 
 type Tone = "supported" | "difference" | "neutral";
@@ -75,12 +76,6 @@ export function ReportVerdict({ report }: { report: ReportV2 }) {
 }
 
 /** Recognize only the new exact summary labels. Arbitrary saved prose keeps its existing parser. */
-export function conciseSummary(report: ReportV2): { takeaways: string; meaning: string; reliability: string } | null {
-  const text = report.summary?.trim() || report.comparison?.summary.trim() || "";
-  const match = text.match(/^Takeaways:\s*([\s\S]+?)\n\s*\nWhat this means:\s*([\s\S]+?)\n\s*\nReliability:\s*([\s\S]+)$/);
-  return match ? { takeaways: match[1].trim(), meaning: match[2].trim(), reliability: match[3].trim() } : null;
-}
-
 export default function ReportSummary({ report }: { report: ReportV2 }) {
   const summary = buildReportSummary(report);
   const concise = conciseSummary(report);

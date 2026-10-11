@@ -182,6 +182,17 @@ export type IngestResult = {
   persisted_at: string;
 };
 
+export type InterpretationDraft = {
+  context_gap: string;
+  summary: string;
+  references: Array<InterpretationReference>;
+};
+
+export type InterpretationReference = {
+  media_id: string;
+  sentence_id: string;
+};
+
 export type JobCompletionResult = {
   job_id: string;
   report_id: string;
@@ -303,6 +314,18 @@ export type PublicPost = {
 export type Queries = {
   queries: Array<string>;
   warnings: Array<string>;
+};
+
+export type ReportInterpretation = {
+  report_id: string;
+  status: "ready" | "unavailable";
+  context_gap: string | null;
+  summary: string | null;
+  reliability: string;
+  references: Array<InterpretationReference>;
+  provider: "gemini";
+  model: string | null;
+  generated_at: string;
 };
 
 export type ReportMedia = {

@@ -53,6 +53,29 @@ def _string_value(value: Any) -> str:
     return value
 
 
+class InterpretationReference(ContractModel):
+    media_id: StrictStr
+    sentence_id: StrictStr
+
+
+class InterpretationDraft(ContractModel):
+    context_gap: StrictStr = Field(min_length=1, max_length=440)
+    summary: StrictStr = Field(min_length=1, max_length=240)
+    references: list[InterpretationReference] = Field(min_length=1, max_length=4)
+
+
+class ReportInterpretation(ContractModel):
+    report_id: StrictStr
+    status: Literal["ready", "unavailable"]
+    context_gap: StrictStr | None = None
+    summary: StrictStr | None = None
+    reliability: StrictStr
+    references: list[InterpretationReference] = Field(default_factory=list)
+    provider: Literal["gemini"] = "gemini"
+    model: StrictStr | None = None
+    generated_at: UtcTimestamp
+
+
 class ConfidenceLevel(str, Enum):
     HIGH = "high"
     MODERATE = "moderate"
@@ -506,6 +529,8 @@ __all__ = [
     "Finding",
     "Frame",
     "IngestResult",
+    "InterpretationDraft",
+    "InterpretationReference",
     "JobCompletionResult",
     "Match",
     "MatchEvidence",
@@ -523,6 +548,7 @@ __all__ = [
     "PublicPost",
     "QuantroError",
     "Queries",
+    "ReportInterpretation",
     "ReportMedia",
     "ReportV2",
     "Retrieval",
@@ -533,8 +559,8 @@ __all__ = [
     "TimeRange",
     "Transcript",
     "TranscriptSentence",
-    "TranscriptWord",
     "TranscriptStatus",
+    "TranscriptWord",
     "UtcTimestamp",
     "VisualText",
     "parse_stage_output",

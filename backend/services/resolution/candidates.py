@@ -629,3 +629,18 @@ async def find_source_video(
         "warnings": warnings,
         "search_metadata": meta,
     }
+
+
+async def check_source_video(transcript: str, url: str) -> MatchResult:
+    """Recheck one saved discovery lead using the same captions/Whisper scorer."""
+    video_id = extract_youtube_id(url)
+    if not video_id or not normalize_text(transcript):
+        raise CandidateSearchError("invalid_candidate", "Candidate or transcript is unavailable.")
+    candidate = Candidate(video_id, "Selected candidate recording", None)
+    scored = await _score_candidate(candidate, normalize_text(transcript))
+    return {"status": "success" if scored and scored["match_score"] >= MATCH_THRESHOLD else "not_found",
+            "match_score": scored["match_score"] if scored else 0.0,
+            "video_id": video_id, "video_url": candidate.url, "title": candidate.title,
+            "candidates": [scored] if scored else [],
+            "leads": [{"video_id": video_id, "video_url": candidate.url, "title": candidate.title, "duration": None}],
+            "warnings": [] if scored else ["The selected recording's transcript could not be retrieved."]}

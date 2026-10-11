@@ -1,5 +1,5 @@
 import type {
-  AnalysisResult, DisplayModel, ErrorCode, IngestResult, Outcome, PublicMediaAsset, ReportV2, Stage, TranscriptStatus,
+  AnalysisResult, DisplayModel, ErrorCode, IngestResult, Outcome, PublicMediaAsset, ReportInterpretation, ReportV2, Stage, TranscriptStatus,
 } from "./api-types";
 export type { AnalysisResult, ReportMedia, ReportV2 } from "./api-types";
 import type { ReportDiagnostics } from "./report-diagnostics";
@@ -188,6 +188,33 @@ export async function getReportDiagnostics(reportId: string): Promise<ReportDiag
     throw new Error("The analysis service returned invalid diagnostics.");
   }
   return data as unknown as ReportDiagnostics;
+}
+
+// Coalesce React strict-mode/remount requests. Durable provider caching lives in Tiger.
+const interpretationRequests = new Map<string, Promise<ReportInterpretation>>();
+export function getReportInterpretation(reportId: string): Promise<ReportInterpretation> {
+  if (!REPORT_ID.test(reportId)) return Promise.reject(new ReportNotFoundError());
+  const previous = interpretationRequests.get(reportId);
+  if (previous) return previous;
+  const promise = postJson(`/reports/${encodeURIComponent(reportId)}/interpretation`, {}).then(data => {
+    if (!isRecord(data) || data.report_id !== reportId || !["ready", "unavailable"].includes(String(data.status))
+      || data.provider !== "gemini" || typeof data.reliability !== "string" || typeof data.generated_at !== "string"
+      || !Array.isArray(data.references) || !data.references.every(ref => isRecord(ref) && typeof ref.media_id === "string" && typeof ref.sentence_id === "string")
+      || !(data.model === null || typeof data.model === "string")
+      || (data.status === "ready" && (typeof data.summary !== "string" || typeof data.context_gap !== "string"))) {
+      throw new Error("The analysis service returned an invalid interpretation.");
+    }
+    return data as unknown as ReportInterpretation;
+  });
+  interpretationRequests.set(reportId, promise);
+  if (interpretationRequests.size > 60) interpretationRequests.delete(interpretationRequests.keys().next().value!);
+  void promise.catch(() => interpretationRequests.delete(reportId));
+  return promise;
+}
+
+export async function recheckReportSource(reportId: string, url: string, jobId = `job_${crypto.randomUUID()}`): Promise<AnalysisResult> {
+  if (!REPORT_ID.test(reportId) || !IDENTIFIER.test(jobId)) throw new Error("The report or job identifier is invalid.");
+  return assertAnalysisResult(await postJson(`/reports/${encodeURIComponent(reportId)}/source`, { url, job_id: jobId }), jobId);
 }
 
 async function requestReport(path: string): Promise<unknown> {
