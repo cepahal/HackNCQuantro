@@ -39,7 +39,7 @@ button{margin:18px 0;cursor:pointer}button:disabled{opacity:.5}#status{white-spa
 .qr{margin-top:32px;border-top:1px solid #b8cbbc;padding-top:20px}.qr img{width:200px;height:200px}small{color:#486252}
 </style></head><body><h1>Use Quantro in iMessage</h1>
 <p>Register your own iMessage phone number, then send Quantro a public video link to request an analysis.</p>
-<form id="signup"><label for="phone">Your phone number, including country code</label>
+<form id="signup" method="post" action="/imessage/signup"><label for="phone">Your phone number, including country code</label>
 <input id="phone" name="phone_number" type="tel" autocomplete="tel" placeholder="+19195551234" maxlength="16" required pattern="\\+[1-9][0-9]{6,14}">
 <label><input id="consent" type="checkbox" required> I own this number and agree to receive Quantro iMessages, including a welcome and replies to links I send.</label>
 <button id="submit" type="submit">Register for iMessage</button></form>

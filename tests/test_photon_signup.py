@@ -62,6 +62,7 @@ async def test_html_has_explicit_consent_same_origin_signup_and_qr(client):
     response = await client.get("/imessage")
     assert response.status_code == 200
     assert 'id="consent" type="checkbox" required' in response.text
+    assert '<form id="signup" method="post" action="/imessage/signup">' in response.text
     assert "I own this number" in response.text
     assert "fetch('/imessage/signup'" in response.text
     assert 'src="/imessage/qr.svg"' in response.text
