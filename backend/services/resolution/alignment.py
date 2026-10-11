@@ -7,17 +7,12 @@ nor evidence of audio/visual authenticity; coarse caption times stay coarse.
 from __future__ import annotations
 
 import math
-import re
-from collections import Counter
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
 
 from rapidfuzz import fuzz
 
 from ..shared.types import Alignment, Context, MediaFeatures, TranscriptSentence
 from .candidates import MATCH_THRESHOLD, normalize_text
-
-WORDING_DIFFERENCE_LIMITATION = "Matched transcript numbers or negation differ; equivalent meaning has not been established."
 
 _COMMON_WORDS = {
     "a",
@@ -134,137 +129,6 @@ def _distinctive(text: str) -> bool:
     words = text.split()
     meaningful = {word for word in words if word not in _COMMON_WORDS}
     return len(words) >= 8 and len(meaningful) >= 4 and len(text) >= 40
-
-
-def _unbalanced_passage_match(clip_text: str, source_passage: str) -> bool:
-    """A near-exact half cannot compensate for an unsupported remaining half.
-
-    This only rejects strongly asymmetric support. Uniform ASR errors retain the
-    existing fuzzy gate; abstention does not diagnose a physical splice.
-    """
-    words = clip_text.split()
-    if len(words) < 16:
-        return False
-    middle = len(words) // 2
-    blocks = (" ".join(words[:middle]), " ".join(words[middle:]))
-    if not all(_distinctive(block) for block in blocks):
-        return False
-    scores = [fuzz.partial_ratio(block, source_passage) for block in blocks]
-    return max(scores) >= 95.0 and min(scores) < MATCH_THRESHOLD
-
-
-def _terminal_anchor_outside_passage(
-    clip_text: str, source_text: str, left: int, right: int
-) -> bool:
-    """Reject a claimed contiguous passage whose observed ending occurs elsewhere.
-
-    A strong majority match can conceal a short, decisive missing conclusion.
-    Require a distinctive verbatim anchor outside the enclosing provider cues,
-    plus weak support inside them. Ordinary ASR substitutions or an unobserved
-    conclusion alone do not establish this inconsistency.
-    """
-    words = clip_text.split()
-    tail_words = words[-max(8, min(32, len(words) // 5)) :]
-    passage = source_text[left:right]
-    outside = (" " + source_text[:left] + " ", " " + source_text[right:] + " ")
-    for index in range(len(tail_words) - 7):
-        anchor = " ".join(tail_words[index : index + 8])
-        if (
-            _distinctive(anchor)
-            and any(" " + anchor + " " in part for part in outside)
-            and fuzz.partial_ratio(anchor, passage) < MATCH_THRESHOLD
-        ):
-            return True
-    return False
-
-
-def _wording_differences(
-    clip_passage: str,
-    source_passage: str,
-    clip_numbers: list[Decimal] | None = None,
-    source_numbers: list[Decimal] | None = None,
-) -> list[str]:
-    """Flag observed lexical differences, never infer a factual contradiction."""
-    negations = {
-        "not",
-        "no",
-        "never",
-        "neither",
-        "nor",
-        "cannot",
-        "cant",
-        "dont",
-        "doesnt",
-        "didnt",
-        "wont",
-        "wouldnt",
-        "shouldnt",
-        "couldnt",
-        "isnt",
-        "arent",
-        "wasnt",
-        "werent",
-        "hasnt",
-        "havent",
-        "hadnt",
-        "mustnt",
-    }
-    clip_words, source_words = clip_passage.split(), source_passage.split()
-    differences = []
-    def canonical(word: str) -> str:
-        return word if word in {"no", "never", "neither", "nor"} else "not"
-
-    if Counter(canonical(w) for w in clip_words if w in negations) != Counter(
-        canonical(w) for w in source_words if w in negations
-    ):
-        differences.append("negation")
-    if (
-        clip_numbers is not None
-        and source_numbers is not None
-        and clip_numbers != source_numbers
-    ):
-        differences.append("numeric")
-    return differences
-
-
-def _matched_numbers(
-    features: MediaFeatures, left: int, right: int
-) -> list[Decimal] | None:
-    """Retain raw numeric values with exact normalized-token character ownership.
-
-    Abstain on clipped numeric tokens or unsupported notation rather than compare
-    invented numbers. This does not infer spoken-out numbers or numeric units.
-    """
-    values: list[Decimal] = []
-    offset = 0
-    for sentence in sorted(
-        features.transcript.sentences, key=lambda s: (s.start_seconds, s.end_seconds)
-    ):
-        if offset >= right:
-            break
-        text = normalize_text(sentence.text)
-        if not text:
-            continue
-        tokens = [(raw, normalize_text(raw)) for raw in sentence.text.split()]
-        tokens = [(raw, normalized) for raw, normalized in tokens if normalized]
-        if " ".join(normalized for _, normalized in tokens) != text:
-            return None
-        for raw, normalized in tokens:
-            end = offset + len(normalized)
-            if offset < right and end > left and any(c.isdigit() for c in normalized):
-                if offset < left or end > right:
-                    return None
-                numeric = raw.strip("\"'()[]{}:;!?").rstrip(",.")
-                if not re.fullmatch(
-                    r"[+-]?(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\.[0-9]+)?", numeric
-                ):
-                    return None
-                try:
-                    values.append(Decimal(numeric.replace(",", "")))
-                except InvalidOperation:
-                    return None
-            offset = end + 1
-    return values
 
 
 def _timed_text(features: MediaFeatures) -> tuple[str, list[_Span]]:
@@ -507,11 +371,6 @@ def build_alignment(
             "The passage occurs at multiple source locations; its timestamp is ambiguous."
         )
         return _empty_alignment(clip, source, effective_score, limitations)
-    if _unbalanced_passage_match(clip_text, source_passage):
-        limitations.append(
-            "One part of the submitted speech closely matches, but the remaining part is not supported by the same source passage."
-        )
-        return _empty_alignment(clip, source, effective_score, limitations)
     clip_owners = _overlapping(clip_spans, matched.src_start, matched.src_end)
     source_owners = _overlapping(source_spans, matched.dest_start, matched.dest_end)
     if not clip_owners or not source_owners:
@@ -519,16 +378,6 @@ def build_alignment(
         return _empty_alignment(
             clip, source, effective_score, limitations, unassessed=True
         )
-    if _terminal_anchor_outside_passage(
-        clip_text,
-        source_text,
-        min(span.left for span in source_owners),
-        max(span.right for span in source_owners),
-    ):
-        limitations.append(
-            "A distinctive ending of the submitted speech occurs outside the proposed source interval; one contiguous passage does not support the whole excerpt."
-        )
-        return _empty_alignment(clip, source, effective_score, limitations)
     clip_start, clip_end = (
         min(span.start for span in clip_owners),
         max(span.end for span in clip_owners),
@@ -546,21 +395,6 @@ def build_alignment(
         )
         return _empty_alignment(
             clip, source, effective_score, limitations, unassessed=True
-        )
-    clip_numbers = _matched_numbers(clip, matched.src_start, matched.src_end)
-    source_numbers = _matched_numbers(source, matched.dest_start, matched.dest_end)
-    wording_differences = _wording_differences(
-        clip_passage,
-        source_passage,
-        clip_numbers,
-        source_numbers,
-    )
-    if wording_differences:
-        limitations.append(WORDING_DIFFERENCE_LIMITATION)
-        limitations.append(
-            "Observed "
-            + " and ".join(wording_differences)
-            + " wording differs between the matched transcripts; source localization does not establish equivalent meaning. ASR or caption errors may explain the difference."
         )
     limitations.append(
         "Only one transcript passage was localized; edit and deletion counts were not assessed."
@@ -597,26 +431,10 @@ def build_alignment(
             ],
             "match_quality": {
                 "confidence": {
-                    "level": "high"
-                    if effective_score >= 90.0 and not wording_differences
-                    else "moderate",
+                    "level": "high" if effective_score >= 90.0 else "moderate",
                     "method": "transcript_partial_ratio_v1",
                     "basis": [
-                        f"Distinctive transcript similarity scored {effective_score:.1f}/100 using a lexical matching heuristic.",
-                        *(
-                            [
-                                f"Potential {' and '.join(wording_differences)} wording difference in observed transcripts: submitted '{clip_passage[:240]}'; source '{source_passage[:240]}'."
-                            ]
-                            if wording_differences
-                            else []
-                        ),
-                        *(
-                            [
-                                f"Observed numeric values: submitted {[str(value) for value in clip_numbers or []]}; source {[str(value) for value in source_numbers or []]}."
-                            ]
-                            if "numeric" in wording_differences
-                            else []
-                        ),
+                        f"Distinctive transcript similarity scored {effective_score:.1f}/100 using a lexical matching heuristic."
                     ],
                     "limitations": limitations,
                 },
@@ -694,7 +512,7 @@ def build_context(
             windows.append({"start": start, "end": end, "match_ids": [match.match_id]})
     if not windows:
         return None
-    limitations = [*source.warnings, *alignment.limitations]
+    limitations = list(source.warnings)
     result = []
     for index, window in enumerate(windows, 1):
         start, end = window["start"], window["end"]

@@ -15,7 +15,6 @@ from ..shared.types import Context, MediaAsset, PublicMediaAsset
 from . import sentence_context
 from .alignment import _coverage
 from .context_badge import render_cue
-from .diagnostics import record
 from .download import _find_tool, download_short_media
 
 logger = logging.getLogger(__name__)
@@ -146,7 +145,6 @@ def _cached_source(media_id, output):
         store = TigerDataPostStore.from_env()
         stored = store.read_media(media_id)
     except Exception:  # noqa: BLE001 - Optional cache failures retain guarded download fallback.
-        record('context_source_cache', 'unavailable', {'media_id': media_id, 'reason': 'cache_read_failed'})
         return None
     finally:
         if store is not None:
@@ -155,14 +153,11 @@ def _cached_source(media_id, output):
             except Exception:  # noqa: BLE001 - Cache cleanup cannot replace a usable download fallback.
                 logger.warning('Tiger source cache connection cleanup failed')
     if stored is None:
-        record('context_source_cache', 'unavailable', {'media_id': media_id, 'reason': 'cache_miss'})
         return None
     mime, data, digest = stored
     if mime != 'video/mp4' or not isinstance(data, bytes) or not data or hashlib.sha256(data).hexdigest() != digest:
-        record('context_source_cache', 'unavailable', {'media_id': media_id, 'reason': 'integrity_or_type_invalid'})
         return None
     Path(output).write_bytes(data)
-    record('context_source_cache', 'completed', {'media_id': media_id, 'reason': 'cache_hit'})
     return str(output)
 
 

@@ -690,13 +690,8 @@ async def _transcribe_file(
     )
 
 
-async def transcribe_youtube_audio(
-    video_id: str, *, skip_caption_cache: bool = False
-) -> dict[str, Any]:
-    if not _YT_ID.fullmatch(video_id):
-        raise InvalidVideoId(video_id)
-    # A sparse-caption recovery must not return the caption it is replacing.
-    cached = None if skip_caption_cache else _read_caption_cache(video_id)
+async def transcribe_youtube_audio(video_id: str) -> dict[str, Any]:
+    cached = _read_caption_cache(video_id)
     if cached is not None and (
         cached.get("segments")
         or (cached.get("source") == "serpapi_captions" and cached.get("transcript"))
@@ -733,74 +728,9 @@ async def transcribe_youtube_audio(
         )
         result["title"] = str(download.get("title") or "")
         result["duration"] = max(result["duration"], duration or 0.0)
-    if result["segments"] and not skip_caption_cache:
+    if result["segments"]:
         _write_caption_cache(_CAPTION_CACHE_DIR / f"{video_id}.json", result)
     return result
-
-
-def _discovery_inadequate(result: dict[str, Any]) -> bool:
-    # An untimed final cue can aid search, but cannot make the observed timed
-    # evidence adequate for alignment. Keep the full transcript unchanged.
-    text = " ".join(
-        segment["text"] for segment in _segments(result.get("segments"))
-    )
-    return len(re.findall(r"\w+", text)) < 6 and sum(char.isalnum() for char in text) < 40
-
-
-def _timed_speech_words(result: dict[str, Any]) -> int:
-    words = 0
-    for segment in result.get("segments") or []:
-        if not isinstance(segment, dict):
-            continue
-        text = segment.get("text")
-        start, end = _number(segment.get("start")), _number(segment.get("end"))
-        if isinstance(text, str) and start is not None and end is not None and end > start:
-            words += len(re.findall(r"\w+(?:['’]\w+)?", _clean_text(text)))
-    return words
-
-
-async def _recover_sparse_captions(
-    result: dict[str, Any], url: str, video_id: str, local_file: Path | None
-) -> dict[str, Any]:
-    """Try independent speech once without treating a short utterance as false."""
-    if not _discovery_inadequate(result):
-        return result
-    sparse = dict(result, discovery_inadequate=True)
-    sparse["warnings"] = [
-        value for value in result.get("warnings", []) if isinstance(value, str)
-    ] + [
-        "Very little speech was available in the captions; source discovery may miss the original recording."
-    ]
-    if not os.getenv("GROQ_API_KEY") or (
-        local_file is not None and not local_file.is_file()
-    ):
-        return sparse
-    try:
-        if local_file is None:
-            recovered = await transcribe_youtube_audio(video_id, skip_caption_cache=True)
-        else:
-            with tempfile.TemporaryDirectory(prefix="quantro-caption-recovery-") as temporary:
-                recovered = await _transcribe_file(local_file, url, "youtube", Path(temporary))
-    except TranscriptionError as exc:
-        sparse["discovery_recovery_error"] = exc.code
-        sparse["warnings"].append(
-            "An independent audio transcription was unavailable; the supplied captions were retained."
-        )
-        return sparse
-    if _timed_speech_words(recovered) <= _timed_speech_words(result):
-        sparse["warnings"].append(
-            "Independent audio transcription did not add timed speech; the supplied captions were retained."
-        )
-        return sparse
-    recovered = dict(recovered)
-    recovered["title"] = str(result.get("title") or recovered.get("title") or "")
-    recovered["warnings"] = [
-        value for value in recovered.get("warnings", []) if isinstance(value, str)
-    ] + ["Independent audio transcription replaced sparse captions for source discovery."]
-    if _discovery_inadequate(recovered):
-        recovered["discovery_inadequate"] = True
-    _write_caption_cache(_CAPTION_CACHE_DIR / f"{video_id}.json", recovered)
-    return recovered
 
 
 async def get_video_transcript(
@@ -814,8 +744,7 @@ async def get_video_transcript(
     except MediaDownloadError as exc:
         raise TranscriptionError(exc.code, exc.message, exc.url, exc.platform) from exc
     local_file = Path(media_file_path) if media_file_path is not None else None
-    missing_local_file = local_file is not None and not local_file.is_file()
-    if missing_local_file and platform != "youtube":
+    if local_file is not None and not local_file.is_file():
         raise TranscriptionError(
             "file_not_found", "The recording is not available locally.", url, platform
         )
@@ -823,7 +752,6 @@ async def get_video_transcript(
     video_id = extract_youtube_id(url) if platform == "youtube" else None
     if video_id:
         captions_blocked = False
-        result = None
         try:
             known_duration = _number(metadata.get("duration"))
             if known_duration:
@@ -834,29 +762,28 @@ async def get_video_transcript(
                 )
             else:
                 result = await asyncio.to_thread(_fetch_youtube_captions_sync, video_id)
+            if result.get("segments") or (
+                result.get("source") == "serpapi_captions" and result.get("transcript")
+            ):
+                result = dict(result)
+                result["title"] = str(
+                    metadata.get("title") or result.get("title") or ""
+                )
+                if result.get("source") == "serpapi_captions":
+                    result["duration"] = (
+                        None
+                        if result.get("duration_hint_rejected") is True
+                        else known_duration or _number(result.get("duration"))
+                    )
+                    result["duration_known"] = result["duration"] is not None
+                else:
+                    result["duration"] = max(
+                        _number(result["duration"]) or 0.0, known_duration or 0.0
+                    )
+                return result
         except Exception as exc:  # noqa: BLE001 - captions are optional and Whisper is the required fallback.
             captions_blocked = isinstance(exc, RequestBlocked)
             logger.info("YouTube captions unavailable; trying Whisper.")
-        if result is not None and (result.get("segments") or (
-            result.get("source") == "serpapi_captions" and result.get("transcript")
-        )):
-            result = dict(result)
-            result["title"] = str(metadata.get("title") or result.get("title") or "")
-            if result.get("source") == "serpapi_captions":
-                result["duration"] = (
-                    None if result.get("duration_hint_rejected") is True
-                    else known_duration or _number(result.get("duration"))
-                )
-                result["duration_known"] = result["duration"] is not None
-            else:
-                result["duration"] = max(
-                    _number(result.get("duration")) or 0.0, known_duration or 0.0
-                )
-            return await _recover_sparse_captions(result, url, video_id, local_file)
-        if missing_local_file:
-            raise TranscriptionError(
-                "file_not_found", "The recording is not available locally.", url, platform
-            )
         if local_file is None:
             try:
                 return await transcribe_youtube_audio(video_id)

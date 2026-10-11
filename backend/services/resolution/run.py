@@ -18,12 +18,7 @@ from ..reporting.save_report import (
     report_id_for_job,
     save_report_and_complete_job,
 )
-from ..reporting.send_summary import (
-    DeliveryTracker,
-    MessagingProvider,
-    format_context_summary,
-    send_summary,
-)
+from ..reporting.send_summary import DeliveryTracker, MessagingProvider, send_summary
 from ..shared.config import environment, validate_search_settings
 from ..shared.errors import (
     ErrorCode,
@@ -33,16 +28,11 @@ from ..shared.errors import (
     normalize_exception,
 )
 from ..shared.post_identity import ensure_distinct_source, normalized_post_url
-from ..shared.types import AnalysisResult, Comparison, IngestResult, Post, ReportV2
+from ..shared.types import AnalysisResult, IngestResult, Post, ReportV2
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from . import context_video
 from .alignment import build_alignment, build_context
-from .analysis import (
-    _extractive_clip_summary,
-    _extractive_context_summary,
-    compare_clip,
-    interpret_clip,
-)
+from .analysis import compare_clip, interpret_clip
 from .candidates import CandidateSearchError, check_source_video, find_source_video
 from .diagnostics import DiagnosticCapture, media_snapshot, record
 from .download import MediaDownloadError
@@ -114,7 +104,7 @@ def _deliver(
         try:
             send_summary(
                 conversation_id,
-                format_context_summary(report),
+                report.summary or "Analysis is ready. Read the evidence in the report.",
                 _report_url(report_id_for_job(report.job_id)),
                 job_id=report.job_id,
                 provider=provider,
@@ -243,17 +233,9 @@ async def _build(job_id: str, url: str, store: TigerStore, *, source_url: str | 
                 _persist_media(source_post)
                 record(stage.value, "completed", {"candidate_number": number, **media_snapshot(source_post, source_features)}, started=candidate_started)
                 ensure_distinct_source(post, source_post, stage)
-                clip_duration = post.media.duration_seconds
-                if clip_duration is None:
-                    # Partial native-video windows retain absolute source time.
-                    # Their last timestamp is not the submitted excerpt length.
-                    speech = features.transcript.sentences
-                    clip_duration = (
-                        max(sentence.end_seconds for sentence in speech)
-                        - min(sentence.start_seconds for sentence in speech)
-                        if speech else features.duration_seconds
-                    )
-                if source_features.duration_seconds < max(30.0, clip_duration + 20.0):
+                if source_features.duration_seconds < max(
+                    30.0, features.duration_seconds + 20.0
+                ):
                     warnings.append(
                         "A repeated short excerpt was retained only as a source lead."
                     )
@@ -353,42 +335,8 @@ async def _build(job_id: str, url: str, store: TigerStore, *, source_url: str | 
                     record('context_video', 'unavailable', details)
         stage = Stage.COMPARE_CONTEXT_AND_CAPTION
         started = time.monotonic()
-        comparison = None
-        if chosen:
-            try:
-                comparison = compare_clip(post, features, chosen[3])
-            except QuantroError as exc:
-                if exc.code != ErrorCode.PROCESSING_FAILED or exc.stage != stage:
-                    raise
-                limitation = "Language assessment was unavailable; source alignment and observed context are retained."
-                sentences = {sentence.sentence_id: sentence
-                             for window in chosen[3].windows for sentence in window.sentences}
-                comparison = Comparison.model_validate({
-                    "context_assessment": "not_assessed",
-                    "caption_assessment": "not_assessed" if post.caption else "not_provided",
-                    "assessment_confidence": {
-                        "level": "not_assessed", "method": "language_assessment_unavailable",
-                        "basis": [], "limitations": [limitation],
-                    },
-                    "summary": _extractive_context_summary(features, sentences),
-                    "findings": [], "limitations": [limitation],
-                })
-                record(stage.value, "unavailable", {"reason": "language_assessment_unavailable",
-                       "code": exc.code.value, "stage": exc.stage.value, "retryable": exc.retryable}, started=started)
-        if comparison:
-            summary = comparison.summary
-        else:
-            try:
-                summary = interpret_clip(post, features)
-            except QuantroError as exc:
-                if exc.code != ErrorCode.PROCESSING_FAILED or exc.stage != stage:
-                    raise
-                warnings.append("Automated explanation was unavailable; the submitted speech and source search results are retained.")
-                summary = _extractive_clip_summary(features)
-                record(stage.value, "unavailable", {
-                    "reason": "language_assessment_unavailable", "code": exc.code.value,
-                    "stage": exc.stage.value, "retryable": exc.retryable,
-                }, started=started)
+        comparison = compare_clip(post, features, chosen[3]) if chosen else None
+        summary = comparison.summary if comparison else interpret_clip(post, features)
         record(stage.value, "completed", {"comparison": comparison.model_dump(mode="json") if comparison else None, "summary": summary}, started=started)
         stage = Stage.BUILD_REPORT
         started = time.monotonic()
