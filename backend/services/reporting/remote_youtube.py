@@ -224,7 +224,8 @@ def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
                 logger.warning("Remote transcription client cleanup failed (%s)", type(exc).__name__)
 
     digest = hashlib.sha256(canonical.encode()).hexdigest()[:20]
-    media_id = f"remote_youtube_{digest}"
+    # A remote reference must not look like an identifier for /media stored bytes.
+    media_id = f"remote:youtube:{digest}"
     limitations = [
         "Limited transcript-only fallback: the platform blocked this server's recording download; no MP4 or JPEG file was acquired.",
         "Only a requested window from 0 to 60 seconds was submitted to Gemini; this is not a complete-video analysis.",

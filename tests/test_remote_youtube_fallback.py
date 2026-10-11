@@ -2,6 +2,7 @@
 
 import copy
 import json
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -101,6 +102,7 @@ def test_native_video_transcript_is_bounded_provenanced_and_honestly_partial(cli
     assert "gemini" in submitted["post"]["retrieval"]["provider"].lower()
     assert URL in submitted["post"]["retrieval"]["metadata_source_urls"]
     assert submitted["post"]["media"]["duration_seconds"] is None
+    assert re.fullmatch(r"[A-Za-z0-9_-]+", submitted["post"]["media"]["media_id"]) is None
     assert submitted["post"]["published_at"] is None
     assert submitted["post"]["author"]["followers_count"] is None
     assert submitted["transcript"]["status"] == "partial"
