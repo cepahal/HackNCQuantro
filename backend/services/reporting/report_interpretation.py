@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import threading
 import time
 from datetime import UTC, datetime
@@ -17,23 +18,51 @@ from ..specialist.gemini import client_and_model, generate_json
 
 _LOCKS = [threading.Lock() for _ in range(32)]
 _STAGE = "report_interpretation"
-_VERSION = "2"
+_VERSION = "5"
 logger = logging.getLogger(__name__)
+
+
+def _unsupported_verification(text: str) -> bool:
+    # Only explicit predicate negations are exempt, never a nearby "no doubt".
+    remaining = re.sub(
+        r"\b(?:has|have|had|is|are|was|were)\s+not\s+(?:been\s+)?"
+        r"(?:(?:independently|externally)\s+)?(?:verified|confirmed|authenticated|corroborated)\b"
+        r"|\b(?:is|are|was|were)\s+not\s+(?:authentic|genuine|unaltered)\b",
+        "", text.casefold(),
+    )
+    return bool(re.search(
+        r"\b(?:verified|verif(?:y|ies)|confirm\w*|authenticat\w*|corroborat\w*|authentic|genuine|unaltered)\b"
+        r"|\b(?:independent|external)\s+fact.checkers?\b", remaining
+    ))
 
 
 def _evidence(report: ReportV2) -> dict:
     # References are real sentence IDs. No invented quotations or media timing.
     remaining = 14000
     sentences = []
+    admitted_windows = []
     supplied = [(report.submitted.post.media.media_id, report.submitted.transcript.sentences[:40])]
     if (report.source and report.context and report.alignment
                 and report.outcome.value == "matched" and report.alignment.status == "verified"
                 and report.alignment.match_quality.confidence.level in ("high", "moderate")
                 and report.context.source_media_id == report.source.post.media.media_id
                 and report.alignment.source_media_id == report.source.post.media.media_id
-                and report.alignment.clip_media_id == report.submitted.post.media.media_id):
-        supplied.append((report.source.post.media.media_id,
-                         [sentence for window in report.context.windows for sentence in window.sentences][:80]))
+                and report.alignment.clip_media_id == report.submitted.post.media.media_id
+                and report.source.post.media.media_id != report.submitted.post.media.media_id):
+        canonical = {sentence.sentence_id: sentence for sentence in report.source.transcript.sentences}
+        source_sentences = []
+        for window in report.context.windows:
+            if window.coverage == "unavailable":
+                continue
+            valid = [sentence for sentence in window.sentences
+                     if canonical.get(sentence.sentence_id) == sentence
+                     and sentence.start_seconds < window.requested_end_seconds
+                     and sentence.end_seconds > window.requested_start_seconds]
+            if valid:
+                admitted_windows.append(window)
+                source_sentences.extend(valid)
+        if source_sentences:
+            supplied.append((report.source.post.media.media_id, source_sentences[:80]))
     seen = set()
     for media_id, group in supplied:
         for sentence in group:
@@ -48,6 +77,8 @@ def _evidence(report: ReportV2) -> dict:
     return {"title": (report.submitted.post.title or "")[:300],
             "caption": (report.submitted.post.caption or "")[:1600],
             "outcome": report.outcome.value, "sentences": sentences,
+            "source_media_id": report.source.post.media.media_id if len(supplied) > 1 and report.source and any(item["media_id"] == report.source.post.media.media_id for item in sentences) else None,
+            "source_scope": {"partial": True, "windows": [{"start_seconds": window.requested_start_seconds, "end_seconds": window.requested_end_seconds, "coverage": window.coverage} for window in admitted_windows if any(item["media_id"] == report.source.post.media.media_id and item["start_seconds"] < window.requested_end_seconds and item["end_seconds"] > window.requested_start_seconds for item in sentences)]} if len(supplied) > 1 else None,
             "context_assessment": report.comparison.context_assessment.value if report.comparison else "not_assessed",
             "limitations": [note[:400] for note in report.limitations[:8]]}
 
@@ -67,11 +98,23 @@ def _generate(evidence: dict) -> tuple[InterpretationDraft, str]:
             "Use no markdown, links, em dashes or boilerplate. references: 1 to 4 supplied media_id/sentence_id pairs "
             "supporting the reading. You MUST cite at least one sentence from EVERY supplied media_id: "
             "one submitted sentence AND one source-context sentence when both are supplied. "
-            "No context available means surrounding meaning is unknown.\nEVIDENCE:\n"
+            "No context available means surrounding meaning is unknown. "
+            "source_review: null unless source_media_id and source sentences were supplied. Otherwise provide "
+            "status, fact_check (at most 35 words), semantic (at most 45 words), and 1 to 4 references ONLY to "
+            "supplied source-media sentences. Review only this partial source excerpt, not the full recording. "
+            "Briefly distinguish checkable factual claims from opinions, jokes and rhetoric, and explain its meaning. "
+            "This is a preliminary transcript review without external fact checking. Use needs_verification for "
+            "claims whose truth requires outside evidence or when uncertain. Use potential_issue for a specific "
+            "apparent contradiction/error supported by quoted source evidence. Use no_obvious_issue only when "
+            "the reviewed excerpt presents no obvious factual inconsistency, never as verified truth or authenticity. "
+            "Do not claim external sources were checked, identity was verified, or the recording is authentic. "
+            "If source-review evidence is insufficient return null.\nEVIDENCE:\n"
             + json.dumps(evidence, ensure_ascii=False)
         )
         data = generate_json(client, model, prompt, InterpretationDraft.model_json_schema(),
                              Stage.DISPLAY_REPORT, max_attempts=1)
+        if isinstance(data, dict) and not evidence.get("source_media_id"):
+            data = {**data, "source_review": None}
         draft = InterpretationDraft.model_validate(data)
         allowed = {(item["media_id"], item["sentence_id"]) for item in evidence["sentences"]}
         if not all((ref.media_id, ref.sentence_id) in allowed for ref in draft.references):
@@ -85,6 +128,26 @@ def _generate(evidence: dict) -> tuple[InterpretationDraft, str]:
             if len(text.split()) > (65 if field == "context_gap" else 30):
                 raise ValueError("Interpretation exceeds its reading budget")
             setattr(draft, field, text)
+        if draft.source_review is not None:
+            source_allowed = {(item["media_id"], item["sentence_id"]) for item in evidence["sentences"]
+                              if item["media_id"] == evidence.get("source_media_id")}
+            if not source_allowed or not all((ref.media_id, ref.sentence_id) in source_allowed for ref in draft.source_review.references):
+                raise ValueError("Interpretation source review references unavailable source evidence")
+            for field, budget in (("fact_check", 35), ("semantic", 45)):
+                text = getattr(draft.source_review, field).replace("\u2014", ", ").replace("**", "").strip()
+                if not text or "<" in text or ">" in text or "http" in text or public_data(text) != text:
+                    raise ValueError("Interpretation source review contains unsafe prose")
+                if len(text.split()) > budget:
+                    raise ValueError("Interpretation source review exceeds its reading budget")
+                # These claims require tools/evidence this transcript-only request never receives.
+                if _unsupported_verification(text):
+                    raise ValueError("Interpretation source review claims unsupported verification")
+                setattr(draft.source_review, field, text)
+            if draft.source_review.status == "no_obvious_issue":
+                draft.source_review.fact_check = (
+                    "No obvious factual issue was identified in the reviewed excerpt. "
+                    "External facts and recording authenticity were not independently verified."
+                )
         return draft, model
     finally:
         client.close()
@@ -116,7 +179,8 @@ def report_interpretation(report_id: str, report: ReportV2, store) -> ReportInte
             try:
                 draft, model = _generate(evidence)
                 result = result.model_copy(update={"status": "ready", "model": model,
-                    "context_gap": draft.context_gap, "summary": draft.summary, "references": draft.references})
+                    "context_gap": draft.context_gap, "summary": draft.summary, "references": draft.references,
+                    "source_review": draft.source_review if evidence.get("source_media_id") else None})
             except Exception as exc:  # noqa: BLE001 - Optional prose must not break a saved report or expose provider errors.
                 reason = str(exc) if type(exc) is ValueError and str(exc).startswith("Interpretation ") else type(exc).__name__
                 logger.warning("Saved-report interpretation unavailable (%s).", reason)

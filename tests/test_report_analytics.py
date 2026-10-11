@@ -80,7 +80,7 @@ def test_provider_failure_is_cached_safe_unavailable_not_a_failed_report(saved, 
     monkeypatch.setattr(insights, "_generate", generate)
     report_id, report = saved
     first = insights.report_interpretation(report_id, report, store)
-    assert first.status == "unavailable" and first.summary is None and first.references == []
+    assert first.status == "unavailable" and first.summary is None and first.references == [] and first.source_review is None
     assert insights.report_interpretation(report_id, report, store) == first
     assert generate.call_count == 1
     assert "private-provider-error" not in first.model_dump_json()
@@ -194,3 +194,156 @@ def test_low_scoring_selected_candidate_cannot_be_promoted(saved, wired, store, 
     result = client.post(f"/reports/{report_id}/source", json={"url": original.source.post.post_url, "job_id": "job_low_selected"})
     assert result.status_code == 200 and result.json()["outcome"] == "no_verified_match"
     assert store.get_report(result.json()["report_id"])["source"] is None
+
+
+def source_review(evidence, **updates):
+    item = next(row for row in evidence["sentences"] if row["media_id"] == evidence["source_media_id"])
+    return {"status": "needs_verification", "fact_check": "The excerpt discusses responsibility. Any factual claims require independent evidence.",
+            "semantic": "The source connects personal effort with access to opportunity, within the supplied excerpt.",
+            "references": [{"media_id": item["media_id"], "sentence_id": item["sentence_id"]}], **updates}
+
+
+def test_source_review_roundtrips_in_existing_cached_request(saved, store, monkeypatch):
+    report_id, report = saved
+    evidence = insights._evidence(report)
+    response = draft(evidence).model_dump()
+    response["source_review"] = source_review(evidence)
+    client = Mock()
+    monkeypatch.setattr(insights, "client_and_model", lambda stage: (client, "unused"))
+    request = Mock(return_value=response)
+    monkeypatch.setattr(insights, "generate_json", request)
+    result = insights.report_interpretation(report_id, report, store)
+    assert result.status == "ready" and result.source_review.status == "needs_verification"
+    assert all(ref.media_id == report.source.post.media.media_id for ref in result.source_review.references)
+    assert insights.report_interpretation(report_id, report, store) == result
+    request.assert_called_once()
+    assert request.call_args.kwargs["max_attempts"] == 1
+    assert evidence["source_scope"]["partial"] is True
+    assert evidence["source_scope"]["windows"]
+    assert store.get_diagnostics(report.job_id)[-1]["data"]["interpretation"]["source_review"]["status"] == "needs_verification"
+
+
+@pytest.mark.parametrize("change", ["submitted_ref", "fabricated_ref", "verbose_fact", "verbose_semantic", "unsafe", "secret"])
+def test_source_review_rejects_invalid_evidence_and_prose(saved, monkeypatch, change):
+    _, report = saved
+    evidence = insights._evidence(report)
+    response = draft(evidence).model_dump()
+    review = source_review(evidence)
+    if change == "submitted_ref":
+        review["references"] = [response["references"][0]]
+    elif change == "fabricated_ref":
+        review["references"][0]["sentence_id"] = "invented"
+    elif change == "verbose_fact":
+        review["fact_check"] = "x " * 36
+    elif change == "verbose_semantic":
+        review["semantic"] = "x " * 46
+    elif change == "unsafe":
+        review["semantic"] = "<script>unsafe</script>"
+    else:
+        review["fact_check"] = "api_key=private"
+    response["source_review"] = review
+    client = Mock()
+    monkeypatch.setattr(insights, "client_and_model", lambda stage: (client, "unused"))
+    monkeypatch.setattr(insights, "generate_json", Mock(return_value=response))
+    with pytest.raises(ValueError):
+        insights._generate(evidence)
+    client.close.assert_called_once()
+
+
+def test_missing_verified_source_discards_invented_green_review(saved, monkeypatch):
+    _, report = saved
+    report.alignment.match_quality.confidence.level = "low"
+    evidence = insights._evidence(report)
+    assert evidence["source_media_id"] is None and evidence["source_scope"] is None
+    response = draft(evidence).model_dump()
+    response["source_review"] = {"status": "no_obvious_issue", "fact_check": "Invented clean bill.", "semantic": "Invented source.", "references": response["references"]}
+    client = Mock()
+    monkeypatch.setattr(insights, "client_and_model", lambda stage: (client, "unused"))
+    monkeypatch.setattr(insights, "generate_json", Mock(return_value=response))
+    generated, _ = insights._generate(evidence)
+    assert generated.source_review is None
+
+
+def test_legacy_interpretations_default_to_no_source_review():
+    from backend.services.shared.types import ReportInterpretation
+    result = ReportInterpretation(report_id="report_legacy", status="ready", context_gap="Original context.", summary="Original summary.", reliability="Unverified.", generated_at="2026-10-11T00:00:00Z")
+    assert result.source_review is None
+
+
+def test_stale_source_sharing_submitted_media_cannot_review_submitted_words(saved):
+    _, report = saved
+    report.source.post.media.media_id = report.submitted.post.media.media_id
+    evidence = insights._evidence(report)
+    assert evidence["source_media_id"] is None and evidence["source_scope"] is None
+    assert {row["media_id"] for row in evidence["sentences"]} == {report.submitted.post.media.media_id}
+
+
+def test_source_review_uses_only_sentences_in_supplied_context(saved):
+    _, report = saved
+    evidence = insights._evidence(report)
+    recorded = {(sentence.sentence_id, sentence.text, sentence.start_seconds, sentence.end_seconds)
+                for window in report.context.windows for sentence in window.sentences}
+    source_rows = [row for row in evidence["sentences"] if row["media_id"] == evidence["source_media_id"]]
+    assert source_rows
+    assert all((row["sentence_id"], row["text"], row["start_seconds"], row["end_seconds"]) in recorded for row in source_rows)
+    assert evidence["title"] == (report.submitted.post.title or "")[:300]
+
+
+@pytest.mark.parametrize("change", ["unavailable", "stale_text", "outside_window"])
+def test_source_review_excludes_unavailable_or_stale_window_evidence(saved, change):
+    _, report = saved
+    for window in report.context.windows:
+        if change == "unavailable": window.coverage = "unavailable"
+        elif change == "stale_text":
+            window.sentences = [row.model_copy(update={"text": "Stale invented words"}) for row in window.sentences]
+        else:
+            window.requested_start_seconds, window.requested_end_seconds = 10000., 10001.
+    evidence = insights._evidence(report)
+    assert evidence["source_media_id"] is None and evidence["source_scope"] is None
+
+
+@pytest.mark.parametrize("claim", ["The claims are independently verified.", "External sources confirm this statement.", "The recording is authentic.", "Independent fact-checkers corroborate the speaker's claims.", "The footage has been authenticated.", "There is no doubt this was independently verified."])
+def test_source_review_rejects_unsupported_external_verification(saved, monkeypatch, claim):
+    _, report = saved
+    evidence = insights._evidence(report)
+    response = draft(evidence).model_dump()
+    response["source_review"] = source_review(evidence, status="no_obvious_issue", fact_check=claim)
+    monkeypatch.setattr(insights, "client_and_model", lambda stage: (Mock(), "unused"))
+    monkeypatch.setattr(insights, "generate_json", Mock(return_value=response))
+    with pytest.raises(ValueError, match="unsupported verification"):
+        insights._generate(evidence)
+
+
+def test_source_review_preserves_explicit_unverified_scope(saved, monkeypatch):
+    _, report = saved
+    evidence = insights._evidence(report)
+    response = draft(evidence).model_dump()
+    response["source_review"] = source_review(evidence, fact_check="These claims have not been independently verified.")
+    monkeypatch.setattr(insights, "client_and_model", lambda stage: (Mock(), "unused"))
+    monkeypatch.setattr(insights, "generate_json", Mock(return_value=response))
+    generated, _ = insights._generate(evidence)
+    assert generated.source_review.status == "needs_verification"
+
+@pytest.mark.parametrize("status", ["needs_verification", "potential_issue"])
+def test_semantic_review_rejects_unsupported_authentication(saved, monkeypatch, status):
+    _, report = saved
+    evidence = insights._evidence(report)
+    response = draft(evidence).model_dump()
+    response["source_review"] = source_review(evidence, status=status, semantic="The footage has been authenticated.")
+    monkeypatch.setattr(insights, "client_and_model", lambda stage: (Mock(), "unused"))
+    monkeypatch.setattr(insights, "generate_json", Mock(return_value=response))
+    with pytest.raises(ValueError, match="unsupported verification"):
+        insights._generate(evidence)
+
+
+def test_green_review_uses_backend_owned_transcript_scope(saved, monkeypatch):
+    _, report = saved
+    evidence = insights._evidence(report)
+    response = draft(evidence).model_dump()
+    response["source_review"] = source_review(evidence, status="no_obvious_issue", fact_check="The passage contains opinions rather than checkable claims.")
+    monkeypatch.setattr(insights, "client_and_model", lambda stage: (Mock(), "unused"))
+    monkeypatch.setattr(insights, "generate_json", Mock(return_value=response))
+    generated, _ = insights._generate(evidence)
+    assert generated.source_review.fact_check == "No obvious factual issue was identified in the reviewed excerpt. External facts and recording authenticity were not independently verified."
+    assert generated.source_review.semantic == response["source_review"]["semantic"]
+    assert generated.source_review.references

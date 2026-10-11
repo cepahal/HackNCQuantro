@@ -186,6 +186,7 @@ export type InterpretationDraft = {
   context_gap: string;
   summary: string;
   references: Array<InterpretationReference>;
+  source_review?: SourceReview | null;
 };
 
 export type InterpretationReference = {
@@ -323,6 +324,7 @@ export type ReportInterpretation = {
   summary: string | null;
   reliability: string;
   references: Array<InterpretationReference>;
+  source_review?: SourceReview | null;
   provider: "gemini";
   model: string | null;
   generated_at: string;
@@ -369,6 +371,13 @@ export type SourceGap = {
   end_seconds: number;
   before_match_id: string;
   after_match_id: string;
+};
+
+export type SourceReview = {
+  status: "no_obvious_issue" | "needs_verification" | "potential_issue";
+  fact_check: string;
+  semantic: string;
+  references: Array<InterpretationReference>;
 };
 
 export type TimeRange = {

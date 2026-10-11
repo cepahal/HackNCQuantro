@@ -124,6 +124,38 @@ def get_report_diagnostics(report_id: ReportId, store: TigerDependency) -> JSONR
     return JSONResponse(content=diagnostic_response(job_id, events))
 
 
+@router.get("/reports/{report_id}/progress")
+def get_report_progress(report_id: ReportId, store: TigerDependency) -> JSONResponse:
+    """Public display projection using the existing per-report access boundary."""
+    from backend.services.resolution.progress import progress_snapshot
+
+    job_id = report_id.removeprefix("report_")
+    try:
+        job = store.get_job(job_id)
+        if job is None:
+            response = not_found("Analysis not found")
+        else:
+            try:
+                events = store.get_diagnostics(job_id)
+            except Exception:  # noqa: BLE001 - Optional capture must not break progress.
+                events = []
+            raw = store.get_report(report_id) if job.get('status') == 'completed' else None
+            report = None
+            if raw is not None:
+                parsed = parse_stage_output(ReportV2, sanitize_report(raw), Stage.DISPLAY_REPORT)
+                ensure_distinct_source(parsed.submitted.post, parsed.source.post if parsed.source else None, Stage.DISPLAY_REPORT)
+                if parsed.job_id != job_id:
+                    response = not_found("Report not found")
+                    response.headers['Cache-Control'] = 'no-store'
+                    return response
+                report = parsed.model_dump(mode='json')
+            response = JSONResponse(content=progress_snapshot(job_id, job, events, report))
+    except Exception:  # noqa: BLE001 - Provider/storage details remain private.
+        response = quantro_error_response(QuantroError(ErrorCode.STORAGE_FAILED, Stage.DISPLAY_REPORT, retryable=True))
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 @router.get("/reports/{report_id}/display")
 def get_display_model(report_id: ReportId, store: TigerDependency) -> JSONResponse:
     response = get_report(report_id, store)

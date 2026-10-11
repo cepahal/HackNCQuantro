@@ -5,6 +5,7 @@
 .back:hover { color: #263747; }
 .heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .eyebrow { font-size: 10px; color: #84909c; letter-spacing: .1em; font-weight: 550; text-transform: uppercase; margin: 0 0 8px; }
+.heading .eyebrow { text-transform: none; }
 .heading h1 { margin: 0; color: #202a34; font-size: 29px; font-weight: 560; letter-spacing: -.035em; line-height: 1.2; }
 .copyButton { display: inline-flex; align-items: center; justify-content: center; gap: 20px; min-height: 40px; padding: 10px 14px; color: #344250; font-size: 12px; line-height: 1.4; font-weight: 550; background: #fff; border: 1px solid #d5dce3; border-radius: 6px; box-shadow: 0 1px 2px #162b3c04; cursor: pointer; }
 .copyButton:hover { background: #f2f5f7; border-color: #bfc9d2; }
@@ -164,3 +165,7 @@
   .footer > span { width: 100%; margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto; } }
+
+/* Two text sizes across the analysis view. */
+.page :global(*) {font-size:14px!important;}
+.page :global(h1),.page :global(h2),.page :global(h3) {font-size:22px!important;}

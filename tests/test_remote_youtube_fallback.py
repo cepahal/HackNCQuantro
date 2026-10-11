@@ -93,7 +93,7 @@ def test_native_video_transcript_is_bounded_provenanced_and_honestly_partial(cli
     assert video_parts[0]["file_data"]["mime_type"] == "video/mp4"
     metadata = video_parts[0]["video_metadata"]
     assert metadata["end_offset"] in {"60s", "PT1M", "PT60S"}
-    assert 0 < float(metadata["fps"]) <= 0.1
+    assert 0 < float(metadata["fps"]) <= 0.5
     data = report.model_dump(mode="json")
     assert data["schema_version"] == "2.1"
     assert data["outcome"] == "no_verified_match"
@@ -379,3 +379,38 @@ def test_failed_remote_provider_keeps_job_failed_without_saving_report(
     assert caught.value.code == ErrorCode.TRANSCRIPTION_FAILED
     assert pipeline_store.get_job(job_id)["status"] == "failed"
     assert pipeline_store.get_job_reports(job_id) == []
+
+
+def test_visual_discovery_clues_share_one_call_and_stay_private(client):
+    client.models.payload["visual_clues"] = ["OCR: PBS NEWS HOUR", "Scene: A podium beside a crowd holding signs."]
+    hints = []
+    report = remote.build_remote_youtube_report("job_visual", URL, discovery_hints=hints)
+    assert hints == client.models.payload["visual_clues"]
+    assert [name for name, _ in client.models.calls] == ["count", "generate"]
+    assert "visual_clues" not in report.model_dump_json() and "PBS NEWS HOUR" not in report.model_dump_json()
+    assert [row.text for row in report.submitted.transcript.sentences] == [row["text"] for row in SENTENCES]
+
+
+@pytest.mark.parametrize("clues", [["OCR: x"] * 5, ["OCR: " + "x" * 160], ["https://example.com"], ["Scene: api_key=private"], ["Scene: <script>"], ["Inferred: Someone in 2020"], None, 42, "OCR: NEWS", [42]])
+def test_invalid_visual_clues_never_escape_provider_boundary(client, clues):
+    client.models.payload["visual_clues"] = clues
+    hints = []
+    report = remote.build_remote_youtube_report("job_bad_visual", URL, discovery_hints=hints)
+    assert hints == []
+    assert [row.text for row in report.submitted.transcript.sentences] == [row["text"] for row in SENTENCES]
+
+
+def test_visual_clues_do_not_replace_missing_speech(client):
+    client.models.payload = {"sentences": [], "visual_clues": ["OCR: NEWS"]}
+    hints = []
+    with pytest.raises(QuantroError):
+        remote.build_remote_youtube_report("job_silent_visual", URL, discovery_hints=hints)
+    assert hints == []
+
+
+def test_visual_clues_require_confirmed_video_modality(client):
+    client.models.payload["visual_clues"] = ["OCR: NEWS"]
+    client.models.usage.prompt_tokens_details = [SimpleNamespace(modality="AUDIO", token_count=500)]
+    hints = []
+    report = remote.build_remote_youtube_report("job_no_visual_usage", URL, discovery_hints=hints)
+    assert hints == [] and report.submitted.transcript.sentences

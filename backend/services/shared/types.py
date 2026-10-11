@@ -58,10 +58,18 @@ class InterpretationReference(ContractModel):
     sentence_id: StrictStr
 
 
+class SourceReview(ContractModel):
+    status: Literal["no_obvious_issue", "needs_verification", "potential_issue"]
+    fact_check: StrictStr = Field(min_length=1, max_length=300)
+    semantic: StrictStr = Field(min_length=1, max_length=400)
+    references: list[InterpretationReference] = Field(min_length=1, max_length=4)
+
+
 class InterpretationDraft(ContractModel):
     context_gap: StrictStr = Field(min_length=1, max_length=440)
     summary: StrictStr = Field(min_length=1, max_length=240)
     references: list[InterpretationReference] = Field(min_length=1, max_length=4)
+    source_review: SourceReview | None = None
 
 
 class ReportInterpretation(ContractModel):
@@ -71,6 +79,7 @@ class ReportInterpretation(ContractModel):
     summary: StrictStr | None = None
     reliability: StrictStr
     references: list[InterpretationReference] = Field(default_factory=list)
+    source_review: SourceReview | None = None
     provider: Literal["gemini"] = "gemini"
     model: StrictStr | None = None
     generated_at: UtcTimestamp
@@ -555,6 +564,7 @@ __all__ = [
     "SavedReportRef",
     "Seconds",
     "SourceGap",
+    "SourceReview",
     "Stage",
     "TimeRange",
     "Transcript",

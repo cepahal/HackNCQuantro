@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Navbar from "./Navbar";
 import AnalysisLoadingScreen from "./AnalysisLoadingScreen";
+import {PersonalizedAnalysisLoading,AnalysisReplay} from "./PersonalizedAnalysis";
 import ReportPlayer from "./ReportPlayer";
 import ReportSummary, { reportAssessment, ReportVerdict } from "./ReportSummary";
 import SourceLeads from "./SourceLeads";
@@ -47,14 +48,17 @@ export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:
  return <><Navbar/><div className={styles.page}><main className={styles.main}>
   <header className={styles.header}>
    <Link className={styles.back} href="/">← New analysis</Link>
-   <div className={styles.heading}><div><p className={styles.eyebrow}>Zoomout / Analysis</p><h1>{analysisName(report)}</h1></div>
+   <div className={styles.heading}><div><p className={styles.eyebrow}>ZoomOut / Analysis</p><h1>{analysisName(report)}</h1></div>
     <div className={styles.actions}><button className={styles.copyButton} onClick={copyLink}>{copyStatus.startsWith("Link copied")?"Copied":copyStatus.startsWith("Couldn’t")?"Copy failed":"Copy link"}<span aria-hidden="true">↗</span></button><span role="status" className="sr-only">{copyStatus}</span></div>
    </div>
   </header>
   {error?<><div className={styles.error} role="alert"><h2>We couldn’t load this report.</h2><p>{error.error.message}</p><p className={styles.note}>{error.error.code} · {error.error.stage}</p>{error.error.retryable&&<button className={styles.copyButton} onClick={retry}>Retry</button>}</div>{(jobId||reportId)&&<DiagnosticPanel key={jobId||reportId} jobId={jobId??reportId!.replace(/^report_/,"")}/>}</>:report&&display?<ReportContent key={report.job_id} report={report} display={display} onRecheckCompleted={id=>router.push(`/results?id=${encodeURIComponent(id)}`)}/>:null}
- </main><footer className={styles.footer}><Link href="/" aria-label="Zoomout home"><Image src="/logo-light.png" alt="Zoomout" width={129} height={25} unoptimized /></Link><p>The full record, in context.</p><span>Built at HackNC · © 2026 Zoomout</span></footer></div>{!loadingDismissed&&<AnalysisLoadingScreen complete={ready} onDone={finishLoading}/>}</>;
+ </main><footer className={styles.footer}><Link href="/" aria-label="ZoomOut home"><Image src="/logo-light.png" alt="ZoomOut" width={129} height={25} unoptimized /></Link><p>The full record, in context.</p><span>Built at HackNC · © 2026 ZoomOut</span></footer></div>{!loadingDismissed&&<PersonalizedAnalysisLoading key={`${jobId}:${reportId}:${attempt}`} jobId={jobId??reportId?.replace(/^report_/,"")??null} complete={ready} onDone={finishLoading}/>}</>;
 }
 export function ReportLoading(){return <AnalysisLoadingScreen/>}
+
+// Preserve the old player code without mounting a duplicate media request.
+const LEGACY_SUBMITTED_PLAYER_ENABLED = false;
 
 export function ReportContent({ report, display, diagnostics, onRecheckCompleted }: { report: Report; display: DisplayModel; diagnostics?: ReportDiagnostics; onRecheckCompleted?: (reportId: string) => void }) {
  const [captured,setCaptured]=useState<ReportDiagnostics|null>(diagnostics??null);
@@ -97,10 +101,8 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
  const candidateMedia = !verifiedSource && !primaryLead ? source : null;
  const additionalLeadCount = leads.length - (primaryLead ? 1 : 0);
  return <article className={styles.report}>
-  <ReportAnalytics data={analytics} interpretation={interpretation} interpretationState={interpretationState}
-   spliceVideoReady={Boolean(verifiedSource && report.context_video && playableContextId===report.context_video.media_id)}/>
   {checkedReportId&&<Link href={`/results?id=${encodeURIComponent(checkedReportId)}`}>Open rechecked report ↗</Link>}
-  {analytics.isVideoDetected&&<div className={styles.videoGrid}>
+  {<div className={styles.videoGrid}>
   <section className={styles.primarySource} aria-label="Submitted video">
    <div className={styles.primaryHead}><h2>Submitted video</h2></div>
    <div className={styles.primaryVideo}><ReportPlayer media={submitted} label="Submitted excerpt"/></div>
@@ -115,20 +117,13 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
     </span>}
    </div>
    {verifiedSource ? <div className={styles.primaryVideo}><ReportPlayer key={verifiedSource.post.media.media_id} media={verifiedSource} label="Matched source recording"/></div>
-    : primaryLead ? <div className={styles.candidatePlayer}>
-     <iframe src={primaryLead.preview} title={`Unverified source candidate: ${primaryLead.title}`} loading="lazy"
-      referrerPolicy="strict-origin-when-cross-origin"
-      allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen/>
-     <a href={primaryLead.url} target="_blank" rel="noopener noreferrer">Open candidate recording ↗</a>
-    </div>
-    : candidateMedia ? <div className={styles.primaryVideo}><ReportPlayer key={candidateMedia.post.media.media_id} media={candidateMedia} label="Unverified source candidate"/></div>
-      : <div className={styles.sourceEmpty}><span aria-hidden="true">○</span><p>No candidate recording is available for this excerpt yet.</p></div>}
+    : <div className={styles.sourceEmpty}><p>No verified source video is available.</p></div>}
    <p className={styles.note}>{verifiedSource
     ? "Matching speech was found in this recording. It may be a reupload; the earliest original upload has not been established."
     : primaryLead || candidateMedia ? "This is the strongest available search lead. Its speech and surrounding context have not been verified against the excerpt."
       : "No source found does not establish whether the excerpt is accurate or unedited."}</p>
   </section>
-  <section hidden={!verifiedSource || !report.context_video} className={styles.primarySource} aria-label="Spliced context video">
+  <section className={styles.primarySource} aria-label="Spliced context video">
    <div className={styles.primaryHead}><h2>Clip in context</h2></div>
    {verifiedSource && report.context_video
     ? <div className={styles.primaryVideo}><ReportPlayer key={report.context_video.media_id}
@@ -140,20 +135,21 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
    {verifiedSource && report.context_video && <p className={styles.note}>Generated from the matched recording, with timed labels for the excerpt and surrounding context.</p>}
   </section>
   </div>}
-  {!analytics.isVideoDetected&&<section className={styles.primarySource} aria-label="Submitted video">
-   <div className={styles.primaryHead}><h2>Submitted video</h2></div>
-   <div className={styles.primaryVideo}><ReportPlayer media={submitted} label="Submitted excerpt"/></div>
-  </section>}
+  <ReportAnalytics data={analytics} interpretation={interpretation} interpretationState={interpretationState}
+   sourceEvidence={verifiedSource&&report.context?.source_media_id===verifiedSource.post.media.media_id
+    ?report.context.windows.filter(window=>window.coverage!=="unavailable").flatMap(window=>window.sentences.filter(sentence=>sentence.start_seconds<window.requested_end_seconds&&sentence.end_seconds>window.requested_start_seconds&&verifiedSource.transcript.sentences.some(recorded=>recorded.sentence_id===sentence.sentence_id&&recorded.text===sentence.text&&recorded.start_seconds===sentence.start_seconds&&recorded.end_seconds===sentence.end_seconds))).map(sentence=>({...sentence,media_id:verifiedSource.post.media.media_id})):[]}
+   spliceVideoReady={Boolean(verifiedSource && report.context_video && playableContextId===report.context_video.media_id)}/>
   {!analytics.isVideoDetected&&<SourceOptions options={leads.slice(0,4)} isVideoDetected={false} pendingUrl={pendingUrl} error={sourceError} onSelect={recheck}/>}
   <div hidden={!sourceError} data-testid="error-diagnostics">
    <DiagnosticPanel key={report.job_id} report={report} display={display} initialDiagnostics={diagnostics} onDiagnostics={setCaptured}/>
   </div>
   {analytics.isVideoDetected&&<SourceOptions options={leads.slice(0,4)} isVideoDetected pendingUrl={pendingUrl} error={sourceError} onSelect={recheck}/>}
+  <AnalysisReplay report={report} videoPlayable={Boolean(verifiedSource && report.context_video && playableContextId===report.context_video.media_id)}/>
   {/* Preserved for restoration after diagnostic mode; intentionally hidden. */}
   <div hidden className={styles.legacyPanels} data-testid="preserved-report-panels">
   <details className={styles.submittedClip} aria-label="Submitted clip">
    <summary><span>Submitted clip</span><span>View the input <span aria-hidden="true">+</span></span></summary>
-   <div className={styles.submittedVideo}><ReportPlayer key={submitted.post.media.media_id} media={submitted} label="Submitted excerpt"/></div>
+   {LEGACY_SUBMITTED_PLAYER_ENABLED&&<div className={styles.submittedVideo}><ReportPlayer key={submitted.post.media.media_id} media={submitted} label="Submitted excerpt"/></div>}
   </details>
   <ReportVerdict report={report}/>
   <ReportSummary report={report}/>

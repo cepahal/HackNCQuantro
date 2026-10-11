@@ -22,7 +22,7 @@ def render(schema, name=None):
         if "properties" in schema:
             # Word timings can be omitted; context-video extensions may be absent in older saved reports.
             return "{\n" + "".join(
-                f"  {key}{'?' if (name == 'TranscriptSentence' and key == 'words') or (name == 'ReportV2' and key in {'context_video', 'context_selection'}) else ''}: {render(value)};\n"
+                f"  {key}{'?' if (name == 'TranscriptSentence' and key == 'words') or (name == 'ReportV2' and key in {'context_video', 'context_selection'}) or (name in {'InterpretationDraft', 'ReportInterpretation'} and key == 'source_review') else ''}: {render(value)};\n"
                 for key, value in schema["properties"].items()
             ) + "}"
         return "Record<string, unknown>"

@@ -209,6 +209,27 @@ def _repeated(needle: str, haystack: str) -> bool:
     return first >= 0 and haystack.find(needle, first + 1) >= 0
 
 
+def _competing_location(clip_text: str, source_text: str, matched) -> bool:
+    """Do not assign one timestamp to competing near-identical passages."""
+    for remaining in (
+        source_text[: matched.dest_start],
+        source_text[matched.dest_end :],
+    ):
+        if len(remaining) < len(clip_text) * 0.8:
+            continue
+        alternate = fuzz.partial_ratio_alignment(clip_text, remaining)
+        if alternate is None:
+            continue
+        if (
+            alternate.score >= max(90.0, matched.score - 10.0)
+            and (alternate.src_end - alternate.src_start) / len(clip_text) >= 0.8
+            and _distinctive(clip_text[alternate.src_start : alternate.src_end])
+            and _distinctive(remaining[alternate.dest_start : alternate.dest_end])
+        ):
+            return True
+    return False
+
+
 def _empty_alignment(
     clip: MediaFeatures,
     source: MediaFeatures,
@@ -341,7 +362,11 @@ def build_alignment(
             "No sufficiently distinctive transcript passage reached the matching threshold."
         )
         return _empty_alignment(clip, source, effective_score, limitations)
-    if _repeated(clip_passage, source_text) or _repeated(source_passage, source_text):
+    if (
+        _repeated(clip_passage, source_text)
+        or _repeated(source_passage, source_text)
+        or _competing_location(clip_text, source_text, matched)
+    ):
         limitations.append(
             "The passage occurs at multiple source locations; its timestamp is ambiguous."
         )

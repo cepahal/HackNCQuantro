@@ -17,6 +17,7 @@ _PRIVATE_VALUE = re.compile(r"file://|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|(?:/tmp/|/h
 _CREDENTIAL = re.compile(r"\b(?:bearer\s+\S+|(?:api[_-]?key|token|secret|password|authorization)\s*[=:]\s*[^\s,;]+)", re.IGNORECASE)
 _KEYS = _KEYS | frozenset({"context_video", "context_selection", "strategy", "before", "after", "before_method", "after_method", "timing_note"})
 _KEYS = _KEYS | frozenset({"exception_type", "evidence_hash", "interpretation", "context_gap", "reliability", "references", "model", "generated_at"})
+_KEYS = _KEYS | frozenset({"source_review", "fact_check", "semantic"})
 
 
 def safe_url(value: str) -> str | None:

@@ -190,7 +190,7 @@ def test_all_matching_nodes_receive_previous_outputs(store, wired, monkeypatch):
     )
     result = run.run_analysis("job_connected", CLIP, store=store)
     run.find_source_video.assert_awaited_once_with(
-        WORDS, title="Commencement address", exclude_ids=["3XPuGqqWLtk"]
+        WORDS, title="Commencement address", exclude_ids=["3XPuGqqWLtk"], store=store
     )
     assert seen[1][0] == SOURCE
     assert seen[1][1]["transcript_result"] is matched["transcript_result"]
@@ -200,6 +200,25 @@ def test_all_matching_nodes_receive_previous_outputs(store, wired, monkeypatch):
     assert report["comparison"]["summary"] == SUMMARY
     assert report["context"]["windows"][0]["sentences"]
     assert store.get_job("job_connected")["status"] == "completed"
+
+
+def test_private_visual_clues_reach_discovery_without_changing_public_report(store, wired):
+    from backend.services.resolution.media import _ResolvedFeatures
+
+    original = run.resolve_media.side_effect
+
+    async def resolve(url, **kwargs):
+        post, features = await original(url, **kwargs)
+        if not kwargs.get("candidate_id"):
+            features = _ResolvedFeatures.model_validate(features.model_dump())
+            features._discovery_hints = ["OCR: PBS NEWS HOUR"]
+        return post, features
+
+    run.resolve_media.side_effect = resolve
+    result = run.run_analysis("job_visual_clues", CLIP, store=store)
+    assert run.find_source_video.await_args.kwargs["discovery_hints"] == ["OCR: PBS NEWS HOUR"]
+    saved = json.dumps(store.get_report(result.report_id))
+    assert "discovery_hints" not in saved and "PBS NEWS HOUR" not in saved
 
 
 @pytest.mark.parametrize(
@@ -328,6 +347,45 @@ def test_near_duplicate_short_cannot_be_context_source(store, wired, monkeypatch
     )
 
 
+@pytest.mark.parametrize(
+    "duration,context_present,expected",
+    [
+        (90.0, True, "matched"),
+        (31.0, True, "no_verified_match"),
+        (90.0, False, "no_verified_match"),
+    ],
+)
+def test_shorter_original_requires_clip_relative_length_and_real_context(
+    store,
+    wired,
+    duration,
+    context_present,
+    expected,
+):
+    original = run.resolve_media.side_effect
+
+    async def resolve(url, **kwargs):
+        post, features = await original(url, **kwargs)
+        if kwargs.get("candidate_id"):
+            post.media.duration_seconds = features.duration_seconds = duration
+            features.transcript.processed_ranges[0].end_seconds = duration
+            for sentence, bounds in zip(
+                features.transcript.sentences, [(1, 5), (10, 22), (24, 29)]
+            ):
+                sentence.start_seconds, sentence.end_seconds = bounds
+            if not context_present:
+                features.transcript.sentences = features.transcript.sentences[1:2]
+        return post, features
+
+    run.resolve_media.side_effect = resolve
+    result = run.run_analysis("job_shorter_original", CLIP, store=store)
+    assert result.outcome.value == expected
+    if expected == "matched":
+        report = store.get_report(result.report_id)
+        assert report["source"]["post"]["media"]["duration_seconds"] == duration
+        assert report["alignment"]["matches"][0]["source_start_seconds"] == 10
+
+
 def test_comparison_citations_and_timestamps_are_checked(monkeypatch):
     post, clip = media("clip", CLIP)
     _, source = media("source", SOURCE, "candidate_1")
@@ -402,60 +460,97 @@ def test_invalid_citation_gets_one_repair_without_relaxing_checks(monkeypatch):
 
 def test_context_video_is_saved_in_report_and_reused(store, wired, monkeypatch):
     from backend.services.shared.types import PublicMediaAsset
-    monkeypatch.setenv('CONTEXT_VIDEO_ENABLED','true')
-    monkeypatch.setattr(run.context_video.sentence_context, 'model_counts', lambda *args:(1,1))
-    asset = PublicMediaAsset(media_id='context_test',mime_type='video/mp4',duration_seconds=125.,width=640,height=360,has_audio=True)
+
+    monkeypatch.setenv("CONTEXT_VIDEO_ENABLED", "true")
+    monkeypatch.setattr(
+        run.context_video.sentence_context, "model_counts", lambda *args: (1, 1)
+    )
+    asset = PublicMediaAsset(
+        media_id="context_test",
+        mime_type="video/mp4",
+        duration_seconds=125.0,
+        width=640,
+        height=360,
+        has_audio=True,
+    )
     exporter = AsyncMock(return_value=asset)
-    monkeypatch.setattr(run.context_video,'export',exporter)
-    result = run.run_analysis('job_context',CLIP,store=store)
+    monkeypatch.setattr(run.context_video, "export", exporter)
+    result = run.run_analysis("job_context", CLIP, store=store)
     report = store.get_report(result.report_id)
-    assert report['context_video']['media_id']=='context_test'
-    assert report['context_selection']['before_method']=='sentences'
-    assert report['context']['windows'][0]['requested_end_seconds']==135
-    assert 'local_path' not in json.dumps(report)
-    run.run_analysis('job_context',CLIP,store=store)
-    assert exporter.await_count==1
+    assert report["context_video"]["media_id"] == "context_test"
+    assert report["context_selection"]["before_method"] == "sentences"
+    assert report["context"]["windows"][0]["requested_end_seconds"] == 135
+    assert "local_path" not in json.dumps(report)
+    run.run_analysis("job_context", CLIP, store=store)
+    assert exporter.await_count == 1
 
 
 def test_context_export_failure_keeps_source_report(store, wired, monkeypatch):
-    monkeypatch.setenv('CONTEXT_VIDEO_ENABLED','true')
-    monkeypatch.setattr(run.context_video.sentence_context,'model_counts',lambda *args:None)
-    monkeypatch.setattr(run.context_video,'export',AsyncMock(side_effect=RuntimeError('private diagnostics')))
-    result=run.run_analysis('job_failed_export',CLIP,store=store)
-    report=store.get_report(result.report_id)
-    assert report['outcome']=='matched' and report['context_video'] is None
-    assert any('could not be exported' in s for s in report['limitations'])
-    assert 'private diagnostics' not in json.dumps(report)
+    monkeypatch.setenv("CONTEXT_VIDEO_ENABLED", "true")
+    monkeypatch.setattr(
+        run.context_video.sentence_context, "model_counts", lambda *args: None
+    )
+    monkeypatch.setattr(
+        run.context_video,
+        "export",
+        AsyncMock(side_effect=RuntimeError("private diagnostics")),
+    )
+    result = run.run_analysis("job_failed_export", CLIP, store=store)
+    report = store.get_report(result.report_id)
+    assert report["outcome"] == "matched" and report["context_video"] is None
+    assert any("could not be exported" in s for s in report["limitations"])
+    assert "private diagnostics" not in json.dumps(report)
 
 
 def test_low_confidence_never_exports_context_video(store, wired, monkeypatch):
-    monkeypatch.setenv('CONTEXT_VIDEO_ENABLED', 'true')
+    monkeypatch.setenv("CONTEXT_VIDEO_ENABLED", "true")
     original = run.build_alignment
+
     def low_alignment(*args, **kwargs):
         from backend.services.shared.types import ConfidenceLevel
+
         alignment = original(*args, **kwargs)
         alignment.match_quality.confidence.level = ConfidenceLevel.LOW
         return alignment
-    monkeypatch.setattr(run, 'build_alignment', low_alignment)
+
+    monkeypatch.setattr(run, "build_alignment", low_alignment)
     exporter = AsyncMock()
-    monkeypatch.setattr(run.context_video, 'export', exporter)
-    result = run.run_analysis('job_low_context', CLIP, store=store)
+    monkeypatch.setattr(run.context_video, "export", exporter)
+    result = run.run_analysis("job_low_context", CLIP, store=store)
     report = store.get_report(result.report_id)
-    assert report['outcome'] == 'no_verified_match'
-    assert report['context_video'] is None
+    assert report["outcome"] == "no_verified_match"
+    assert report["context_video"] is None
     exporter.assert_not_awaited()
 
 
-@pytest.mark.parametrize("failure,reason", [
-    (run.StorageError("private storage details"), "context_storage_unavailable"),
-    (run.MediaDownloadError("auth_required", "private download details", CLIP), "context_source_media_unavailable"),
-    (QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_CANDIDATE_MEDIA), "context_source_media_unavailable"),
-    (TimeoutError("private timeout details"), "context_export_timeout"),
-    (run.subprocess.CalledProcessError(1, ["ffmpeg", "/tmp/private.mp4"], stderr="private secret"), "context_encoding_failed"),
-])
-def test_context_export_records_safe_failure_boundary(store, wired, monkeypatch, failure, reason):
+@pytest.mark.parametrize(
+    "failure,reason",
+    [
+        (run.StorageError("private storage details"), "context_storage_unavailable"),
+        (
+            run.MediaDownloadError("auth_required", "private download details", CLIP),
+            "context_source_media_unavailable",
+        ),
+        (
+            QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_CANDIDATE_MEDIA),
+            "context_source_media_unavailable",
+        ),
+        (TimeoutError("private timeout details"), "context_export_timeout"),
+        (
+            run.subprocess.CalledProcessError(
+                1, ["ffmpeg", "/tmp/private.mp4"], stderr="private secret"
+            ),
+            "context_encoding_failed",
+        ),
+    ],
+)
+def test_context_export_records_safe_failure_boundary(
+    store, wired, monkeypatch, failure, reason
+):
     monkeypatch.setenv("CONTEXT_VIDEO_ENABLED", "true")
-    monkeypatch.setattr(run.context_video.sentence_context, "model_counts", lambda *args: None)
+    monkeypatch.setattr(
+        run.context_video.sentence_context, "model_counts", lambda *args: None
+    )
     monkeypatch.setattr(run.context_video, "export", AsyncMock(side_effect=failure))
     result = run.run_analysis("job_export_diagnostic", CLIP, store=store)
     events = store.get_diagnostics("job_export_diagnostic")

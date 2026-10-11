@@ -3,7 +3,7 @@ import "./globals.css";
 import PointerCursor from "../components/PointerCursor";
 
 export const metadata: Metadata = {
-  title: "Zoomout — Political speeches in context.",
+  title: "ZoomOut | Political speeches in context.",
   description: "Compare political debate and speech excerpts with their full recordings and surrounding context.",
 };
 

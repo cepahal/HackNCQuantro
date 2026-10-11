@@ -137,7 +137,45 @@ def _number(value: Any) -> float | None:
     return number if math.isfinite(number) and number >= 0 else None
 
 
-def _segments(values: Any, *, offset: float = 0.0) -> list[dict[str, Any]]:
+def _segment_words(values: Any, text: str, start: float, end: float, offset: float):
+    """Keep complete provider timing only; partial/invalid words use segment timing."""
+    if not isinstance(values, list) or not values:
+        return []
+    words = []
+    previous = start
+    for item in values:
+        if not isinstance(item, dict):
+            return []
+        word = item.get("word", item.get("text"))
+        left = _number(item.get("start", item.get("start_seconds")))
+        right = _number(item.get("end", item.get("end_seconds")))
+        if (
+            not isinstance(word, str)
+            or not word.strip()
+            or left is None
+            or right is None
+            or not start <= left < right <= end
+            or left < previous
+        ):
+            return []
+        normalized = {"word": word, "start": left + offset, "end": right + offset}
+        for key in ("confidence", "probability"):
+            confidence = _number(item.get(key))
+            if confidence is not None and confidence <= 1:
+                normalized[key] = confidence
+        words.append(normalized)
+        previous = right
+    tokens = lambda value: re.findall(r"\w+(?:['’]\w+)?", value.casefold())
+    return (
+        words
+        if tokens(" ".join(word["word"] for word in words)) == tokens(text)
+        else []
+    )
+
+
+def _segments(
+    values: Any, *, offset: float = 0.0, words: Any = None
+) -> list[dict[str, Any]]:
     result = []
     for item in values if isinstance(values, list) else []:
         if not isinstance(item, dict):
@@ -145,11 +183,23 @@ def _segments(values: Any, *, offset: float = 0.0) -> list[dict[str, Any]]:
         text = _clean_text(str(item.get("text") or ""))
         start, end = _number(item.get("start")), _number(item.get("end"))
         if text and start is not None and end is not None and end > start:
+            supplied_words = item.get("words")
+            if supplied_words is None and isinstance(words, list):
+                supplied_words = [
+                    word
+                    for word in words
+                    if isinstance(word, dict)
+                    and (left := _number(word.get("start"))) is not None
+                    and (right := _number(word.get("end"))) is not None
+                    and start <= left < right <= end
+                ]
+            timed_words = _segment_words(supplied_words, text, start, end, offset)
             result.append(
                 {
                     "text": text,
                     "start": float(start + offset),
                     "end": float(end + offset),
+                    **({"words": timed_words} if timed_words else {}),
                 }
             )
     return sorted(result, key=lambda segment: (segment["start"], segment["end"]))
@@ -525,7 +575,7 @@ async def _transcribe_with_groq(audio: Path, url: str, platform: str) -> dict[st
                 file=(audio.name, data),
                 model=WHISPER_MODEL,
                 response_format="verbose_json",
-                timestamp_granularities=["segment"],
+                timestamp_granularities=["word", "segment"],
                 temperature=0.0,
             )
     except AuthenticationError as exc:
@@ -559,7 +609,7 @@ async def _transcribe_with_groq(audio: Path, url: str, platform: str) -> dict[st
         ) from exc
     raw = result.model_dump() if hasattr(result, "model_dump") else dict(result)
     return _transcript_result(
-        _segments(raw.get("segments")),
+        _segments(raw.get("segments"), words=raw.get("words")),
         text=str(raw.get("text") or ""),
         duration=_number(raw.get("duration")),
         source="groq_whisper",

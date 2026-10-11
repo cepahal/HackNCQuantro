@@ -28,16 +28,26 @@ RESULT = {
 
 def test_bot_block_uses_bounded_reader_and_retains_partial_evidence(monkeypatch):
     from backend.services.reporting import remote_youtube
+
     error = QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST)
     error.platform_challenge = True
     monkeypatch.setattr(media, "detect_platform", lambda url: "youtube")
     monkeypatch.setattr(media, "_transcript_for_media", AsyncMock(side_effect=error))
-    sentence = SimpleNamespace(text="Actual available speech", start_seconds=1.0, end_seconds=4.0)
-    remote = SimpleNamespace(submitted=SimpleNamespace(
-        transcript=SimpleNamespace(sentences=[sentence]), post=SimpleNamespace(title="Public clip")))
+    sentence = SimpleNamespace(
+        text="Actual available speech", start_seconds=1.0, end_seconds=4.0
+    )
+    remote = SimpleNamespace(
+        submitted=SimpleNamespace(
+            transcript=SimpleNamespace(sentences=[sentence]),
+            post=SimpleNamespace(title="Public clip"),
+        )
+    )
     calls = []
-    monkeypatch.setattr(remote_youtube, "build_remote_youtube_report",
-                        lambda job, url: calls.append(url) or remote)
+    monkeypatch.setattr(
+        remote_youtube,
+        "build_remote_youtube_report",
+        lambda job, url, **kwargs: calls.append(url) or remote,
+    )
     post, features = asyncio.run(media.resolve_media(URL))
     assert calls == [URL]
     assert features.transcript.status == TranscriptStatus.PARTIAL
@@ -48,11 +58,15 @@ def test_bot_block_uses_bounded_reader_and_retains_partial_evidence(monkeypatch)
 
 def test_unavailable_video_does_not_invoke_remote_reader(monkeypatch):
     from backend.services.reporting import remote_youtube
+
     error = QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST)
     monkeypatch.setattr(media, "detect_platform", lambda url: "youtube")
     monkeypatch.setattr(media, "_transcript_for_media", AsyncMock(side_effect=error))
-    monkeypatch.setattr(remote_youtube, "build_remote_youtube_report",
-                        lambda *args: pytest.fail("Unavailable is not a bot challenge"))
+    monkeypatch.setattr(
+        remote_youtube,
+        "build_remote_youtube_report",
+        lambda *args: pytest.fail("Unavailable is not a bot challenge"),
+    )
     with pytest.raises(QuantroError):
         asyncio.run(media.resolve_media(URL))
 
@@ -60,10 +74,14 @@ def test_unavailable_video_does_not_invoke_remote_reader(monkeypatch):
 @pytest.fixture(autouse=True)
 def isolated_cache(monkeypatch, tmp_path):
     from backend.services.reporting import remote_youtube
-    def unavailable(*args):
+
+    def unavailable(*args, **kwargs):
         raise QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST)
+
     monkeypatch.setattr(remote_youtube, "build_remote_youtube_report", unavailable)
-    monkeypatch.setattr(transcribe, "_fetch_hosted_captions", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        transcribe, "_fetch_hosted_captions", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(transcribe, "_CAPTION_CACHE_DIR", tmp_path / "captions")
     monkeypatch.setattr(download, "DOWNLOADS_DIR", tmp_path / "downloads")
     monkeypatch.setattr(transcribe, "_transcript_api_blocked_until", 0.0)
@@ -237,14 +255,21 @@ async def test_groq_requests_verbose_segment_timing(monkeypatch, tmp_path):
                     "text": "Timed speech",
                     "duration": 4,
                     "segments": [{"text": "Timed speech", "start": 1.5, "end": 3.75}],
+                    "words": [
+                        {"word": "Timed", "start": 1.5, "end": 2.0},
+                        {"word": "speech", "start": 2.1, "end": 3.75},
+                    ],
                 }
             )
 
     monkeypatch.setattr(transcribe, "AsyncGroq", Client)
     result = await transcribe._transcribe_with_groq(audio, URL, "youtube")
     assert calls[0]["response_format"] == "verbose_json"
-    assert calls[0]["timestamp_granularities"] == ["segment"]
-    assert result["segments"][0] == {"text": "Timed speech", "start": 1.5, "end": 3.75}
+    assert calls[0]["timestamp_granularities"] == ["word", "segment"]
+    assert result["segments"][0]["words"] == [
+        {"word": "Timed", "start": 1.5, "end": 2.0},
+        {"word": "speech", "start": 2.1, "end": 3.75},
+    ]
 
 
 @pytest.mark.asyncio
@@ -261,12 +286,20 @@ async def test_full_audio_adds_chunk_offsets(monkeypatch, tmp_path):
         return {
             "transcript": path.stem,
             "duration": 5.0,
-            "segments": [{"text": path.stem, "start": 1.0, "end": 5.0}],
+            "segments": [
+                {
+                    "text": path.stem,
+                    "start": 1.0,
+                    "end": 5.0,
+                    "words": [{"word": path.stem, "start": 1.5, "end": 4.5}],
+                }
+            ],
         }
 
     monkeypatch.setattr(transcribe, "_transcribe_with_groq", whisper)
     result = await transcribe._transcribe_file(source, URL, "youtube", tmp_path)
     assert [segment["start"] for segment in result["segments"]] == [1.0, 1201.0]
+    assert [s["words"][0]["start"] for s in result["segments"]] == [1.5, 1201.5]
     assert result["duration"] == 1300.0
 
 
@@ -561,3 +594,19 @@ async def test_contradicted_search_duration_is_not_published():
     assert post.media.duration_seconds is None
     assert features.duration_seconds == 20.0
     assert features.transcript.status == TranscriptStatus.PARTIAL
+
+
+def test_private_visual_discovery_hints_reach_features_not_report_fields(monkeypatch):
+    from backend.services.reporting import remote_youtube
+    error = QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST)
+    error.platform_challenge = True
+    monkeypatch.setattr(media, "_transcript_for_media", AsyncMock(side_effect=error))
+    def fallback(job, url, *, discovery_hints=None):
+        discovery_hints.extend(["OCR: NEWS", "Scene: A speaker at a podium."])
+        return SimpleNamespace(submitted=SimpleNamespace(transcript=SimpleNamespace(sentences=[SimpleNamespace(text="Actual speech.",start_seconds=0.,end_seconds=3.)]), post=SimpleNamespace(title="Public video")))
+    monkeypatch.setattr(remote_youtube, "build_remote_youtube_report", fallback)
+    _, features = asyncio.run(media.resolve_media(URL))
+    assert features.discovery_hints == ["OCR: NEWS", "Scene: A speaker at a podium."]
+    assert features.visual_text == [] and features.frames == []
+    assert "discovery_hints" not in features.model_dump_json() and "OCR: NEWS" not in features.model_dump_json()
+    assert "unverified visual search clues" in " ".join(features.warnings).lower()

@@ -6,11 +6,12 @@ import asyncio
 import hashlib
 import math
 import os
+import re
 import subprocess
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, ValidationError
 
 from ..external_apis.retrieve_post import _source_url
 from ..shared.errors import ErrorCode, QuantroError, Stage
@@ -25,6 +26,7 @@ from ..shared.types import (
     Transcript,
     TranscriptSentence,
     TranscriptStatus,
+    TranscriptWord,
 )
 from .download import (
     MediaDownloadError,
@@ -39,10 +41,22 @@ class _ResolvedFeatures(MediaFeatures):
     """Carry complete discovery text privately without changing report JSON."""
 
     _full_transcript_text: str = PrivateAttr(default="")
+    _discovery_hints: list[str] = PrivateAttr(default_factory=list)
+    _word_confidences: dict[str, list[dict[str, float]]] = PrivateAttr(default_factory=dict)
+
+    @property
+    def discovery_hints(self) -> list[str]:
+        """Unverified same-call visual discovery clues, excluded from public reports."""
+        return list(self._discovery_hints)
 
     @property
     def full_transcript_text(self) -> str:
         return self._full_transcript_text
+
+    @property
+    def word_confidences(self) -> dict[str, list[dict[str, float]]]:
+        """Provider metadata only; the shared word/report contract has no confidence field."""
+        return self._word_confidences
 
 
 def _number(value: Any, *, positive: bool = False) -> float | None:
@@ -61,6 +75,53 @@ def _count(value: Any) -> int | None:
 
 def _text(value: Any) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _timed_words(
+    segment: dict[str, Any], text: str, start: float, end: float
+) -> tuple[list[TranscriptWord], list[dict[str, float]]]:
+    """Keep a complete observed word sequence or use enclosing segment timing.
+
+    Accept shared-contract and provider spellings; never interpolate, reorder,
+    clamp, or retain a misleading partial word sequence.
+    """
+    raw_words = segment.get("words")
+    if not isinstance(raw_words, list) or not raw_words:
+        return [], []
+    words: list[TranscriptWord] = []
+    confidences: list[dict[str, float]] = []
+    previous = start
+    for item in raw_words:
+        if not isinstance(item, dict):
+            return [], []
+        word_text = _text(item.get("text", item.get("word")))
+        left = _number(item.get("start_seconds", item.get("start")))
+        right = _number(item.get("end_seconds", item.get("end")))
+        if (
+            word_text is None or left is None or right is None
+            or not start <= left < right <= end or left < previous
+        ):
+            return [], []
+        try:
+            word = TranscriptWord.model_validate(
+                {"text": word_text, "start_seconds": left, "end_seconds": right}
+            )
+        except ValidationError:
+            return [], []
+        words.append(word)
+        previous = right
+        confidence = {}
+        for key in ("confidence", "probability"):
+            value = _number(item.get(key))
+            if value is not None and value <= 1:
+                confidence[key] = value
+        confidences.append(confidence)
+    # Same token policy as specialist validation; original word text stays intact.
+    pattern = r"\w+(?:['’]\w+)?"
+    supplied_tokens = re.findall(pattern, " ".join(word.text for word in words).casefold())
+    if supplied_tokens != re.findall(pattern, text.casefold()):
+        return [], []
+    return words, confidences
 
 
 async def _transcript_for_media(*args: Any, **kwargs: Any) -> dict[str, Any]:
@@ -122,11 +183,12 @@ async def resolve_media(
     info = dict(metadata or {})
     download: dict[str, Any] | None = None
     warnings: list[str] = []
+    discovery_hints: list[str] = []
     if transcript_result is not None:
         transcript = dict(transcript_result)
         if platform == "youtube":
             warnings.append(
-                "Source playback uses YouTube; its video file was not downloaded. Analysis uses its timed transcript."
+                "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately."
             )
     elif platform == "youtube":
         # Follow the prototype: acquire the submitted clip, then prefer captions.
@@ -155,7 +217,7 @@ async def resolve_media(
             # Continue normal discovery rather than returning its standalone report.
             from ..reporting.remote_youtube import build_remote_youtube_report
             try:
-                remote = await asyncio.to_thread(build_remote_youtube_report, "retrieval_fallback", url)
+                remote = await asyncio.to_thread(build_remote_youtube_report, "retrieval_fallback", url, discovery_hints=discovery_hints)
             except QuantroError:
                 raise error from error.__cause__
             speech = remote.submitted.transcript.sentences
@@ -165,6 +227,8 @@ async def resolve_media(
                 "YouTube blocked native retrieval; Gemini supplied a partial transcript from the first 60 seconds.",
                 "Gemini transcript words and timestamps are estimates; audio and visual authenticity were not assessed.",
             ])
+            if discovery_hints:
+                warnings.append("Unverified visual search clues supplement discovery only; they do not establish identity, dates, speech or source context.")
             transcript = {"transcript": " ".join(s.text for s in speech),
                           "segments": [{"text": s.text, "start": s.start_seconds,
                                         "end": s.end_seconds} for s in speech],
@@ -194,19 +258,29 @@ async def resolve_media(
     ).hexdigest()[:24]
     media_id = f"media_{identity}"
     sentences: list[TranscriptSentence] = []
+    word_confidences: dict[str, list[dict[str, float]]] = {}
     for segment in transcript.get("segments") or []:
         if not isinstance(segment, dict):
             continue
         start, end = _number(segment.get("start")), _number(segment.get("end"))
         text = _text(segment.get("text"))
         if start is not None and end is not None and end > start and text:
+            words, confidences = _timed_words(segment, text, start, end)
+            sentence_id = f"s{len(sentences) + 1}"
+            if segment.get("words") and not words:
+                warnings.append(
+                    "Invalid or incomplete provider word timestamps were ignored; enclosing segment timing is retained."
+                )
+            if words:
+                word_confidences[sentence_id] = confidences
             sentences.append(
                 TranscriptSentence(
-                    sentence_id=f"s{len(sentences) + 1}",
+                    sentence_id=sentence_id,
                     start_seconds=start,
                     end_seconds=end,
                     text=text,
                     speaker_id=None,
+                    words=words,
                 )
             )
     sentences.sort(key=lambda item: (item.start_seconds, item.end_seconds))
@@ -327,4 +401,6 @@ async def resolve_media(
         warnings=list(warnings),
     )
     features._full_transcript_text = _text(transcript.get("transcript")) or ""
+    features._word_confidences = word_confidences
+    features._discovery_hints = discovery_hints
     return post, features

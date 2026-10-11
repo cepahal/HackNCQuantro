@@ -202,6 +202,9 @@ async def _build(job_id: str, url: str, store: TigerStore, *, source_url: str | 
             short_text,
             title=post.title or post.caption,
             exclude_ids=[identity] if (identity := _id(url)) else [],
+            store=store,
+            **({"discovery_hints": features.discovery_hints}
+               if getattr(features, "discovery_hints", None) else {}),
         )
         record(stage.value, "completed", {"status": discovered.get("status"), "match_score": discovered.get("match_score"),
                 "search_metadata": discovered.get("search_metadata"), "leads": discovered.get("leads", []),
@@ -231,7 +234,7 @@ async def _build(job_id: str, url: str, store: TigerStore, *, source_url: str | 
                 record(stage.value, "completed", {"candidate_number": number, **media_snapshot(source_post, source_features)}, started=candidate_started)
                 ensure_distinct_source(post, source_post, stage)
                 if source_features.duration_seconds < max(
-                    180.0, features.duration_seconds + 20.0
+                    30.0, features.duration_seconds + 20.0
                 ):
                     warnings.append(
                         "A repeated short excerpt was retained only as a source lead."
@@ -291,6 +294,9 @@ async def _build(job_id: str, url: str, store: TigerStore, *, source_url: str | 
                         ensure_ascii=False,
                     )
                 )
+        if chosen:
+            record('selected_passage', 'completed', {'title': chosen[0].title,
+                   'matches': [m.model_dump(mode='json') for m in chosen[2].matches]})
         context_asset, context_selection = None, None
         if chosen and os.getenv('CONTEXT_VIDEO_ENABLED', 'true').lower() == 'true':
             try:

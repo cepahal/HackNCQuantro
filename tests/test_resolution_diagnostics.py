@@ -142,6 +142,7 @@ def test_candidate_stage_records_search_metadata_and_unavailable_leads(store, mo
     leads = [candidates.Candidate("12345678901", "Available", 300), candidates.Candidate("12345678902", "Unavailable", 400)]
     monkeypatch.setattr(candidates, "extract_search_metadata", AsyncMock(return_value=meta))
     monkeypatch.setattr(candidates, "search_candidates", AsyncMock(return_value=leads))
+    monkeypatch.setattr(candidates, "_candidate_captions", AsyncMock(return_value=None))
     monkeypatch.setattr(candidates, "_score_candidate", AsyncMock(side_effect=[{"video_id": "12345678901", "video_url": leads[0].url, "title": "Available", "duration": 300, "match_score": 89.0, "transcript_result": {"transcript": WORDS, "source": "youtube_captions"}}, None]))
     with DiagnosticCapture("job_candidates", store).bind():
         result = asyncio.run(candidates.find_source_video(WORDS))

@@ -58,3 +58,24 @@
   .connector { display: none; }
   .layerNote { font-size: 11px; }
 }
+
+/* Interactive evidence layers, separate from generated-video playback. */
+.wafer {min-height:470px;}
+.stack {left:5%;width:48%;height:440px;top:0;}
+.disc {cursor:pointer;text-align:center;padding:0;color:inherit;}
+.disc:focus-visible {outline:3px solid #b51c38;outline-offset:4px;}
+.disc[aria-pressed="true"] {border-color:#b68b99;}
+.layers {position:absolute;right:0;width:40%;display:block;transition:top .25s ease;}
+.layer,.layer:nth-child(even) {margin:0;padding-top:40px;border:0;}
+.layer[hidden] {display:none;}
+@media(max-width:700px){.wafer{min-height:640px;display:block}.stack{position:relative;left:0;width:100%;max-width:380px;top:0;margin:20px auto;height:440px}.layers{position:relative!important;top:auto!important;right:auto;width:100%}.layer,.layer:nth-child(even){padding-top:0}.disc{height:150px}}
+@media(prefers-reduced-motion:reduce){.layers{transition:none}}
+
+.sourceReview{margin:24px 0;padding:20px;border:1px solid #dfe3e8;background:#fff;border-radius:6px}.sourceReview h2{margin:0 0 14px}.sourceReview p{line-height:1.65}.sourceReview[data-review="no_obvious_issue"] h2 span{color:#237447}.sourceReview[data-review="potential_issue"] h2 span{color:#b32636}
+
+.wafer{min-height:620px}.stack{top:200px}.layer,.layer:nth-child(even){padding-top:0}@media(max-width:700px){.wafer{min-height:660px}.stack{top:160px;height:500px;margin-top:0}.layers{margin-top:20px}}
+
+/* Keep mobile selected text alongside its actual wafer center. */
+@media(max-width:700px){.wafer{min-height:680px}.stack{position:absolute;left:0;top:200px;width:52%;height:440px;margin:0;max-width:none}.disc{height:168px}.layers{position:absolute!important;top:var(--evidence-label-top)!important;left:57%;right:0;width:43%;margin:0}.layerNote{overflow-wrap:anywhere}}
+
+.reviewEvidence{border-top:1px solid #dfe3e8;padding-top:16px}.reviewEvidence summary{cursor:pointer}.reviewEvidence figure{margin:16px 0}.reviewEvidence blockquote{margin:0;padding-left:12px;border-left:2px solid #b51c38;line-height:1.6}.reviewEvidence figcaption{margin-top:6px;color:#586373}

@@ -180,7 +180,7 @@ test("without verification the view centers recorded candidate options without a
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
   const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
   assert.match(primary, /Top candidate recording/);
-  assert.match(primary, /Unverified lead/);
+  assert.match(primary, /No verified source video is available/);
   assert.match(primary, /Recheck Possible related recording/);
   assert.doesNotMatch(primary, /Source analysis|Four layers|Verified speech match|<iframe/);
   assert.match(primary, /aria-label="Submitted excerpt"/);
@@ -254,7 +254,10 @@ test("stored context video appears alongside submitted and matched recordings", 
   assert.match(visible, /aria-label="Matched source recording"/);
   assert.match(visible, /aria-label="Spliced context video"/);
   assert.equal((visible.match(/<video/g) ?? []).length, 3);
-  assert.doesNotMatch(visible, /data-testid="splice-animation"/);
+  assert.equal((html.match(/<video/g) ?? []).length, 3, "preserved UI must not mount a fourth player");
+  const preserved = html.split('data-testid="preserved-report-panels"')[1]!;
+  assert.doesNotMatch(preserved, /<video/);
+  assert.match(visible, /data-testid="evidence-wafer"/);
   assert.match(html,/https:\/\/api.example\/media\/context_test/);
   assert.ok(html.includes(value.source!.post.post_url.replaceAll("&", "&amp;")));
 });
@@ -288,7 +291,7 @@ test("the analytics view has four evidence layers and keeps source gaps separate
   assert.match(html, /Source-match confidence|Word overlap|Splice assessment|Detection limitations/);
   assert.match(html, /0 source gaps/);
   assert.match(html, /do not confirm a splice/);
-  assert.doesNotMatch(html, /data-testid="splice-animation"/);
+  assert.match(html, /data-testid="evidence-wafer"/);
   assert.doesNotMatch(html, /0 splices detected|95% accurate/);
 });
 
@@ -298,25 +301,27 @@ test("missing generated context stays hidden while submitted and matched recordi
   value.alignment!.edit_analysis.status = "not_assessed";
   const html = renderToStaticMarkup(createElement(ReportContent, {report:value,display:display(value)}));
   const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
-  assert.match(primary, /<section hidden=""[^>]*aria-label="Spliced context video"/);
+  assert.match(primary, /<section[^>]*aria-label="Spliced context video"/);
   assert.match(primary, /aria-label="Submitted excerpt"/);
   assert.match(primary, /aria-label="Matched source recording"/);
   assert.equal((primary.match(/<video/g) ?? []).length, 2);
   assert.doesNotMatch(primary, /Splice assessment|Generation time/);
-  assert.doesNotMatch(primary, /data-testid="splice-animation"/);
+  assert.match(primary, /data-testid="evidence-wafer"/);
 });
 
-test("splice animation requires a loaded video and disappears after playback failure", () => {
+test("evidence wafer stays visible and static without a loaded generated MP4", () => {
   const { default: Analytics } = componentRequire("../components/ReportAnalytics.tsx") as typeof import("../components/ReportAnalytics.tsx");
   const { reportAnalytics } = componentRequire("../lib/report-analytics.ts") as typeof import("../lib/report-analytics.ts");
   const data = reportAnalytics(report());
   for (const spliceVideoReady of [false, true, false]) {
     const html = renderToStaticMarkup(createElement(Analytics, { data, interpretationState: "unavailable", spliceVideoReady }));
-    assert.equal(html.includes('data-testid="splice-animation"'), spliceVideoReady);
-    assert.match(html, /Source-match confidence|Word overlap/);
+    assert.match(html, /data-testid="evidence-wafer"/);
+    assert.equal(html.includes('data-motion="animated"'), spliceVideoReady);
+    assert.equal(html.includes('data-motion="static"'), !spliceVideoReady);
   }
+  const noMatch = renderToStaticMarkup(createElement(Analytics, {data:reportAnalytics(unmatchedReport()),interpretationState:"unavailable",spliceVideoReady:true}));
+  assert.doesNotMatch(noMatch, /data-testid="evidence-wafer"/);
 });
-
 
 test("no-match retains submitted video while hiding matched and generated video results", () => {
   const value = unmatchedReport();
@@ -327,5 +332,84 @@ test("no-match retains submitted video while hiding matched and generated video 
   assert.match(primary, /aria-label="Submitted video"/);
   assert.match(primary, /aria-label="Submitted excerpt"/);
   assert.equal((primary.match(/<video/g) ?? []).length, 1);
-  assert.doesNotMatch(primary, /aria-label="Matched source recording"|aria-label="Spliced context video"|context_stale/);
+  assert.doesNotMatch(primary, /aria-label="Matched source recording"|context_stale/);
+  assert.match(primary, /aria-label="Spliced context video"/);
+});
+
+test("personalized export animation requires playable video, not stored metadata", () => {
+  const {default: Motion} = componentRequire("../components/AlgorithmMotion.tsx") as typeof import("../components/AlgorithmMotion.tsx");
+  const {progressFromReport} = componentRequire("../lib/analysis-progress.ts") as typeof import("../lib/analysis-progress.ts");
+  const value = report();
+  value.context_video = {...value.source!.post.media,media_id:"context_saved"};
+  const progress = progressFromReport(value);
+  const pending = renderToStaticMarkup(createElement(Motion,{progress}));
+  assert.doesNotMatch(pending,/Schematic, not proportional|Continuous source excerpt ready/);
+  assert.match(pending,/Playback has not been confirmed/);
+  const ready = renderToStaticMarkup(createElement(Motion,{progress,videoPlayable:true}));
+  assert.match(ready,/Schematic, not proportional|Continuous source excerpt ready/);
+  for(const stage of ["failed","no_match"] as const){
+    const terminal = renderToStaticMarkup(createElement(Motion,{progress:{...progress,stage},videoPlayable:true}));
+    assert.doesNotMatch(terminal,/Schematic, not proportional|Continuous source excerpt ready/);
+    assert.match(terminal,/STOPPED/);
+  }
+});
+
+test("three video slots precede analysis, with honest blanks for missing results",()=>{
+ const value=report();value.context_video=null;
+ const html=renderToStaticMarkup(createElement(ReportContent,{report:value,display:display(value)}));
+ for(const name of ["Submitted video","Source video result","Spliced context video"])
+   assert.ok(html.indexOf(`aria-label="${name}"`)<html.indexOf('aria-label="Source analysis"'));
+ assert.match(html,/No generated context video is available/);
+});
+
+test("wafer layers are accessible buttons with explanations hidden until interaction",()=>{
+ const {default:Analytics}=componentRequire("../components/ReportAnalytics.tsx") as typeof import("../components/ReportAnalytics.tsx");
+ const {reportAnalytics}=componentRequire("../lib/report-analytics.ts") as typeof import("../lib/report-analytics.ts");
+ const html=renderToStaticMarkup(createElement(Analytics,{data:reportAnalytics(report()),interpretationState:"unavailable"}));
+ assert.match(html,/aria-label="Source-match confidence" aria-pressed="false" aria-controls="evidence-layer-0"/);
+ assert.match(html,/id="evidence-layer-1" hidden=""/);
+ assert.match(html,/data-motion="static"/);
+});
+
+test("source review check requires a ready recorded review and retains verification scope",()=>{
+ const {default:Analytics}=componentRequire("../components/ReportAnalytics.tsx") as typeof import("../components/ReportAnalytics.tsx");
+ const {reportAnalytics}=componentRequire("../lib/report-analytics.ts") as typeof import("../lib/report-analytics.ts");
+ const value=report(),data=reportAnalytics(value),sentence=value.context!.windows[0].sentences[0];
+ const interpretation={status:"ready",source_review:{status:"no_obvious_issue",fact_check:"No checkable factual claim in these sentences.",semantic:"The speaker is making a joke.",references:[{media_id:"media_source",sentence_id:sentence.sentence_id}]}} as unknown as import("../lib/api-types.ts").ReportInterpretation;
+ const html=renderToStaticMarkup(createElement(Analytics,{data,interpretation,interpretationState:"ready",sourceEvidence:[{...sentence,media_id:"media_source"}]}));
+ assert.match(html,/No obvious issue in reviewed source text/);assert.match(html,/external facts not independently verified/);
+ assert.ok(html.indexOf('aria-label="Source excerpt review"')<html.indexOf('data-testid="evidence-wafer"'));
+ const absent=renderToStaticMarkup(createElement(Analytics,{data,interpretation:{...interpretation,status:"unavailable"},interpretationState:"unavailable"}));
+ assert.doesNotMatch(absent,/No obvious issue in reviewed source text/);
+ const missing=renderToStaticMarkup(createElement(Analytics,{data,interpretation,interpretationState:"ready",sourceEvidence:[]}));
+ assert.doesNotMatch(missing,/No obvious issue in reviewed source text/);
+ const stale=renderToStaticMarkup(createElement(Analytics,{data,interpretation:{...interpretation,source_review:{...interpretation.source_review!,references:[...interpretation.source_review!.references,{media_id:"media_source",sentence_id:"missing"}]}},interpretationState:"ready",sourceEvidence:[{...sentence,media_id:"media_source"}]}));
+ assert.doesNotMatch(stale,/No obvious issue in reviewed source text/);
+});
+
+
+test("hovered evidence layer expands upper gaps while retaining the lower stack",()=>{
+ const {evidenceLayerPosition:position}=componentRequire("../components/ReportAnalytics.tsx") as typeof import("../components/ReportAnalytics.tsx");
+ assert.deepEqual([0,1,2,3].map(i=>position(i,null)),[0,150,168,186]);
+ assert.ok(position(1,1)-position(0,1)>150);
+ assert.equal(position(2,1),168);assert.equal(position(3,1),186);
+ assert.ok(position(2,2)-position(1,2)>18);
+});
+
+
+test("source review resolves only recorded citations to actual sentence quotes",()=>{
+ const {default:Analytics}=componentRequire("../components/ReportAnalytics.tsx") as typeof import("../components/ReportAnalytics.tsx");
+ const {reportAnalytics}=componentRequire("../lib/report-analytics.ts") as typeof import("../lib/report-analytics.ts");
+ const value=report(),sentence=value.context!.windows[0].sentences[0];
+ const interpretation={status:"ready",source_review:{status:"needs_verification",fact_check:"Claim requires checking.",semantic:"A qualification matters.",references:[{media_id:"media_source",sentence_id:sentence.sentence_id},{media_id:"wrong_media",sentence_id:sentence.sentence_id},{media_id:"media_source",sentence_id:"missing"}]}} as unknown as import("../lib/api-types.ts").ReportInterpretation;
+ const html=renderToStaticMarkup(createElement(Analytics,{data:reportAnalytics(value),interpretation,interpretationState:"ready",sourceEvidence:[{...sentence,media_id:"media_source"}]}));
+ assert.match(html,/Source evidence \(1\)/);assert.match(html,/We will not raise taxes/);assert.match(html,/1:41/);assert.doesNotMatch(html,/wrong_media|missing/);
+});
+
+test("personalized loading reuses the homepage fragment visual with real transcript words",()=>{
+ const {default:Motion}=componentRequire("../components/AlgorithmMotion.tsx") as typeof import("../components/AlgorithmMotion.tsx");
+ const {parseProgress}=componentRequire("../lib/analysis-progress.ts") as typeof import("../lib/analysis-progress.ts");
+ const progress=parseProgress({job_id:"job",stage:"transcript",excerpt:"Actual recorded speech words"},"job");
+ const html=renderToStaticMarkup(createElement(Motion,{progress}));
+ assert.match(html,/data-testid="personalized-fragments"/);assert.match(html,/stage-fragment/);assert.match(html,/Actual recorded speech words/);assert.doesNotMatch(html,/Continuous source excerpt ready/);
 });

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useAnimate, useInView, useReducedMotion } from "framer-motion";
+import { motion, useAnimate, useInView, useReducedMotion } from "framer-motion";
+
+import {motionStep,type AnalysisProgress} from "../lib/analysis-progress";
 
 const captions = [
   "Searching for the source.",
@@ -17,7 +19,7 @@ const gapSegments = markerPositions.slice(0, -1).map((position, index) => {
   return { left: position + distance / 4, width: distance / 2 };
 });
 
-export default function AlgorithmAnimation() {
+export default function AlgorithmAnimation({progress,motionEnabled=true}:{progress?:AnalysisProgress;motionEnabled?:boolean}={}) {
   const [scope, animate] = useAnimate();
   const view = useInView(scope, { once: false, amount: 0.25 });
   const reduced = useReducedMotion();
@@ -25,7 +27,7 @@ export default function AlgorithmAnimation() {
   const running = useRef(false);
 
   useEffect(() => {
-    if (!view || reduced || running.current) return;
+    if (progress || !view || reduced || running.current) return;
     running.current = true;
     let cancelled = false;
     const pause = (duration: number) => new Promise<void>((resolve) => window.setTimeout(resolve, duration));
@@ -142,7 +144,24 @@ export default function AlgorithmAnimation() {
       cancelled = true;
       running.current = false;
     };
-  }, [view, reduced, animate, scope]);
+  }, [view, reduced, animate, scope, progress]);
+
+  if(progress){
+    const confirmed=motionStep(progress);
+    const fragments=progress.excerpt.trim().split(/\s+/).filter(Boolean).slice(0,5);
+    const aligned=confirmed>=3&&progress.source_start!==null&&progress.source_end!==null;
+    const transition={duration:reduced||!motionEnabled?0:.65};
+    return <div data-testid="personalized-fragments" className="hatch">
+      <div className="algorithm-stage" aria-label="Recorded pipeline fragments, schematic">
+        <div className="stage-grid">{Array.from({length:20},(_,index)=><i className="stage-cell" key={index}/>)}</div>
+        <motion.div className="stage-source" animate={{opacity:aligned?0:1,y:confirmed>=1?-12:0}} transition={transition}/>
+        <motion.div className="stage-target" animate={{left:aligned?"50%":"65%",top:aligned?"65%":"25%",width:aligned?"64%":28,x:aligned?"-50%":0,height:aligned?14:28,backgroundColor:confirmed>=2?"#e73552":"#101116"}} transition={transition}/>
+        {fragments.map((word,index)=><motion.div key={index} className={`stage-fragment stage-fragment-${index}`} title={word}
+          animate={{opacity:1,left:aligned?`${32+index*8}%`:`${22+index*5}%`,top:aligned?"calc(65% - 20px)":"42%",scale:1}} transition={transition}><span className="sr-only">{word}</span></motion.div>)}
+        <div className="stage-status">Recorded stage: {progress.stage}. Schematic, not to scale.</div>
+      </div>
+    </div>;
+  }
 
   return (
     <div>

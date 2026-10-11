@@ -200,6 +200,12 @@ export function getReportInterpretation(reportId: string): Promise<ReportInterpr
     if (!isRecord(data) || data.report_id !== reportId || !["ready", "unavailable"].includes(String(data.status))
       || data.provider !== "gemini" || typeof data.reliability !== "string" || typeof data.generated_at !== "string"
       || !Array.isArray(data.references) || !data.references.every(ref => isRecord(ref) && typeof ref.media_id === "string" && typeof ref.sentence_id === "string")
+      || !(data.source_review === undefined || data.source_review === null || (data.status === "ready" && isRecord(data.source_review)
+        && ["no_obvious_issue", "needs_verification", "potential_issue"].includes(String(data.source_review.status))
+        && typeof data.source_review.fact_check === "string" && data.source_review.fact_check.trim().length > 0 && data.source_review.fact_check.trim().split(/\s+/).length <= 35
+        && typeof data.source_review.semantic === "string" && data.source_review.semantic.trim().length > 0 && data.source_review.semantic.trim().split(/\s+/).length <= 45
+        && Array.isArray(data.source_review.references) && data.source_review.references.length >= 1 && data.source_review.references.length <= 4
+        && data.source_review.references.every(ref => isRecord(ref) && typeof ref.media_id === "string" && typeof ref.sentence_id === "string")))
       || !(data.model === null || typeof data.model === "string")
       || (data.status === "ready" && (typeof data.summary !== "string" || typeof data.context_gap !== "string"))) {
       throw new Error("The analysis service returned an invalid interpretation.");
@@ -286,4 +292,11 @@ export async function waitForReport(jobId: string, signal?: AbortSignal): Promis
     await pause();
   }
   throw new Error("This analysis is taking longer than expected. Refresh to check its saved status again.");
+}
+
+/** Compact allowlisted progress; no logs, provider responses, or filesystem paths. */
+export async function getAnalysisProgress(jobId:string, signal?:AbortSignal) {
+  if(!IDENTIFIER.test(jobId)) throw new Error('Invalid job identifier');
+  const {parseProgress}=await import('./analysis-progress');
+  return parseProgress(await request(`/reports/report_${encodeURIComponent(jobId)}/progress`,{signal},reportApiBase()),jobId);
 }

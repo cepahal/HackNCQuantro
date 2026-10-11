@@ -160,3 +160,13 @@ test("gateway cannot be configured as an external or credentialed open proxy", (
     assert.throws(() => createGateway({ backendOrigin }), /fixed loopback/);
   }
 });
+
+test("compact progress uses the existing public report allowlist", async (t) => {
+  const {origin,calls}=await setup(t);
+  assert.equal((await call(origin,"/api/reports/report_public/progress")).status,200);
+  assert.equal((await call(origin,"/api/reports/report_private/progress")).status,404);
+  assert.equal((await call(origin,"/api/reports/report_public/progress?debug=1")).status,404);
+  assert.equal((await call(origin,"/api/reports/report_public/progress","POST")).status,405);
+  assert.ok(calls.some(item=>item.path==="/reports/report_public/progress"));
+  assert.ok(calls.every(item=>!item.headers.cookie&&!item.headers.authorization));
+});

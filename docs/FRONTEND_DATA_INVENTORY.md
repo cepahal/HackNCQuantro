@@ -1,6 +1,6 @@
 # Frontend data wiring and metric inventory
 
-Audited 2026-10-11 against local teammate commit `53ba049` plus the uncommitted integration fixes. This is a source and offline contract audit, not confirmation that the public deployment runs these changes. No commit or deployment was made.
+Audited 2026-10-11 against application base `37ecb71` plus the integration fixes below. This is a source and offline contract audit; deployment availability requires separate verification.
 
 ## Input and output wiring
 
@@ -18,7 +18,7 @@ Audited 2026-10-11 against local teammate commit `53ba049` plus the uncommitted 
 | Copy link / copy output / download | Clipboard / local `.txt` | Browser actions; no write endpoint needed. Export includes raw public report plus typed data/timeline markers |
 | Data markers disclosure | `reportDataMarkers(report, diagnostics)` | New typed projection in `frontend/lib/view-model.ts`, rendered in `DiagnosticPanel` |
 | Timeline markers for upcoming bars | `reportTimelineMarkers(report)` | Linked submitted/source passages, assessed gaps, unmatched ranges, context windows; invalid intervals are omitted |
-| Navigation, menu, “How it works” | Local links, focus/menu state | UI-only |
+| Navigation and menu | Local links and focus/menu state | Logo returns to `/`; redundant header section links are removed |
 | Homepage sample durations/counts/confidence and algorithm animation | Static illustrations | **Not live backend measurements.** Do not use those values as report data |
 | Demo link | Configured/default report ID via ordinary report route | The route is wired; this audit does not prove that a particular demo report still exists in production Tiger |
 | Old `ResultCard` tabs, passage map and selectors | Local selections over report fields | Component remains in source but is not mounted by the current results page; do not assume its controls are live |
@@ -183,12 +183,22 @@ Not implemented: calibrated misinformation/truth probability, deceptive intent, 
 
 ## Verification and scope
 
-The analytics page replaces the visible terminal during normal use. The terminal and previous panels remain preserved; load errors expose diagnostics, and a failed candidate recheck also reveals the saved report's diagnostics. The existing three-video layout remains available for verified high/moderate matches. Reports without a sufficient match show four candidate slots, with missing slots disabled rather than invented.
+The analytics page replaces the visible terminal during normal use. The terminal and previous panels remain preserved; load errors expose diagnostics, and a failed candidate recheck also reveals the saved report's diagnostics. The three primary video slots remain at the top. Only recorded alternative candidates are shown; missing options are hidden.
 
 `POST /reports/{report_id}/interpretation` uses the existing private Gemini adapter and `GEMINI_COMPARISON_MODEL` (default `gemini-3.1-flash-lite`). Input is bounded to 40 submitted sentences, 80 context sentences, and 14,000 transcript characters. One provider attempt is allowed per generation. Returned prose must cite real supplied IDs from both recordings, meet length limits, and pass public-data validation. Successful readings are cached in the existing Tiger diagnostics table, keyed by evidence and prompt version; unavailable results are cached for five minutes. A fixed lock pool coalesces same-process requests, and the browser coalesces remounts. There is no cross-process generation lock, so multiple API workers may each initiate a first request. No new table or ReportV2 field is required. Provider failure preserves the saved report and displays its existing summary.
 
 `POST /reports/{report_id}/source` accepts a previously saved YouTube candidate and a client-generated job ID. It reruns the original submitted URL against that candidate using the existing captions/Whisper scorer, timed alignment, broader-context requirement, report persistence and optional FFmpeg export. It creates a separate report and does not overwrite the old one. Arbitrary hosts, undiscovered links and the submitted recording are rejected. These POST routes use the backend API, not the read-only sharing gateway.
 
 The wafer uses categorical source confidence, exact multiset token overlap in aligned transcript passages, assessed source-gap counts and saved limitations. Token overlap ignores order and is not a measured source-identification accuracy rate. Source gaps are possible cuts, not confirmed splices. Generation time comes only from a completed `run_analysis` event explicitly marked `job_elapsed`; old captures remain unavailable. Source context ranges are requested windows and do not establish complete coverage.
+
+`GET /reports/{report_id}/progress` projects saved per-job events into bounded display fields: stage/status, transcript excerpt, search anchor, candidate titles/scores, selected passage, surrounding text, and stored-video readiness. It uses the existing report identity boundary and sends `no-store` for route responses. No provider call is made by polling. Missing completed reports remain unavailable rather than a successful animation. The loading orb stays through retrieval and until meaningful transcript or calculation evidence exists; the personalized animation then follows recorded stages. Replay is explicitly separate from live progress.
+
+The existing interpretation response also includes optional `source_review`: a brief factual-claim reading, semantic explanation, preliminary status, and one to four source sentence references. Only admitted, available source windows with matching transcript IDs/text/times may support this review. The same bounded, cached Gemini request generates it; absent evidence or provider failure leaves it null. A green check means only no obvious issue in the supplied excerpt. External factual truth and recording authenticity are not independently verified. The browser resolves the references into quoted source sentences and recorded time ranges beneath the review.
+
+The submitted, matched, and generated-context video slots precede analytics. Missing confident sources or exports leave honest empty slots. The wafer remains interactive without an MP4; idle generated-video motion requires actual successful player loading. The legacy player code is retained behind a disabled flag so it does not create a fourth media request. Analysis uses two text sizes, with accessible pointer, focus, and tap selection for the evidence layers.
+
+Saved reports govern progress completion; diagnostic snapshots cannot override them. A completed match requires distinct recordings, verified alignment and moderate/high confidence. Green source reviews require resolved saved citations and use backend-owned transcript-scoped factual wording. Interpretation cache version 5 invalidates older readings.
+
+Blocked YouTube fallback can supply bounded OCR/scene search clues in the same native-video Gemini request. These private estimates add at most two queries and never replace the independent speech anchor or become verified identity, event, transcript or media evidence. Invalid optional clues do not discard usable speech. Candidate caption failures may reuse a fresh, extraction-signature-matched Tiger recording snapshot with validated identities, hashes and real transcript timings; reuse is disclosed and does not imply freshly downloaded MP4 bytes.
 
 The audit uses existing frontend API tests, backend route/shape tests, media serving and safe diagnostic projection tests. Added tests cover null vs zero, merged interval durations, stale no-match fields, typed scales, timeline links, unknown historic timing, same-job diagnostics, context-export public fields and sensitive-data exclusion. Analytics tests also cover durable cache reuse, concurrent calls, safe provider failures, fabricated citations, bounded input/output and source rechecks. No new dependency or schema migration is required. Opening a verified report can make one Gemini request and persist its reading in Tiger. It sends no phone message and does not deploy code.
