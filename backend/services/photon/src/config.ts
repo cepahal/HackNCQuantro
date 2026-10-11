@@ -42,5 +42,7 @@ export function readConfig(env: NodeJS.ProcessEnv, args: string[]) {
   return {
     cloud, resumeSaved, token, projectId, projectSecret, port, backendPort,
     directory, publicReportsFile, reportBaseUrl: env.REPORT_BASE_URL?.trim() ?? "",
+    // Hackathon demo: hardcoded report replies stay on unless explicitly disabled.
+    demoReplies: env.PHOTON_DEMO_REPLIES?.trim().toLowerCase() !== "false",
   };
 }
