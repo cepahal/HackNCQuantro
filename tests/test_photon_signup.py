@@ -72,6 +72,26 @@ async def test_html_has_explicit_consent_same_origin_signup_and_qr(client):
 
 
 @pytest.mark.asyncio
+async def test_signup_uses_zoomout_branding_and_clear_mobile_steps_without_external_assets(client):
+    response = await client.get("/imessage")
+    html = response.text
+    assert "<title>Zoomout | iMessage signup</title>" in html
+    assert 'class="brand" aria-label="Zoomout">zoomout</span>' in html
+    assert "--black:#0b0b0f" in html and "--red:#e63950" in html
+    assert "background:#fff" in html
+    assert "@media(max-width:720px)" in html
+    assert "button:focus-visible,a:focus-visible,input:focus-visible" in html
+    assert html.index("<strong>Register</strong>") < html.index("<strong>Open Messages</strong>") < html.index("<strong>Send a video</strong>")
+    assert 'aria-labelledby="signup-heading"' in html
+    assert 'aria-labelledby="register-heading"' in html
+    assert 'id="result" hidden' in html
+    assert "Registration alone does not confirm delivery" in html
+    assert "Your number is shared with our messaging provider" in html
+    assert "<script src=" not in html and "<link " not in html
+    assert "https://" not in html and "http://" not in html
+
+
+@pytest.mark.asyncio
 async def test_success_proxies_only_phone_and_consent_to_authenticated_loopback(client, environment):
     response = await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": True})
     assert response.status_code == 200

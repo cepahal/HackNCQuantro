@@ -31,29 +31,50 @@ _HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "R
 
 _HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Quantro iMessage signup</title><style>
-body{font:17px/1.5 system-ui,sans-serif;max-width:560px;margin:48px auto;padding:0 24px;color:#14271c;background:#f6f9f7}
-h1{line-height:1.1}label{display:block;margin:18px 0 8px}input[type=tel]{box-sizing:border-box;width:100%;padding:12px;font:inherit}
-button,.messages{display:inline-block;padding:12px 18px;background:#163d28;color:white;border:0;border-radius:6px;font:inherit;text-decoration:none}
-button{margin:18px 0;cursor:pointer}button:disabled{opacity:.5}#status{white-space:pre-line}#result{padding:16px;border:1px solid #b8cbbc}
-.qr{margin-top:32px;border-top:1px solid #b8cbbc;padding-top:20px}.qr img{width:200px;height:200px}small{color:#486252}
-</style></head><body><h1>Use Quantro in iMessage</h1>
-<p>Register your own iMessage phone number, then send Quantro a public video link to request an analysis.</p>
+<title>Zoomout | iMessage signup</title><style>
+:root{--ink:#0e0e11;--body:#5b5b61;--muted:#8a8a90;--line:#e4e4e7;--black:#0b0b0f;--red:#e63950}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:16px/1.5 Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:#fbd5dc}.navbar{height:72px;background:var(--black);color:#fff}.wrap{width:min(1120px,100%);margin:auto;padding-inline:clamp(24px,5vw,64px)}
+.nav-inner{height:100%;display:flex;align-items:center;justify-content:space-between;gap:24px}.brand{font-size:32px;font-weight:600;line-height:1;letter-spacing:-.06em;border-bottom:3px solid var(--red);padding-bottom:5px}
+.nav-note{font-size:13px;color:#d5d5d9}.layout{display:grid;grid-template-columns:1.05fr 1fr;gap:clamp(32px,6vw,80px);padding-block:64px 48px;align-items:start}
+.eyebrow{margin:0 0 20px;color:var(--red);font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+h1{font-size:clamp(48px,6.7vw,76px);font-weight:400;line-height:1;letter-spacing:-.055em;margin:0 0 26px}h2{font-size:26px;font-weight:400;letter-spacing:-.04em;line-height:1.15;margin:0 0 12px}
+p{margin:0 0 16px}.intro{font-size:19px;line-height:1.55;color:var(--body);max-width:440px}.steps{list-style:none;padding:0;margin:32px 0 0;counter-reset:steps;display:grid;gap:20px}
+.steps li{counter-increment:steps;display:grid;grid-template-columns:28px 1fr;column-gap:12px}.steps li::before{content:"0" counter(steps);font-size:12px;color:var(--red);padding-top:4px}.steps strong{display:block;font-weight:600}.steps span{font-size:14px;color:var(--body)}
+.signup-card{border:1px solid var(--line);padding:28px}.card-copy{font-size:14px;color:var(--body)}label{display:block;margin:20px 0 8px;font-size:14px;font-weight:600}
+input[type=tel]{width:100%;padding:14px;border:1px solid #c9c9ce;border-radius:6px;background:#fff;color:var(--ink);font:inherit;min-height:48px}
+.consent{display:flex;align-items:flex-start;gap:10px;font-size:13px;font-weight:400;line-height:1.5;color:var(--body)}.consent input{flex:none;width:17px;height:17px;margin:2px 0 0;accent-color:var(--red)}
+button,.messages{display:inline-flex;justify-content:center;align-items:center;min-height:48px;padding:14px 20px;border:1px solid var(--black);border-radius:6px;background:var(--black);color:#fff;font:600 14px Arial,Helvetica,sans-serif;text-decoration:none;touch-action:manipulation}
+button{width:100%;margin:20px 0 14px;cursor:pointer}button:disabled{opacity:.5;cursor:wait}button:hover:not(:disabled),.messages:hover{background:#28282d}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--red);outline-offset:3px}.privacy,small{font-size:12px;color:var(--body)}
+#status{white-space:pre-line;font-size:14px;overflow-wrap:anywhere;border-left:3px solid var(--red);padding-left:12px;margin:18px 0 0}#status:empty{display:none}
+#result{padding:20px;margin-top:20px;border:1px solid var(--line);background:#fafafa}#result[hidden]{display:none}#assigned{font-size:14px;font-weight:600;overflow-wrap:anywhere}.messages{background:#fff;color:var(--ink);border-color:#c9c9ce;margin:0 0 14px}.messages:hover{background:#f1f1f3}
+.qr{margin-top:28px;border-top:1px solid var(--line);padding-top:24px;display:grid;grid-template-columns:112px 1fr;align-items:center;gap:20px}.qr img{display:block;width:112px;height:112px}.qr h2{font-size:20px}.qr p{font-size:13px;color:var(--body);margin:0}
+footer{border-top:1px solid var(--line);padding-block:22px;color:var(--body);font-size:12px}.footer-inner{display:flex;justify-content:space-between;gap:20px}
+@media(max-width:720px){.navbar{height:64px}.layout{grid-template-columns:1fr;gap:32px;padding-block:36px}.intro{font-size:17px}.steps{gap:16px;margin-top:24px}.signup-card{padding:24px}.brand{font-size:28px}.footer-inner{flex-wrap:wrap}}
+@media(max-width:380px){.signup-card{padding:20px}.qr{grid-template-columns:88px 1fr;gap:14px}.qr img{width:88px;height:88px}.nav-note{font-size:12px}}
+</style></head><body><header class="navbar"><div class="wrap nav-inner"><span class="brand" aria-label="Zoomout">zoomout</span><span class="nav-note">iMessage signup</span></div></header>
+<main class="wrap layout"><section aria-labelledby="signup-heading"><p class="eyebrow">The bigger picture</p><h1 id="signup-heading">Context.<br>In iMessage.</h1>
+<p class="intro">Send a public video link. Review the available source and surrounding context, right from Messages.</p>
+<ol class="steps" aria-label="How to get started"><li><div><strong>Register</strong><span>Add your own iMessage phone number below.</span></div></li><li><div><strong>Open Messages</strong><span>Start a conversation with your assigned number.</span></div></li><li><div><strong>Send a video</strong><span>Paste a public video link to request an analysis.</span></div></li></ol></section>
+<div><section class="signup-card" aria-labelledby="register-heading"><h2 id="register-heading">Your next step: register.</h2><p class="card-copy">Use the number you send iMessages from, including its country code.</p>
 <form id="signup" method="post" action="/imessage/signup"><label for="phone">Your phone number, including country code</label>
 <input id="phone" name="phone_number" type="tel" autocomplete="tel" placeholder="+19195551234" maxlength="16" required pattern="\\+[1-9][0-9]{6,14}">
-<label><input id="consent" type="checkbox" required> I own this number and agree to receive Quantro iMessages, including a welcome and replies to links I send.</label>
+<label class="consent"><input id="consent" type="checkbox" required> I own this number and agree to receive Zoomout iMessages, including a welcome and replies to links I send.</label>
 <button id="submit" type="submit">Register for iMessage</button></form>
+<p class="privacy">Your number is shared with our messaging provider for registration. Only register a number you own.</p>
 <p id="status" role="status" aria-live="polite"></p><section id="result" hidden>
 <p id="assigned"></p><a id="messages" class="messages">Open Messages</a>
-<p><small>Sending and receiving a message verifies the connection. Registration alone does not confirm delivery.</small></p></section>
-<section class="qr"><h2>Open signup on your phone</h2><a href="/imessage/qr.svg"><img src="/imessage/qr.svg" alt="QR code linking to Quantro iMessage signup"></a>
-<p>Scan the code or open this page on your iPhone.</p></section>
+<p><small>Sending and receiving a message verifies the connection. Registration alone does not confirm delivery.</small></p></section></section>
+<section class="qr"><a href="/imessage/qr.svg"><img src="/imessage/qr.svg" alt="QR code linking to Zoomout iMessage signup"></a><div><h2>On your computer?</h2>
+<p>Scan to open signup on your iPhone.</p></div></section></div></main>
+<footer><div class="wrap footer-inner"><span>The full record, in context.</span><span>Zoomout · Built at HackNC</span></div></footer>
 <script>
 const form=document.getElementById('signup'),button=document.getElementById('submit'),status=document.getElementById('status'),result=document.getElementById('result');
 form.addEventListener('submit',async(event)=>{event.preventDefault();button.disabled=true;result.hidden=true;status.textContent='Registering your number…';
 try{const response=await fetch('/imessage/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone_number:document.getElementById('phone').value.trim(),consent:document.getElementById('consent').checked})});
 const body=await response.json();if(!response.ok)throw new Error(body.error?.message||'Signup is temporarily unavailable.');
-document.getElementById('assigned').textContent='Your assigned Quantro number: '+body.assigned_phone_number;
+document.getElementById('assigned').textContent='Your assigned Zoomout number: '+body.assigned_phone_number;
 document.getElementById('messages').href=body.open_messages_url;result.hidden=false;
 status.textContent=(body.already_enrolled?'Your number is already registered. ':'Your number is registered. ')+(body.welcome_status==='accepted'?'A welcome message was accepted for sending. Check Messages or use the link below.':'Welcome delivery is unconfirmed. Use Open Messages to start.');
 }catch(error){status.textContent=error instanceof Error?error.message:'Signup is temporarily unavailable.';}finally{button.disabled=false;}});
