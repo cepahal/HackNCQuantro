@@ -1,12 +1,12 @@
 """Real FFmpeg contract tests; no external network or database required."""
 import asyncio
-import json
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace as N
 from unittest.mock import AsyncMock
 
 import pytest
+
 from backend.services.resolution import context_video as cv
 
 
@@ -48,7 +48,13 @@ def test_silent_input_and_invalid_bounds(source,tmp_path):
 
 
 def test_persists_before_return_and_cleans_scratch(source,monkeypatch):
-    from backend.services.shared.types import Post,MediaAsset,Author,Engagement,Retrieval
+    from backend.services.shared.types import (
+        Author,
+        Engagement,
+        MediaAsset,
+        Post,
+        Retrieval,
+    )
     post=Post(post_id='source',post_url='https://youtube.com/watch?v=e50Tt9qJRQk',platform='youtube',
               author=Author(),engagement=Engagement(),media=MediaAsset(media_id='source',mime_type='video/mp4',local_path=str(source)),
               retrieval=Retrieval(retrieved_at='2026-10-11T00:00:00Z',provider='test'))
@@ -111,3 +117,95 @@ def test_empty_alignment_is_rejected_before_ffmpeg_encoding(source, tmp_path):
     with pytest.raises(ValueError, match="No aligned passages"):
         cv.encode(source, tmp_path / "empty.mp4", {"start_seconds": 0., "end_seconds": 7.}, N(matches=[]))
     assert not (tmp_path / "empty.mp4").exists()
+
+
+def test_export_recovers_tiger_source_without_network(monkeypatch):
+    import hashlib
+    data = b"stored mp4 bytes"
+    class Store:
+        closed = False
+        def read_media(self, media_id):
+            assert media_id == 'stored_source'
+            return 'video/mp4', data, hashlib.sha256(data).hexdigest()
+        def close(self): self.closed = True
+    store = Store()
+    monkeypatch.setattr(cv.TigerDataPostStore, 'from_env', lambda: store)
+    download = AsyncMock(side_effect=AssertionError('network must not be used'))
+    monkeypatch.setattr(cv, 'download_short_media', download)
+    paths = []
+    def encode(post, path, output, selection, alignment):
+        paths.append(Path(path))
+        assert paths[-1].read_bytes() == data and store.closed
+        return 'stored_asset'
+    monkeypatch.setattr(cv, '_encode_and_store', encode)
+    post = N(media=N(local_path='', media_id='stored_source'), post_url='https://example.com/source')
+    assert asyncio.run(cv.export(post, N(matches=[]), {})) == 'stored_asset'
+    download.assert_not_awaited()
+    assert not paths[0].exists()
+
+
+@pytest.mark.parametrize('mime,digest', [('image/jpeg', 'valid'), ('video/mp4', 'corrupt')])
+def test_cached_source_rejects_wrong_mime_or_digest(monkeypatch, tmp_path, mime, digest):
+    import hashlib
+    data = b'cached bytes'
+    class Store:
+        closed = False
+        def read_media(self, media_id):
+            return mime, data, hashlib.sha256(data).hexdigest() if digest == 'valid' else '0' * 64
+        def close(self): self.closed = True
+    store = Store()
+    monkeypatch.setattr(cv.TigerDataPostStore, 'from_env', lambda: store)
+    output = tmp_path / 'cached.mp4'
+    assert cv._cached_source('source', output) is None
+    assert store.closed and not output.exists()
+
+
+def test_existing_local_source_has_priority_over_tiger(monkeypatch, tmp_path):
+    path = tmp_path / 'source.mp4'
+    path.write_bytes(b'local')
+    monkeypatch.setattr(cv, '_cached_source', lambda *a: pytest.fail('cache must not be read'))
+    monkeypatch.setattr(cv, 'download_short_media', AsyncMock(side_effect=AssertionError('network must not be used')))
+    monkeypatch.setattr(cv, '_encode_and_store', lambda post, source, *a: str(source))
+    post = N(media=N(local_path=str(path), media_id='source'), post_url='https://example.com/source')
+    assert asyncio.run(cv.export(post, N(matches=[]), {})) == str(path)
+    assert path.exists()
+
+
+def test_tiger_failure_falls_back_to_guarded_download(monkeypatch):
+    def unavailable():
+        raise RuntimeError('private storage diagnostic')
+    monkeypatch.setattr(cv.TigerDataPostStore, 'from_env', unavailable)
+    async def download(url, dest_dir):
+        path = Path(dest_dir) / 'download.mp4'
+        path.write_bytes(b'download')
+        return {'file_path': str(path)}
+    mock = AsyncMock(side_effect=download)
+    monkeypatch.setattr(cv, 'download_short_media', mock)
+    monkeypatch.setattr(cv, '_encode_and_store', lambda post, path, *a: Path(path).read_bytes())
+    post = N(media=N(local_path='', media_id='source'), post_url='https://example.com/source')
+    assert asyncio.run(cv.export(post, N(matches=[]), {})) == b'download'
+    mock.assert_awaited_once()
+
+
+def test_probe_rejects_network_playlist(tmp_path):
+    # Do not follow URLs or local references from autodetected playlist formats.
+    path = tmp_path / 'untrusted.m3u8'
+    path.write_text('#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXTINF:5,\nhttp://127.0.0.1:9/private.ts\n#EXT-X-ENDLIST\n')
+    with pytest.raises(subprocess.CalledProcessError) as error:
+        cv._probe(path)
+    assert 'whitelist' in error.value.stderr.lower()
+
+
+def test_probe_and_encode_restrict_source_protocols(source, tmp_path, monkeypatch):
+    commands = []
+    run = cv._run
+    def capture(args):
+        commands.append(args)
+        return run(args)
+    monkeypatch.setattr(cv, '_run', capture)
+    cv.encode(source, tmp_path / 'restricted.mp4', {'start_seconds': 0., 'end_seconds': 4.},
+              N(matches=[N(source_start_seconds=1., source_end_seconds=3.)]))
+    for command in commands:
+        assert command[command.index('-protocol_whitelist') + 1] == 'file'
+        assert command[command.index('-format_whitelist') + 1] == 'mov,matroska,webm'
+    assert any(command[0] == 'ffmpeg' for command in commands)

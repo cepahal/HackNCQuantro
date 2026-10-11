@@ -1,3 +1,5 @@
+FROM denoland/deno:bin-2.9.7 AS deno
+
 FROM node:24-bookworm-slim AS photon
 WORKDIR /photon
 COPY services/photon/package.json services/photon/package-lock.json ./
@@ -13,6 +15,10 @@ RUN apt-get update \
 # Matching Debian releases keep the official Node binary's runtime ABI compatible.
 COPY --from=photon /usr/local/bin/node /usr/local/bin/node
 RUN node --version
+
+# No-permissions JavaScript challenge runtime used by the guarded yt-dlp worker.
+COPY --from=deno /deno /usr/local/bin/deno
+RUN deno --version
 
 # Every module imports through the `backend.` package, and main.py puts its parent
 # directory on sys.path, so the service root must live at /app/backend.

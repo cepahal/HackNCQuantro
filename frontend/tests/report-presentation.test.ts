@@ -182,7 +182,9 @@ test("without verification the view centers recorded candidate options without a
   assert.match(primary, /Top candidate recording/);
   assert.match(primary, /Unverified lead/);
   assert.match(primary, /Recheck Possible related recording/);
-  assert.doesNotMatch(primary, /Source analysis|Four layers|Verified speech match|<iframe|<video/);
+  assert.doesNotMatch(primary, /Source analysis|Four layers|Verified speech match|<iframe/);
+  assert.match(primary, /aria-label="Submitted excerpt"/);
+  assert.equal((primary.match(/<video/g) ?? []).length, 1);
   assert.equal((primary.match(/<button/g) ?? []).length, 4);
   assert.match(primary, /Search leads are not verified matches/);
   const otherLeads = html.split("Other source candidates")[1]!.split('aria-label="Evidence strength"')[0]!;
@@ -210,7 +212,8 @@ test("stale unmatched source fields cannot acquire a verified label in the main 
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
   const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
   assert.match(primary, /A source has not been confirmed yet/);
-  assert.doesNotMatch(primary, /Verified speech match|Source analysis|Four layers|<video/);
+  assert.doesNotMatch(primary, /Verified speech match|Source analysis|Four layers/);
+  assert.equal((primary.match(/<video/g) ?? []).length, 1);
 });
 
 test("diagnostic mode preserves old panels in a hidden container and shows every saved field", () => {
@@ -298,4 +301,17 @@ test("missing generated context stays hidden while submitted and matched recordi
   assert.match(primary, /aria-label="Matched source recording"/);
   assert.equal((primary.match(/<video/g) ?? []).length, 2);
   assert.doesNotMatch(primary, /Splice assessment|Generation time/);
+});
+
+
+test("no-match retains submitted video while hiding matched and generated video results", () => {
+  const value = unmatchedReport();
+  value.limitations = [];
+  value.context_video = { ...report().source!.post.media, media_id: "context_stale", playback_url: "https://api.example/media/context_stale" };
+  const html = renderToStaticMarkup(createElement(ReportContent, {report:value,display:display(value)}));
+  const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
+  assert.match(primary, /aria-label="Submitted video"/);
+  assert.match(primary, /aria-label="Submitted excerpt"/);
+  assert.equal((primary.match(/<video/g) ?? []).length, 1);
+  assert.doesNotMatch(primary, /aria-label="Matched source recording"|aria-label="Spliced context video"|context_stale/);
 });

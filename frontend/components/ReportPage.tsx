@@ -138,6 +138,10 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
    {verifiedSource && report.context_video && <p className={styles.note}>Generated from the matched recording, with timed labels for the excerpt and surrounding context.</p>}
   </section>
   </div>}
+  {!analytics.isVideoDetected&&<section className={styles.primarySource} aria-label="Submitted video">
+   <div className={styles.primaryHead}><h2>Submitted video</h2></div>
+   <div className={styles.primaryVideo}><ReportPlayer media={submitted} label="Submitted excerpt"/></div>
+  </section>}
   {!analytics.isVideoDetected&&<SourceOptions options={leads.slice(0,4)} isVideoDetected={false} pendingUrl={pendingUrl} error={sourceError} onSelect={recheck}/>}
   <div hidden={!sourceError} data-testid="error-diagnostics">
    <DiagnosticPanel key={report.job_id} report={report} display={display} initialDiagnostics={diagnostics} onDiagnostics={setCaptured}/>

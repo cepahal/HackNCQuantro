@@ -1,6 +1,8 @@
 """Sentence-bounded original-source export, persisted via the existing media store."""
 import asyncio
+import hashlib
 import json
+import logging
 import math
 import subprocess
 import tempfile
@@ -8,12 +10,14 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace as N
 
+from ..external_apis.tigerdata_storage import TigerDataPostStore
+from ..shared.types import Context, MediaAsset, PublicMediaAsset
 from . import sentence_context
 from .alignment import _coverage
 from .context_badge import render_cue
 from .download import _find_tool, download_short_media
-from ..external_apis.tigerdata_storage import TigerDataPostStore
-from ..shared.types import Context, MediaAsset, PublicMediaAsset
+
+logger = logging.getLogger(__name__)
 
 
 def select(alignment, features):
@@ -42,7 +46,9 @@ def _run(args):
 
 
 def _probe(path):
-    return json.loads(_run(['ffprobe','-v','error','-show_streams','-show_format','-of','json',str(path)]).stdout)
+    return json.loads(_run(['ffprobe','-v','error','-protocol_whitelist','file',
+                            '-format_whitelist','mov,matroska,webm',
+                            '-show_streams','-show_format','-of','json',str(path)]).stdout)
 
 
 def _duration(stream, info):
@@ -91,7 +97,8 @@ def encode(source_path, output, selection, alignment):
         spans.append(('CONTEXT AFTER', cursor, end, '#38bdf8'))
     cues = [{'label':label,'start_seconds':a-start,'end_seconds':b-start,'color':color}
             for label,a,b,color in spans]
-    args = ['ffmpeg','-nostdin','-y','-v','error','-ss',str(start),'-i',str(source_path)]
+    args = ['ffmpeg','-nostdin','-y','-v','error','-ss',str(start),
+            '-protocol_whitelist','file','-format_whitelist','mov,matroska,webm','-i',str(source_path)]
     filters = ['[0:v]setpts=PTS-STARTPTS,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v0]']
     for i,cue in enumerate(cues):
         badge = Path(output).parent / f'cue_{i}.png'
@@ -131,17 +138,47 @@ def _encode_and_store(source, source_path, output, selection, alignment):
     return PublicMediaAsset.model_validate(asset.model_dump(exclude={'local_path'}))
 
 
+def _cached_source(media_id, output):
+    """Recover only verified stored MP4 bytes into an owned scratch path."""
+    store = None
+    try:
+        store = TigerDataPostStore.from_env()
+        stored = store.read_media(media_id)
+    except Exception:  # noqa: BLE001 - Optional cache failures retain guarded download fallback.
+        return None
+    finally:
+        if store is not None:
+            try:
+                store.close()
+            except Exception:  # noqa: BLE001 - Cache cleanup cannot replace a usable download fallback.
+                logger.warning('Tiger source cache connection cleanup failed')
+    if stored is None:
+        return None
+    mime, data, digest = stored
+    if mime != 'video/mp4' or not isinstance(data, bytes) or not data or hashlib.sha256(data).hexdigest() != digest:
+        return None
+    Path(output).write_bytes(data)
+    return str(output)
+
+
+async def _owned_worker(function, *args):
+    task = asyncio.create_task(asyncio.to_thread(function, *args))
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        # Keep scratch inputs alive until the worker releases them.
+        await asyncio.gather(task, return_exceptions=True)
+        raise
+
+
 async def export(source, alignment, selection):
     """Only expose a media ID after durable storage succeeds; always clean scratch."""
     with tempfile.TemporaryDirectory(prefix='quantro-context-') as td:
         path = source.media.local_path
         if not path or not Path(path).is_file():
-            download = await download_short_media(source.post_url,dest_dir=td)
-            path = download['file_path']
-        task = asyncio.create_task(asyncio.to_thread(_encode_and_store,source,path,Path(td)/'context.mp4',selection,alignment))
-        try:
-            return await asyncio.shield(task)
-        except asyncio.CancelledError:
-            # Do not delete inputs while the encoding/storage worker still owns them.
-            await asyncio.gather(task,return_exceptions=True)
-            raise
+            media_id = getattr(source.media, 'media_id', None)
+            path = await _owned_worker(_cached_source, media_id, Path(td)/'cached-source.mp4') if media_id else None
+            if not path:
+                download = await download_short_media(source.post_url, dest_dir=td)
+                path = download['file_path']
+        return await _owned_worker(_encode_and_store, source, path, Path(td)/'context.mp4', selection, alignment)

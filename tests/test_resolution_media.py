@@ -63,6 +63,7 @@ def isolated_cache(monkeypatch, tmp_path):
     def unavailable(*args):
         raise QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST)
     monkeypatch.setattr(remote_youtube, "build_remote_youtube_report", unavailable)
+    monkeypatch.setattr(transcribe, "_fetch_hosted_captions", lambda *args, **kwargs: None)
     monkeypatch.setattr(transcribe, "_CAPTION_CACHE_DIR", tmp_path / "captions")
     monkeypatch.setattr(download, "DOWNLOADS_DIR", tmp_path / "downloads")
     monkeypatch.setattr(transcribe, "_transcript_api_blocked_until", 0.0)

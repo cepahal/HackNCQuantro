@@ -8,15 +8,18 @@ import logging
 import math
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlencode
 
+from ..external_apis._retrieval_worker import _audit_network
 from ..external_apis.retrieve_post import RetrievalError, _validate_url
 
 logger = logging.getLogger(__name__)
@@ -103,10 +106,8 @@ def _build_ydl_opts(out_dir: str, mode: Mode) -> dict[str, Any]:
     cookies = os.getenv("YTDLP_COOKIES_FILE")
     if cookies and Path(cookies).is_file():
         options["cookiefile"] = cookies
-    for name in ("deno", "node"):
-        if runtime := _find_tool(name):
-            options["js_runtimes"] = {name: {"path": runtime}}
-            break
+    if runtime := _find_tool("deno"):
+        options["js_runtimes"] = {"deno": {"path": runtime}}
     return options
 
 
@@ -140,6 +141,55 @@ def _classify_error(exc: BaseException) -> tuple[str, str]:
     return "download_failed", "The platform could not provide this video."
 
 
+_DENO_FLAGS = frozenset({
+    "--no-config", "--no-remote", "--no-npm", "--cached-only", "--no-prompt",
+    "--ext=js", "--no-lock", "--node-modules-dir=none", "--no-code-cache",
+})
+_CHILD_ENV_KEYS = frozenset({"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR", "HOME",
+                             "MEDIA_TOOLS_DIR", "YTDLP_COOKIES_FILE", "SSL_CERT_FILE", "SSL_CERT_DIR",
+                             "LANG", "LC_ALL", "LC_CTYPE"})
+
+
+def _child_environment(environment):
+    """Media workers and JS solvers do not need application provider secrets."""
+    return {key: value for key, value in environment.items() if key.upper() in _CHILD_ENV_KEYS}
+
+
+def _resolver_audit(event, arguments):
+    """Permit only a no-permissions Deno stdin solver; keep every network guard."""
+    if event != "subprocess.Popen":
+        return _audit_network(event, arguments)
+    executable, argv, cwd, environment = arguments
+    runtime = _find_tool("deno")
+    # Windows audit events contain the final command line rather than an argv list.
+    if os.name == "nt" and isinstance(argv, str):
+        try:
+            parsed = [part.removeprefix('"').removesuffix('"') for part in shlex.split(argv, posix=False)]
+            argv = parsed if subprocess.list2cmdline(parsed) == argv else None
+        except ValueError:
+            argv = None
+    if not runtime or not isinstance(argv, (list, tuple)) or not argv:
+        return _audit_network(event, arguments)
+    try:
+        same_binary = Path(executable or argv[0]).resolve() == Path(runtime).resolve() == Path(argv[0]).resolve()
+    except (TypeError, ValueError, OSError):
+        same_binary = False
+    flags = list(argv[2:-1])
+    version = list(argv[1:]) == ["--version"]
+    solver = (len(argv) == len(_DENO_FLAGS) + 3 and argv[1] == "run" and argv[-1] == "-"
+              and len(flags) == len(set(flags)) and set(flags) == _DENO_FLAGS)
+    if not same_binary or cwd is not None or not (version or solver):
+        return _audit_network(event, arguments)
+    # CPython may serialize env before the audit event; validate instead of mutating.
+    child_env = os.environ if environment is None else environment
+    if not isinstance(child_env, Mapping) or any(
+        key.upper() not in _CHILD_ENV_KEYS
+        and not (key.upper() in {"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"} and value == "")
+        for key, value in child_env.items()
+    ):
+        return _audit_network(event, arguments)
+
+
 def _guarded_call(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Isolate DNS/redirect checks and audit hooks from the long-running API process."""
     try:
@@ -158,6 +208,7 @@ def _guarded_call(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
             errors="replace",
             cwd=Path(__file__).resolve().parents[3],
             timeout=20 if operation == "oembed" else 240,
+            env=_child_environment(os.environ),
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
@@ -239,7 +290,95 @@ def _resolve_file_path(info: dict[str, Any], out_dir: str) -> str:
 
 
 def _download_sync(url: str, out_dir: str, mode: Mode) -> dict[str, Any]:
-    return _guarded_call("download", {"url": url, "out_dir": out_dir, "mode": mode})
+    payload = {"url": url, "out_dir": out_dir, "mode": mode}
+    try:
+        return _guarded_call("download", payload)
+    except MediaDownloadError as exc:
+        if mode != "video" or exc.code != "format_unavailable":
+            raise
+    # Only missing combined formats justify the adaptive-stream fallback.
+    split_dir = Path(out_dir) / "adaptive"
+    split_dir.mkdir()
+    result = _guarded_call("download_split", {**payload, "out_dir": str(split_dir)})
+    from ..external_apis.retrieve_post import _is_complete_mp4
+
+    paths = [split_dir / "video.mp4", split_dir / "audio.m4a"]
+    total = 0
+    for path in paths:
+        if path.is_symlink() or not path.is_file():
+            raise MediaDownloadError("download_failed", "A downloaded stream is unavailable.", url)
+        total += path.stat().st_size
+        if total > _MAX_DOWNLOAD_BYTES:
+            raise MediaDownloadError("file_too_large", "Combined media exceeds the download budget.", url)
+        if not _is_complete_mp4(path, path.stat().st_size):
+            raise MediaDownloadError("download_failed", "A downloaded stream is invalid.", url)
+    tool = _find_tool("ffmpeg")
+    if not tool:
+        raise MediaDownloadError("download_failed", "Local media tools are unavailable.", url)
+    output = Path(out_dir) / "adaptive.mp4"
+    args = [tool, "-nostdin", "-v", "error", "-y"]
+    for path in paths:
+        args.extend(["-protocol_whitelist", "file", "-f", "mov", "-i", str(path)])
+    args.extend(["-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-map_metadata", "-1",
+                 "-movflags", "+faststart", "-f", "mp4", str(output)])
+    subprocess.run(args, check=True, capture_output=True, timeout=120)
+    if output.is_symlink() or not output.is_file() or output.stat().st_size > _MAX_DOWNLOAD_BYTES:
+        raise MediaDownloadError("file_too_large", "Merged media exceeds the download budget.", url)
+    if not _is_complete_mp4(output, output.stat().st_size):
+        raise MediaDownloadError("download_failed", "Merged media is invalid.", url)
+    return {"info": result["info"], "file_path": str(output)}
+
+
+def _download_split_worker(yt_dlp, url, output):
+    """Native HTTPS stream downloads only; the API process owns local muxing."""
+    from ..external_apis._retrieval_worker import (
+        SplitMediaTooLargeError,
+        _budgeted_streams,
+    )
+
+    completed = 0
+    def budget(progress):
+        if completed + (progress.get("downloaded_bytes") or 0) > _MAX_DOWNLOAD_BYTES:
+            raise MediaDownloadError("file_too_large", "Combined media exceeds the download budget.", url)
+    options = _build_ydl_opts(output, "video")
+    options.update(format="bv[ext=mp4][vcodec^=avc1][height<=720][protocol=https]+ba[ext=m4a][protocol=https]",
+                   progress_hooks=[budget])
+    with yt_dlp.YoutubeDL(options) as downloader:
+        info = downloader.extract_info(url, download=False)
+        if not isinstance(info, dict) or info.get("entries") is not None or info.get("is_live") or info.get("live_status") in {"is_live", "is_upcoming", "post_live"}:
+            raise ValueError("Only finished single recordings are supported")
+        # Prefer a compact source copy, retaining higher resolution only if needed.
+        formats = info.get("formats") or []
+        compact = [stream for stream in formats if stream.get("vcodec") in (None, "none")
+                   or 0 < (stream.get("height") or 0) <= 360]
+        selection_info = {**info, "formats": compact} if any(
+            stream.get("ext") == "mp4" and stream.get("vcodec") not in (None, "none")
+            for stream in compact) else info
+        try:
+            streams = _budgeted_streams(selection_info, _MAX_DOWNLOAD_BYTES)
+        except SplitMediaTooLargeError as exc:
+            raise MediaDownloadError("file_too_large", "Combined media exceeds the download budget.", url) from exc
+        if len(streams) != 2:
+            raise ValueError("Separate video and audio streams are unavailable")
+        for stream, filename, extension in zip(streams, ("video.mp4", "audio.m4a"), ("mp4", "m4a")):
+            if stream.get("protocol") != "https" or stream.get("ext") != extension or stream.get("has_drm") or not str(stream.get("url", "")).startswith("https://"):
+                raise ValueError("Unsupported media stream")
+            path = Path(output) / filename
+            if path.exists() or path.is_symlink():
+                raise ValueError("Stream destination already exists")
+            downloader.params["max_filesize"] = _MAX_DOWNLOAD_BYTES - completed
+            success, _ = downloader.dl(str(path), {**info, **stream, "requested_formats": None})
+            if not success or path.is_symlink() or not path.is_file():
+                raise ValueError("Stream download failed")
+            completed += path.stat().st_size
+            if completed > _MAX_DOWNLOAD_BYTES:
+                raise MediaDownloadError("file_too_large", "Combined media exceeds the download budget.", url)
+        video, audio = streams
+        actual_info = {**info, "ext": "mp4", "vcodec": video.get("vcodec"),
+                       "acodec": audio.get("acodec")}
+        for key in ("width", "height", "fps"):
+            actual_info[key] = video.get(key)
+        return {"info": downloader.sanitize_info(actual_info)}
 
 
 def _extract_info_sync(url: str) -> dict[str, Any]:
@@ -295,7 +434,13 @@ async def download_short_media(
     staging.mkdir(parents=True, exist_ok=True)
     out_dir = tempfile.mkdtemp(prefix=f"{platform}_", dir=staging)
     try:
-        result = await asyncio.to_thread(_download_sync, url.strip(), out_dir, mode)
+        task = asyncio.create_task(asyncio.to_thread(_download_sync, url.strip(), out_dir, mode))
+        try:
+            result = await asyncio.shield(task)
+        except asyncio.CancelledError:
+            # The worker may still own downloads/mux inputs; do not delete them early.
+            await asyncio.gather(task, return_exceptions=True)
+            raise
         raw_source = Path(result["file_path"])
         source = raw_source.resolve()
         if (
@@ -342,14 +487,14 @@ def delete_download(result: dict[str, Any]) -> None:
 def _worker(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
     import socket
 
-    from ..external_apis._retrieval_worker import _audit_network, _public_getaddrinfo
+    from ..external_apis._retrieval_worker import _public_getaddrinfo
 
     # Preserve the established DNS and redirect guard for captions as well as media.
     for name in tuple(os.environ):
         if name.lower().endswith("_proxy"):
             os.environ.pop(name, None)
     socket.getaddrinfo = _public_getaddrinfo
-    sys.addaudithook(_audit_network)
+    sys.addaudithook(_resolver_audit)
     if operation == "oembed":
         from urllib.request import urlopen
 
@@ -400,6 +545,8 @@ def _worker(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
     url = payload["url"]
     detect_platform(url)
     output = payload.get("out_dir") or tempfile.gettempdir()
+    if operation == "download_split":
+        return _download_split_worker(yt_dlp, url, output)
     opts = _build_ydl_opts(output, payload.get("mode", "audio"))
     if operation == "metadata":
         opts.update(skip_download=True, ignore_no_formats_error=True)
@@ -436,7 +583,7 @@ if __name__ == "__main__":
             raise ValueError("Worker arguments are required.")
         response = _worker(sys.argv[2], json.loads(sys.stdin.read()))
     except Exception as exc:  # noqa: BLE001 - child boundary must redact arbitrary provider failures.
-        code, message = _classify_error(exc)
+        code, message = (exc.code, exc.message) if isinstance(exc, MediaDownloadError) else _classify_error(exc)
         response = {
             "error": True,
             "type": type(exc).__name__,
