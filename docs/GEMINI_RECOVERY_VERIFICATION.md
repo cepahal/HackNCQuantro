@@ -46,7 +46,7 @@ PASS: full YouTube pipeline, report_id and report_url.
 Elapsed seconds: 80.7
 GET /reports/report_job_yt_001 -> HTTP 200
 Source-match confidence: Moderate
-Submitted clip aligned: 38%
+Excerpt aligned: 38%
 Context-assessment confidence: Moderate
 Findings: 1
 Submitted/source transcript sentences: 2 5

@@ -5,7 +5,7 @@ import { percent } from "./format.ts";
 
 // Wording mirrors backend/services/reporting/display_report.py.
 export const SOURCE_MATCH_LABEL = "Source-match confidence";
-export const CLIP_COVERAGE_LABEL = "Submitted clip aligned";
+export const CLIP_COVERAGE_LABEL = "Excerpt aligned";
 export const CONTEXT_ASSESSMENT_LABEL = "Context-assessment confidence";
 export const CONFIDENCE_NOTE = "Confidence levels describe the available evidence; they are not calibrated probabilities.";
 export const NO_SOURCE_MESSAGE = "No verified source found";
@@ -53,7 +53,7 @@ export function confidenceDisplay(report: ReportV2): ConfidenceDisplay {
       label: CLIP_COVERAGE_LABEL,
       value: percent(quality.clip_coverage_ratio),
       description: quality.matched_clip_seconds === null
-        ? NOT_ASSESSED : `${quality.matched_clip_seconds} seconds aligned to the selected source.`,
+        ? NOT_ASSESSED : `${quality.matched_clip_seconds} seconds of the submitted excerpt aligned to the selected source.`,
     } : null,
     context_assessment: context,
     confidence_note: CONFIDENCE_NOTE,
@@ -79,18 +79,18 @@ export function secondsLabel(value: number | null | undefined): string {
 }
 
 const CONTEXT_SENTENCES: Record<ContextAssessment, string> = {
-  material_context_missing: "The surrounding source context suggests material context is missing from the submitted clip.",
-  no_material_difference_found: "No material difference was found between the clip and its surrounding source context.",
-  uncertain: "It is uncertain whether the surrounding source context changes the clip's meaning.",
+  material_context_missing: "The surrounding source context suggests material context is missing from the submitted excerpt.",
+  no_material_difference_found: "No material difference was found between the excerpt and its surrounding source context.",
+  uncertain: "It is uncertain whether the surrounding source context changes the excerpt's meaning.",
   not_assessed: "The surrounding context was not assessed.",
 };
 
 const CAPTION_SENTENCES: Record<CaptionAssessment, string> = {
-  supported_by_context: "The caption appears supported by the source context.",
-  contradicted_by_context: "The caption appears contradicted by the source context.",
-  uncertain: "It is uncertain whether the source context supports the caption.",
-  not_provided: "The post had no caption to assess.",
-  not_assessed: "The caption was not assessed.",
+  supported_by_context: "The post’s claim appears supported by the source transcript context.",
+  contradicted_by_context: "The post’s claim appears contradicted by the source transcript context.",
+  uncertain: "The transcript context does not establish whether the post’s claim is supported.",
+  not_provided: "The post had no claim to assess.",
+  not_assessed: "The post’s claim was not assessed.",
 };
 
 function sentence(text: string): string {
@@ -103,7 +103,7 @@ export function generatedSummary(report: ReportV2): string {
   const parts: string[] = [];
   const quality = report.outcome === "matched" ? report.alignment?.match_quality ?? null : null;
   if (report.outcome === "no_verified_match") {
-    parts.push(`${NO_SOURCE_MESSAGE} for this post. That does not establish that the clip is accurate or unedited.`);
+    parts.push(`${NO_SOURCE_MESSAGE} for this excerpt. That does not establish that the excerpt is accurate or unedited.`);
   } else if (!quality) {
     parts.push("A source recording was matched, but alignment details are unavailable.");
   } else {
@@ -113,7 +113,7 @@ export function generatedSummary(report: ReportV2): string {
       : `A source recording was matched with ${levelLabel(level).toLowerCase()} source-match confidence.`);
     if (quality.clip_coverage_ratio !== null) {
       const aligned = quality.matched_clip_seconds === null ? "" : ` (${Math.round(quality.matched_clip_seconds * 10) / 10} seconds)`;
-      parts.push(`${percent(quality.clip_coverage_ratio)} of the submitted clip${aligned} aligned to the selected source.`);
+      parts.push(`${percent(quality.clip_coverage_ratio)} of the submitted excerpt${aligned} aligned to the selected source.`);
     }
   }
   const comparison = report.comparison;

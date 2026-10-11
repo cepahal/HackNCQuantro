@@ -28,7 +28,7 @@ from ..shared.types import (
 )
 from ..shared.types import ReportV2 as _ReturnModel
 
-NO_VERIFIED_SOURCE_LIMITATION = "No verified source was found for the submitted clip."
+NO_VERIFIED_SOURCE_LIMITATION = "No verified source was found for the submitted excerpt."
 
 _STRIPPED_KEYS = frozenset(
     {"local_path", "image_path", "file_path", "credentials", "api_key", "token", "secret"}

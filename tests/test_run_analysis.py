@@ -89,7 +89,7 @@ def _comparison(context, caption):
         "assessment_confidence": {"level": "moderate", "method": "llm_rubric_v1",
                                   "basis": ["Surrounding context says the closure is temporary."],
                                   "limitations": ["Comparison uses transcript text only."]},
-        "summary": "The clip omits that the closure is temporary.",
+        "summary": "The excerpt omits that the closure is temporary.",
         "findings": [{"finding_id": "finding_001", "type": "omitted_context",
                       "explanation": "The source says repairs finish by summer.",
                       "evidence": [{"media_id": context["source_media_id"], "sentence_ids": [sentence["sentence_id"]],
@@ -181,11 +181,11 @@ def test_matched_end_to_end(client, store, upstream):
     assert report["alignment"]["status"] == "verified"
     assert report["alignment"]["match_quality"]["confidence"]["level"] == "moderate"
     assert report["context"]["windows"][0]["sentences"][-1]["text"].startswith("The repairs")
-    assert report["summary"] == "The clip omits that the closure is temporary."
+    assert report["summary"] == "The excerpt omits that the closure is temporary."
     assert store.get_job("job_match")["status"] == "completed"
     assert upstream["compare_calls"] == ["The bridge is closed forever."]
     assert upstream["provider"].sent == [
-        ("conv_1", ("The clip omits that the closure is temporary. "
+        ("conv_1", ("The excerpt omits that the closure is temporary. "
                    "View the evidence: https://quantro.test/reports/report_job_match"))
     ]
 
@@ -199,9 +199,9 @@ def test_empty_search_produces_no_verified_match(client, store, upstream):
     assert response.json()["outcome"] == "no_verified_match"
     report = client.get("/reports/report_job_empty").json()
     assert report["source"] is None and report["alignment"] is None and report["comparison"] is None
-    assert report["limitations"][0] == "No verified source was found for the submitted clip."
+    assert report["limitations"][0] == "No verified source was found for the submitted excerpt."
     assert upstream["compare_calls"] == []
-    assert upstream["provider"].sent[0][1].startswith("No verified source was found for this clip.")
+    assert upstream["provider"].sent[0][1].startswith("No verified source was found for this excerpt.")
 
 
 def test_search_failure_is_an_error_not_a_no_match(client, store, upstream):
@@ -312,7 +312,7 @@ def test_display_report_renders_no_verified_match(client, store, upstream):
 
     assert model.no_source_message == "No verified source found"
     assert model.source_match is None and model.source_panel is None
-    assert model.limitations[0] == "No verified source was found for the submitted clip."
+    assert model.limitations[0] == "No verified source was found for the submitted excerpt."
 
 
 def test_display_report_rejects_non_report_input():
@@ -723,7 +723,7 @@ def test_display_endpoint_uses_canonical_backend_display_model(client, upstream)
     assert response.status_code == 200
     assert response.json() == display_report(report).model_dump(mode="json")
     assert response.json()["source_match"]["label"] == "Source-match confidence"
-    assert response.json()["clip_coverage"]["label"] == "Submitted clip aligned"
+    assert response.json()["clip_coverage"]["label"] == "Excerpt aligned"
     assert response.json()["context_assessment"]["label"] == "Context-assessment confidence"
     assert "local_path" not in response.text and "/tmp/" not in response.text
 

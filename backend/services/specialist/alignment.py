@@ -115,7 +115,7 @@ def _align(clip, source, duration):
     if ambiguous:
         limits.append('A repeated passage has multiple source locations; its alignment was not accepted.')
     if not matches:
-        limits.append('No verified match does not establish that the submitted clip is authentic or unedited.')
+        limits.append('No verified match does not establish that the submitted excerpt is authentic or unedited.')
     intervals = merge_ranges([(m['clip_start_seconds'], m['clip_end_seconds']) for m in matches])
     seconds = sum(end - start for start, end in intervals)
     gaps, unmatched = [], []

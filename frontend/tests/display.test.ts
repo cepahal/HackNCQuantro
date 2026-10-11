@@ -18,7 +18,7 @@ test("a matched report shows three labelled blocks with level words and a rounde
     label: "Source-match confidence", value: "Moderate", basis: ["Two aligned sentences."], limitations: [],
   });
   assert.deepEqual(display.clip_coverage, {
-    label: "Submitted clip aligned", value: "50%", description: "3.5 seconds aligned to the selected source.",
+    label: "Excerpt aligned", value: "50%", description: "3.5 seconds of the submitted excerpt aligned to the selected source.",
   });
   assert.equal(display.context_assessment?.label, "Context-assessment confidence");
   assert.equal(display.context_assessment?.value, "Moderate");
@@ -73,9 +73,9 @@ test("without written summaries a matched report gets a deterministic paragraph 
   assert.equal(paragraph, generatedSummary(withoutSummaries));
   assert.equal(paragraph, [
     "A source recording was matched with moderate source-match confidence.",
-    "50% of the submitted clip (3.5 seconds) aligned to the selected source.",
-    "The surrounding source context suggests material context is missing from the submitted clip.",
-    "The caption appears contradicted by the source context.",
+    "50% of the submitted excerpt (3.5 seconds) aligned to the selected source.",
+    "The surrounding source context suggests material context is missing from the submitted excerpt.",
+    "The post’s claim appears contradicted by the source transcript context.",
     "Context-assessment confidence is moderate.",
     "Key finding: The source continues with a condition.",
     "The report lists 1 limitation.",
@@ -84,7 +84,7 @@ test("without written summaries a matched report gets a deterministic paragraph 
 
 test("the no-match paragraph states the absence of a source without claiming accuracy", () => {
   const paragraph = generatedSummary(noMatch);
-  assert.match(paragraph, new RegExp(`^${NO_SOURCE_MESSAGE} for this post\\. That does not establish`));
+  assert.match(paragraph, new RegExp(`^${NO_SOURCE_MESSAGE} for this excerpt\\. That does not establish`));
   assert.equal(reportSummary(noMatch), paragraph);
   assert.doesNotMatch(paragraph, /\d+%|100% accurate|confidence is high/i);
 });
@@ -104,8 +104,8 @@ test("generated summaries use the capped coverage percentage formatter", () => {
   report.summary = null;
   report.comparison!.summary = "";
   report.alignment!.match_quality.clip_coverage_ratio = 0.996;
-  assert.match(generatedSummary(report), /99% of the submitted clip/);
-  assert.doesNotMatch(generatedSummary(report), /100% of the submitted clip/);
+  assert.match(generatedSummary(report), /99% of the submitted excerpt/);
+  assert.doesNotMatch(generatedSummary(report), /100% of the submitted excerpt/);
 });
 
 test("seconds labels round to a tenth and keep unknowns as 'Not assessed'", () => {

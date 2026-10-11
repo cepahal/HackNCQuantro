@@ -61,7 +61,7 @@ logger = logging.getLogger(__name__)
 SEARCH_LIMIT = 5
 CONTEXT_OPTIONS = {"padding_seconds": 30.0, "merge_overlapping_windows": True}
 MULTIPLE_PLAUSIBLE_SOURCES = "Multiple plausible sources remain."
-NO_SOURCE_SUMMARY = "No verified source was found for this clip."
+NO_SOURCE_SUMMARY = "No verified source was found for this excerpt."
 
 _VIABLE_LEVELS = {ConfidenceLevel.HIGH, ConfidenceLevel.MODERATE}
 _LEVEL_RANK: dict[ConfidenceLevel, int] = {

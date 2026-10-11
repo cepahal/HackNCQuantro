@@ -30,7 +30,7 @@ from ..shared.types import (
 from ..shared.types import DisplayModel as _ReturnModel
 
 SOURCE_MATCH_LABEL = "Source-match confidence"
-CLIP_COVERAGE_LABEL = "Submitted clip aligned"
+CLIP_COVERAGE_LABEL = "Excerpt aligned"
 CONTEXT_ASSESSMENT_LABEL = "Context-assessment confidence"
 CONFIDENCE_NOTE = (
     "Confidence levels describe the available evidence; they are not calibrated probabilities."
@@ -77,7 +77,7 @@ def build_clip_coverage(
     if not 0 <= clip_coverage_ratio <= 1:
         raise _display_error("clip_coverage_ratio must be between 0 and 1")
     description = (
-        f"{matched_clip_seconds} seconds aligned to the selected source."
+        f"{matched_clip_seconds} seconds of the submitted excerpt aligned to the selected source."
         if matched_clip_seconds is not None
         else NOT_ASSESSED
     )

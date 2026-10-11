@@ -143,7 +143,7 @@ COMPARISON = {
     "context_assessment": "material_context_missing",
     "caption_assessment": "contradicted_by_context",
     "assessment_confidence": COMPARISON_CONFIDENCE,
-    "summary": "The clip omits that the closure is temporary.",
+    "summary": "The excerpt omits that the closure is temporary.",
     "findings": [{"finding_id": "finding_001", "type": "omitted_qualification",
                   "explanation": "The source says repairs finish by summer.",
                   "evidence": [{"media_id": "media_smoke_source",

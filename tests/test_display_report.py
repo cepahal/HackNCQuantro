@@ -57,9 +57,9 @@ def test_matched_report_labels():
 
     assert model.source_match.label == "Source-match confidence"
     assert model.source_match.value == "Moderate"
-    assert model.clip_coverage.label == "Submitted clip aligned"
+    assert model.clip_coverage.label == "Excerpt aligned"
     assert model.clip_coverage.value == "100%"
-    assert model.clip_coverage.description == "12.5 seconds aligned to the selected source."
+    assert model.clip_coverage.description == "12.5 seconds of the submitted excerpt aligned to the selected source."
     assert model.context_assessment.label == "Context-assessment confidence"
     assert model.context_assessment.value == "Low"
     assert model.confidence_note == CONFIDENCE_NOTE

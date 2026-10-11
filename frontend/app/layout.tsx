@@ -3,8 +3,8 @@ import "./globals.css";
 import PointerCursor from "../components/PointerCursor";
 
 export const metadata: Metadata = {
-  title: "Unzoom — You deserve the truth.",
-  description: "See the source, what changed, and the context left out of a post.",
+  title: "Zoomout — Political speeches in context.",
+  description: "Compare political debate and speech excerpts with their full recordings and surrounding context.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

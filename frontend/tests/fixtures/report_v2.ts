@@ -82,13 +82,13 @@ export const reportFixture = {
     context_assessment: "material_context_missing",
     caption_assessment: "contradicted_by_context",
     assessment_confidence: { ...confidence, basis: [...confidence.basis], limitations: [] },
-    summary: "The clip omits the qualifying sentence that follows.",
+    summary: "The excerpt omits the qualifying sentence that follows.",
     findings: [{
       finding_id: "f1", type: "omitted_qualifier", explanation: "The source continues with a condition.",
       evidence: [{ media_id: "media_source", sentence_ids: ["source_s1"], start_seconds: 101, end_seconds: 104.5, quote: "We will not raise taxes." }],
     }],
     limitations: [],
   },
-  summary: "The clip omits the qualifying sentence that follows.",
+  summary: "The excerpt omits the qualifying sentence that follows.",
   limitations: ["Transcript timestamps are estimates."],
 } satisfies ReportV2;

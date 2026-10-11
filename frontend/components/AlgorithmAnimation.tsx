@@ -6,7 +6,7 @@ import { useAnimate, useInView, useReducedMotion } from "framer-motion";
 const captions = [
   "Searching for the source.",
   "Candidate source found.",
-  "Mapping each clip to its timestamp.",
+  "Mapping each excerpt to its timestamp.",
   "Checking unmatched intervals.",
   "Showing surrounding context.",
 ];
@@ -169,7 +169,7 @@ export default function AlgorithmAnimation() {
         </div>
       </div>
       <p className="stage-caption">{captions[step]}</p>
-      <p className="sr-only">A source clip is found, aligned to a timeline, and separated into gaps so missing context can be restored.</p>
+      <p className="sr-only">A debate or speech recording is found, an excerpt is aligned to its timeline, and nearby context is surfaced.</p>
     </div>
   );
 }
