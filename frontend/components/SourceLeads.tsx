@@ -2,8 +2,8 @@ import type { ReportV2 } from "../lib/api-types";
 import { sourceLeads } from "../lib/source-leads";
 import styles from "./ReportSummary.module.css";
 
-export default function SourceLeads({ report }: { report: ReportV2 }) {
-  const leads = sourceLeads(report);
+export default function SourceLeads({ report, excludeUrl }: { report: ReportV2; excludeUrl?: string }) {
+  const leads = sourceLeads(report).filter(lead => lead.url !== excludeUrl);
   if (!leads.length) return null;
   return <section className="report-section" aria-label="Possible source recordings">
     <h2>Possible source recordings.</h2>

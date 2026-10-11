@@ -131,7 +131,7 @@ test("ordinary saved summaries are preserved by the existing parser", () => {
 test("recordings, transcripts, context, and technical evidence stay reachable in disclosures", () => {
   const value = report();
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
-  for (const wording of ["Compare the recordings", "Transcripts", "Surrounding source context", "Technical evidence", "Post details", "Limitations and retrieval notes", "We will not raise taxes."]) assert.ok(html.includes(wording), wording);
+  for (const wording of ["Matched source recording", "Submitted clip", "Transcripts", "Surrounding source context", "Technical evidence", "Post details", "Limitations and retrieval notes", "We will not raise taxes."]) assert.ok(html.includes(wording), wording);
   assert.match(html, /<details[^>]*><summary/);
   assert.doesNotMatch(html, /<details[^>]+ open/);
 });
@@ -146,4 +146,67 @@ test("unknown numeric coverage and edit counts stay unavailable instead of zero"
   assert.match(html, /confirmed added segments<\/dt><dd>Unavailable<\/dd>/);
   assert.doesNotMatch(html, /100% accurate|misinformation|deceptive intent confirmed/i);
   assert.equal(JSON.stringify(value), before);
+});
+
+function unmatchedReport(): ReportV2 {
+  const value = report();
+  value.outcome = "no_verified_match";
+  value.source = value.alignment = value.context = value.comparison = null;
+  value.limitations = [
+    "Unverified source candidate: https://www.youtube.com/watch?v=FX6GQSyxA-8",
+    "Unverified source candidate details: " + JSON.stringify({ url: "https://www.youtube.com/watch?v=FX6GQSyxA-8", title: "Top candidate recording", reason: "Highest ranked search lead, not verified." }),
+    "Unverified source candidate: https://www.youtube.com/watch?v=JFmUO6BvwDc",
+  ];
+  return value;
+}
+
+test("a verified source is the single prominent video and the submitted clip is collapsed", () => {
+  const value = report();
+  value.limitations.push("Unverified source candidate: https://www.youtube.com/watch?v=FX6GQSyxA-8");
+  const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
+  const primary = html.slice(0, html.indexOf('aria-label="Submitted clip"'));
+  assert.match(primary, /aria-label="Source video result"/);
+  assert.match(primary, /aria-label="Matched source recording"/);
+  assert.match(primary, /Verified speech match/);
+  assert.doesNotMatch(primary, /aria-label="Submitted excerpt"|youtube-nocookie/);
+  assert.ok(html.indexOf('aria-label="Source video result"') < html.indexOf('aria-label="Report verdict"'));
+  assert.match(html, /<details[^>]*aria-label="Submitted clip"[^>]*><summary/);
+  assert.doesNotMatch(html, /<details[^>]*aria-label="Submitted clip"[^>]* open|Compare the recordings/);
+});
+
+test("without verification only the highest-ranked lead is promoted and remains explicitly unverified", () => {
+  const value = unmatchedReport();
+  const before = JSON.stringify(value);
+  const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
+  const primary = html.slice(0, html.indexOf('aria-label="Submitted clip"'));
+  assert.match(primary, /Most likely source candidate|Top candidate recording/);
+  assert.match(primary, /Unverified lead/);
+  assert.match(primary, /youtube-nocookie.com\/embed\/FX6GQSyxA-8/);
+  assert.doesNotMatch(primary, /JFmUO6BvwDc|Verified speech match|aria-label="Submitted excerpt"/);
+  assert.match(primary, /have not been verified against the excerpt/);
+  const otherLeads = html.split("Other source candidates")[1]!.split('aria-label="Evidence strength"')[0]!;
+  assert.match(otherLeads, /JFmUO6BvwDc/);
+  assert.doesNotMatch(otherLeads, /FX6GQSyxA-8/);
+  assert.equal(JSON.stringify(value), before);
+});
+
+test("an unmatched report with no lead has a neutral empty source result and keeps input accessible", () => {
+  const value = unmatchedReport();
+  value.limitations = [];
+  const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
+  const primary = html.slice(0, html.indexOf('aria-label="Submitted clip"'));
+  assert.match(primary, /No source candidate found/);
+  assert.doesNotMatch(primary, /<video|<iframe|Verified speech match|data-assessment="difference"/);
+  assert.match(html, /aria-label="Submitted excerpt"/);
+  assert.doesNotMatch(html, /Other source candidates/);
+});
+
+test("stale unmatched source fields cannot acquire a verified label in the main result", () => {
+  const value = report();
+  value.outcome = "no_verified_match";
+  const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
+  const primary = html.slice(0, html.indexOf('aria-label="Submitted clip"'));
+  assert.match(primary, /Unverified lead/);
+  assert.match(primary, /aria-label="Unverified source candidate"/);
+  assert.doesNotMatch(primary, /Verified speech match/);
 });

@@ -31,7 +31,7 @@ def isolated_cache(monkeypatch, tmp_path):
     monkeypatch.setattr(download, "DOWNLOADS_DIR", tmp_path / "downloads")
     monkeypatch.setattr(transcribe, "_transcript_api_blocked_until", 0.0)
     monkeypatch.setattr(transcribe, "_ytdlp_captions_blocked_until", 0.0)
-    monkeypatch.delenv("RESOLUTION_DOWNLOAD_VIDEO", raising=False)
+    monkeypatch.setenv("RESOLUTION_DOWNLOAD_VIDEO", "false")
 
 
 @pytest.mark.parametrize(
@@ -356,7 +356,7 @@ async def test_caption_block_marker_survives_audio_error_normalization(
 
 
 @pytest.mark.asyncio
-async def test_youtube_default_does_not_download_video(monkeypatch):
+async def test_explicit_caption_only_mode_does_not_download_video(monkeypatch):
     monkeypatch.setattr(media, "get_video_transcript", AsyncMock(return_value=RESULT))
     monkeypatch.setattr(
         media,
@@ -399,3 +399,128 @@ async def test_untimed_text_never_fabricates_sentences():
     assert features.transcript.sentences == []
     assert features.transcript.status == TranscriptStatus.PARTIAL
     assert any("timestamps" in warning for warning in features.warnings)
+
+
+@pytest.mark.asyncio
+async def test_prototype_downloads_submitted_clip_and_reuses_it_for_transcription(
+    monkeypatch, tmp_path
+):
+    monkeypatch.delenv("RESOLUTION_DOWNLOAD_VIDEO", raising=False)
+    path = tmp_path / "clip.mp4"
+    path.write_bytes(b"media")
+    downloaded = {"file_path": str(path), "title": "Submitted speech", "duration": 20.0}
+    downloader = AsyncMock(return_value=downloaded)
+    speech = AsyncMock(return_value=RESULT)
+    monkeypatch.setattr(media, "download_short_media", downloader)
+    monkeypatch.setattr(media, "get_video_transcript", speech)
+    post, features = await media.resolve_media(URL)
+    downloader.assert_awaited_once_with(URL)
+    speech.assert_awaited_once_with(URL, str(path), known_info=downloaded)
+    assert post.media.local_path == str(path)
+    assert features.full_transcript_text == RESULT["transcript"]
+    assert "full_transcript_text" not in features.model_dump()
+
+
+@pytest.mark.asyncio
+async def test_hosted_caption_windows_preserve_full_search_text_and_unknown_duration():
+    result = {
+        **RESULT,
+        "source": "serpapi_captions",
+        "duration": None,
+        "duration_known": False,
+        "coverage": "partial",
+        "transcript": RESULT["transcript"] + " Final untimed words.",
+        "warnings": ["Cue windows are not word endpoints."],
+    }
+    post, features = await media.resolve_media(URL, transcript_result=result)
+    assert post.media.duration_seconds is None
+    assert features.duration_seconds == 20.0
+    assert features.transcript.status == TranscriptStatus.PARTIAL
+    assert features.full_transcript_text.endswith("Final untimed words.")
+    assert "Cue windows are not word endpoints." in features.warnings
+    assert "Final untimed words" not in " ".join(
+        s.text for s in features.transcript.sentences
+    )
+
+
+@pytest.mark.asyncio
+async def test_real_ffmpeg_output_is_used_by_whisper(monkeypatch, tmp_path):
+    import asyncio
+    import math
+    import struct
+    import subprocess
+    import wave
+    from pathlib import Path
+
+    ffmpeg = transcribe._find_tool("ffmpeg")
+    assert ffmpeg, "FFmpeg must be installed for this media integration check."
+    wav = tmp_path / "tone.wav"
+    with wave.open(str(wav), "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(16000)
+        audio.writeframes(
+            b"".join(
+                struct.pack("<h", int(2000 * math.sin(i * 440 * 2 * math.pi / 16000)))
+                for i in range(16000)
+            )
+        )
+    video = tmp_path / "clip.mp4"
+    await asyncio.to_thread(
+        subprocess.run,
+        [
+            ffmpeg,
+            "-nostdin",
+            "-y",
+            "-v",
+            "error",
+            "-i",
+            str(wav),
+            "-c:a",
+            "aac",
+            str(video),
+        ],
+        check=True,
+    )
+    received = []
+
+    async def whisper(path, url, platform):
+        received.append(Path(path))
+        assert Path(path).suffix == ".mp3"
+        assert Path(path).stat().st_size > 0
+        audio_present, duration = transcribe._probe_sync(Path(path))
+        assert audio_present and duration > 0
+        return {
+            "segments": [{"text": "Speech response", "start": 0.0, "end": 0.8}],
+            "transcript": "Speech response",
+            "duration": 1.0,
+        }
+
+    monkeypatch.setenv("GROQ_API_KEY", "offline-test")
+    monkeypatch.setattr(
+        transcribe,
+        "_fetch_youtube_captions_sync",
+        lambda _: (_ for _ in ()).throw(TranscriptsDisabled(VIDEO_ID)),
+    )
+    monkeypatch.setattr(transcribe, "_transcribe_with_groq", whisper)
+    result = await transcribe.get_video_transcript(URL, str(video))
+    assert len(received) == 1 and result["source"] == "groq_whisper"
+    assert result["segments"][0]["text"] == "Speech response"
+
+
+@pytest.mark.asyncio
+async def test_contradicted_search_duration_is_not_published():
+    result = {
+        **RESULT,
+        "source": "serpapi_captions",
+        "duration": None,
+        "duration_known": False,
+        "duration_hint_rejected": True,
+        "coverage": "partial",
+    }
+    post, features = await media.resolve_media(
+        URL, transcript_result=result, metadata={"duration": 10.0}
+    )
+    assert post.media.duration_seconds is None
+    assert features.duration_seconds == 20.0
+    assert features.transcript.status == TranscriptStatus.PARTIAL

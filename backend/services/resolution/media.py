@@ -9,6 +9,8 @@ import subprocess
 from datetime import UTC, datetime
 from typing import Any
 
+from pydantic import PrivateAttr
+
 from ..external_apis.retrieve_post import _source_url
 from ..shared.errors import ErrorCode, QuantroError, Stage
 from ..shared.types import (
@@ -30,6 +32,16 @@ from .download import (
     fetch_youtube_oembed,
 )
 from .transcribe import TranscriptionError, extract_youtube_id, get_video_transcript
+
+
+class _ResolvedFeatures(MediaFeatures):
+    """Carry complete discovery text privately without changing report JSON."""
+
+    _full_transcript_text: str = PrivateAttr(default="")
+
+    @property
+    def full_transcript_text(self) -> str:
+        return self._full_transcript_text
 
 
 def _number(value: Any, *, positive: bool = False) -> float | None:
@@ -116,20 +128,23 @@ async def resolve_media(
                 "Source playback uses YouTube; its video file was not downloaded. Analysis uses its timed transcript."
             )
     elif platform == "youtube":
-        # Request captions before attempting media. A bot challenge must not discard usable captions.
-        transcript = await _transcript_for_media(url, known_info=info or None)
-        if os.getenv("RESOLUTION_DOWNLOAD_VIDEO", "").lower() == "true":
+        # Follow the prototype: acquire the submitted clip, then prefer captions.
+        # A blocked recording must not discard independently available captions.
+        if os.getenv("RESOLUTION_DOWNLOAD_VIDEO", "true").lower() == "true":
             try:
                 download = await download_short_media(url)
                 info = {**download, **info}
             except MediaDownloadError:
                 warnings.append(
-                    "YouTube blocked the video download. The report uses its available timed transcript; visual and audio forensics were not assessed."
+                    "YouTube blocked the video download. Available captions can still be matched; audio and visual forensics were not assessed."
                 )
         else:
             warnings.append(
                 "YouTube playback uses the original recording; the video file was not downloaded."
             )
+        transcript = await _transcript_for_media(
+            url, download["file_path"] if download else None, known_info=info or None
+        )
         if not info.get("title") and not transcript.get("title"):
             try:
                 info = {**(await fetch_youtube_oembed(url)), **info}
@@ -144,6 +159,11 @@ async def resolve_media(
             url, download["file_path"], known_info=info
         )
 
+    warnings.extend(
+        warning
+        for warning in transcript.get("warnings", [])
+        if isinstance(warning, str)
+    )
     identity = hashlib.sha256(
         f"{platform}:{url}:{candidate_id or ''}".encode()
     ).hexdigest()[:24]
@@ -166,15 +186,23 @@ async def resolve_media(
             )
     sentences.sort(key=lambda item: (item.start_seconds, item.end_seconds))
     transcript_end = max((sentence.end_seconds for sentence in sentences), default=0.0)
+    recording_duration = (
+        None
+        if transcript.get("duration_hint_rejected") is True
+        else _number(info.get("duration"), positive=True)
+    )
+    if recording_duration is None and transcript.get("duration_known") is not False:
+        recording_duration = _number(transcript.get("duration"), positive=True)
     duration = max(
-        _number(info.get("duration")) or 0.0,
+        recording_duration or 0.0,
         _number(transcript.get("duration")) or 0.0,
         transcript_end,
     )
     if sentences:
         known_duration = _number(info.get("duration"))
         coverage_known = (
-            known_duration is not None
+            transcript.get("coverage") != "partial"
+            and known_duration is not None
             and known_duration > 0
             and sentences[0].start_seconds <= 3
             and transcript_end >= known_duration - 3
@@ -248,7 +276,7 @@ async def resolve_media(
             local_path=local_path,
             mime_type="video/mp4",
             playback_url=playback_url,
-            duration_seconds=duration or None,
+            duration_seconds=recording_duration,
             width=_count(info.get("width")) if download else None,
             height=_count(info.get("height")) if download else None,
             fps=_number(info.get("fps"), positive=True) if download else None,
@@ -262,7 +290,7 @@ async def resolve_media(
             warnings=list(warnings),
         ),
     )
-    features = MediaFeatures(
+    features = _ResolvedFeatures(
         media_id=media_id,
         duration_seconds=float(duration),
         language=None,
@@ -273,4 +301,5 @@ async def resolve_media(
         visual_text=[],
         warnings=list(warnings),
     )
+    features._full_transcript_text = _text(transcript.get("transcript")) or ""
     return post, features

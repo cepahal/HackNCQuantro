@@ -6,13 +6,14 @@ import Image from "next/image";
 import Navbar from "./Navbar";
 import AnalysisLoadingScreen from "./AnalysisLoadingScreen";
 import ReportPlayer from "./ReportPlayer";
-import ReportSummary, { ReportVerdict } from "./ReportSummary";
+import ReportSummary, { reportAssessment, ReportVerdict } from "./ReportSummary";
 import SourceLeads from "./SourceLeads";
 import { analysisInFlight, getReport, getDisplayModel, publicUrl, startAnalysis, waitForReport } from "../lib/api";
 import type { ReportV2 as Report, DisplayModel } from "../lib/api-types";
 import { errorDisplay, type ErrorDisplay } from "../lib/display";
 import { compact, date, percent, time, unique } from "../lib/format";
 import { summaryText } from "../lib/report-summary";
+import { sourceLeads } from "../lib/source-leads";
 import styles from "./ReportPage.module.css";
 
 export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:string|null}){
@@ -42,7 +43,7 @@ export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:
  return <><Navbar/><div className={styles.page}><main className={styles.main}>
   <header className={styles.header}>
    <Link className={styles.back} href="/">← New analysis</Link>
-   <div className={styles.heading}><div><p className={styles.eyebrow}>Zoomout / Results</p><h1>Context report</h1></div>
+   <div className={styles.heading}><div><p className={styles.eyebrow}>Zoomout / Results</p><h1>Source result</h1></div>
     <div className={styles.actions}><button className={styles.copyButton} onClick={copyLink}>{copyStatus.startsWith("Link copied")?"Copied":copyStatus.startsWith("Couldn’t")?"Copy failed":"Copy link"}<span aria-hidden="true">↗</span></button><span role="status" className="sr-only">{copyStatus}</span></div>
    </div>
   </header>
@@ -59,17 +60,41 @@ export function ReportContent({ report, display }: { report: Report; display: Di
   ...(alignment?.match_quality.confidence.limitations ?? []), ...(comparison?.assessment_confidence.limitations ?? []),
  ]);
  const findings = comparison?.findings.filter(finding => finding.evidence.length > 0) ?? [];
+ const verifiedSource = reportAssessment(report).items[0].tone === "supported" ? source : null;
+ const leads = sourceLeads(report);
+ const primaryLead = verifiedSource ? undefined : leads[0];
+ const candidateMedia = !verifiedSource && !primaryLead ? source : null;
+ const additionalLeadCount = leads.length - (primaryLead ? 1 : 0);
  return <article className={styles.report}>
+  <section className={styles.primarySource} aria-label="Source video result">
+   <div className={styles.primaryHead}>
+    <div><p className={styles.eyebrow}>{verifiedSource ? "Matched source recording" : primaryLead || candidateMedia ? "Most likely source candidate" : "Source recording"}</p>
+     <h2>{summaryText(verifiedSource?.post.title || primaryLead?.title || candidateMedia?.post.title || (verifiedSource ? "Matched recording" : "No source candidate found"))}</h2>
+    </div>
+    {(verifiedSource || primaryLead || candidateMedia) && <span className={`${styles.sourceStatus} ${verifiedSource ? styles.verifiedSource : styles.unverifiedSource}`}>
+     {verifiedSource ? "Verified speech match" : "Unverified lead"}
+    </span>}
+   </div>
+   {verifiedSource ? <div className={styles.primaryVideo}><ReportPlayer key={verifiedSource.post.media.media_id} media={verifiedSource} label="Matched source recording"/></div>
+    : primaryLead ? <div className={styles.candidatePlayer}>
+     <iframe src={primaryLead.preview} title={`Unverified source candidate: ${primaryLead.title}`} loading="lazy"
+      referrerPolicy="strict-origin-when-cross-origin"
+      allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen/>
+     <a href={primaryLead.url} target="_blank" rel="noopener noreferrer">Open candidate recording ↗</a>
+    </div>
+    : candidateMedia ? <div className={styles.primaryVideo}><ReportPlayer key={candidateMedia.post.media.media_id} media={candidateMedia} label="Unverified source candidate"/></div>
+      : <div className={styles.sourceEmpty}><span aria-hidden="true">○</span><p>No candidate recording is available for this excerpt yet.</p></div>}
+   <p className={styles.note}>{verifiedSource
+    ? "Matching speech was found in this recording. It may be a reupload; the earliest original upload has not been established."
+    : primaryLead || candidateMedia ? "This is the strongest available search lead. Its speech and surrounding context have not been verified against the excerpt."
+      : "No source found does not establish whether the excerpt is accurate or unedited."}</p>
+  </section>
+  <details className={styles.submittedClip} aria-label="Submitted clip">
+   <summary><span>Submitted clip</span><span>View the input <span aria-hidden="true">+</span></span></summary>
+   <div className={styles.submittedVideo}><ReportPlayer key={submitted.post.media.media_id} media={submitted} label="Submitted excerpt"/></div>
+  </details>
   <ReportVerdict report={report}/>
   <ReportSummary report={report}/>
-  <section className={styles.section} aria-label="Recordings">
-   <div className={styles.sectionHead}><h2>{source ? "Compare the recordings" : "Submitted recording"}</h2><span>{source ? "Excerpt + matched recording" : "Source comparison unavailable"}</span></div>
-   <div className={`${styles.recordings} ${!source ? styles.singleRecording : ""}`}>
-    <ReportPlayer key={submitted.post.media.media_id} media={submitted} label="Submitted excerpt"/>
-    {source&&<ReportPlayer key={source.post.media.media_id} media={source} label="Matched recording"/>}
-   </div>
-   {source&&<p className={styles.note}>A matching recording may be a reupload. The earliest original upload has not been established.</p>}
-  </section>
   {findings.length>0&&<section className={styles.section} aria-label="Cited findings"><h2>Evidence behind the result</h2>
    <div className={styles.findings}>{findings.slice(0,3).map(finding=><article className={styles.finding} key={finding.finding_id}>
     <p>{summaryText(finding.explanation)}</p>{finding.evidence.slice(0,2).map((evidence,index)=><figure key={`${evidence.media_id}-${index}`}>
@@ -77,7 +102,10 @@ export function ReportContent({ report, display }: { report: Report; display: Di
     </figure>)}
    </article>)}</div>
   </section>}
-  <div className={styles.sourceLeads}><SourceLeads report={report}/></div>
+  {additionalLeadCount>0&&<details className={`${styles.disclosure} ${styles.additionalLeads}`}>
+   <summary><span>Other source candidates</span><span className={styles.disclosureHint}>{additionalLeadCount} unverified {additionalLeadCount===1?"lead":"leads"}</span></summary>
+   <div className={styles.sourceLeads}><SourceLeads report={report} excludeUrl={primaryLead?.url}/></div>
+  </details>}
   <section className={styles.section} aria-label="Evidence strength">
    <h2>Evidence strength</h2>
    <dl className={styles.metrics}>

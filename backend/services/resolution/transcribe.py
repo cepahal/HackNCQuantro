@@ -37,6 +37,7 @@ from youtube_transcript_api import (
     YouTubeTranscriptApi,
 )
 
+from .captions_provider import CaptionProviderError, fetch_caption_transcript
 from .download import (
     MediaDownloadError,
     _build_ydl_opts,
@@ -77,6 +78,7 @@ class TranscriptionError(Exception):
     def __init__(self, code: str, message: str, url: str, platform: str | None = None):
         super().__init__(message)
         self.code, self.message, self.url, self.platform = code, message, url, platform
+        self.platform_challenge = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -187,15 +189,36 @@ def _read_caption_cache(video_id: str) -> dict[str, Any] | None:
         return cached
     # Old plain-text caches cannot supply alignment timestamps: refresh them.
     segments = _segments(cached.get("segments"))
-    if not segments:
+    hosted = cached.get("source") == "serpapi_captions"
+    if not segments and not (
+        hosted
+        and isinstance(cached.get("transcript"), str)
+        and cached["transcript"].strip()
+    ):
         return None
-    return _transcript_result(
+    result = _transcript_result(
         segments,
         text=str(cached.get("transcript") or cached.get("text") or ""),
         duration=_number(cached.get("duration", cached.get("end"))),
         source=str(cached.get("source") or "youtube_captions"),
         title=str(cached.get("title") or ""),
     )
+    if hosted:
+        warnings = cached.get("warnings")
+        known_duration = _number(cached.get("duration"))
+        result.update(
+            transcript=cached["transcript"],
+            duration=known_duration,
+            duration_known=known_duration is not None
+            and cached.get("duration_known") is True,
+            duration_hint_rejected=cached.get("duration_hint_rejected") is True,
+            coverage="partial",
+            timing_basis=str(cached.get("timing_basis") or "caption_cue_windows"),
+            warnings=[value for value in warnings if isinstance(value, str)]
+            if isinstance(warnings, list)
+            else [],
+        )
+    return result
 
 
 def _write_caption_cache(cache_file: Path, data: dict[str, Any]) -> None:
@@ -210,20 +233,45 @@ def _write_caption_cache(cache_file: Path, data: dict[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _fetch_youtube_captions_sync(video_id: str) -> dict[str, Any]:
+def _fetch_hosted_captions(
+    video_id: str, *, known_duration: float | None = None
+) -> dict[str, Any] | None:
+    try:
+        return fetch_caption_transcript(video_id, known_duration=known_duration)
+    except CaptionProviderError:
+        logger.info(
+            "Hosted caption provider unavailable; retaining the Whisper fallback."
+        )
+        return None
+
+
+def _fetch_youtube_captions_sync(
+    video_id: str, *, known_duration: float | None = None
+) -> dict[str, Any]:
     cached = _read_caption_cache(video_id)
+    cache_file = _CAPTION_CACHE_DIR / f"{video_id}.json"
     if cached is not None:
         if cached.get("no_captions"):
+            # This negative cache describes the native providers, not the hosted one.
+            hosted = _fetch_hosted_captions(video_id, known_duration=known_duration)
+            if hosted is not None:
+                _write_caption_cache(cache_file, hosted)
+                return hosted
             raise CachedNoCaptions(video_id)
         return cached
-    cache_file = _CAPTION_CACHE_DIR / f"{video_id}.json"
     try:
         result = _fetch_youtube_captions_uncached(video_id)
-    except _PERMANENT_CAPTION_ERRORS as exc:
-        _write_caption_cache(cache_file, {"no_captions": type(exc).__name__})
+        if not result.get("segments"):
+            raise NoCaptionsViaYtDlp(video_id)
+    except Exception as exc:
+        # Independent hosted captions precede the original audio fallback.
+        hosted = _fetch_hosted_captions(video_id, known_duration=known_duration)
+        if hosted is not None:
+            _write_caption_cache(cache_file, hosted)
+            return hosted
+        if isinstance(exc, _PERMANENT_CAPTION_ERRORS):
+            _write_caption_cache(cache_file, {"no_captions": type(exc).__name__})
         raise
-    if not result.get("segments"):
-        raise NoCaptionsViaYtDlp(video_id)
     _write_caption_cache(cache_file, result)
     return result
 
@@ -594,7 +642,10 @@ async def _transcribe_file(
 
 async def transcribe_youtube_audio(video_id: str) -> dict[str, Any]:
     cached = _read_caption_cache(video_id)
-    if cached is not None and cached.get("segments"):
+    if cached is not None and (
+        cached.get("segments")
+        or (cached.get("source") == "serpapi_captions" and cached.get("transcript"))
+    ):
         return cached
     url = f"https://www.youtube.com/watch?v={video_id}"
     if not os.getenv("GROQ_API_KEY"):
@@ -652,15 +703,33 @@ async def get_video_transcript(
     if video_id:
         captions_blocked = False
         try:
-            result = await asyncio.to_thread(_fetch_youtube_captions_sync, video_id)
-            if result.get("segments"):
+            known_duration = _number(metadata.get("duration"))
+            if known_duration:
+                result = await asyncio.to_thread(
+                    _fetch_youtube_captions_sync,
+                    video_id,
+                    known_duration=known_duration,
+                )
+            else:
+                result = await asyncio.to_thread(_fetch_youtube_captions_sync, video_id)
+            if result.get("segments") or (
+                result.get("source") == "serpapi_captions" and result.get("transcript")
+            ):
                 result = dict(result)
                 result["title"] = str(
                     metadata.get("title") or result.get("title") or ""
                 )
-                result["duration"] = max(
-                    result["duration"], _number(metadata.get("duration")) or 0.0
-                )
+                if result.get("source") == "serpapi_captions":
+                    result["duration"] = (
+                        None
+                        if result.get("duration_hint_rejected") is True
+                        else known_duration or _number(result.get("duration"))
+                    )
+                    result["duration_known"] = result["duration"] is not None
+                else:
+                    result["duration"] = max(
+                        _number(result["duration"]) or 0.0, known_duration or 0.0
+                    )
                 return result
         except Exception as exc:  # noqa: BLE001 - captions are optional and Whisper is the required fallback.
             captions_blocked = isinstance(exc, RequestBlocked)

@@ -15,11 +15,34 @@
 .sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
 .sectionHead > span { color: #7a8693; font-size: 11px; }
 .note { margin: 12px 0 0; color: #74808c; font-size: 12px; line-height: 1.7; }
-.recordings { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
-.singleRecording { grid-template-columns: minmax(0,1fr); max-width: 640px; }
-.recordings :global(.hatch) { padding: 0; background: none; }
-.recordings :global(.panel) { border-color: #d7dee5; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 6px #152c3e06; background: #fff; }
-.recordings video { max-height: 390px; }
+.primarySource { padding: 28px 30px 23px; margin-bottom: 12px; background: #fff; border: 1px solid #dce2e8; border-radius: 10px; box-shadow: 0 3px 14px #152c3e04; }
+.primaryHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+.primaryHead h2 { margin: 0; max-width: 65ch; color: #24303c; font-size: clamp(20px,2.3vw,27px); font-weight: 560; letter-spacing: -.025em; line-height: 1.4; overflow-wrap: anywhere; }
+.primaryHead .eyebrow { margin-bottom: 9px; }
+.sourceStatus { display: inline-flex; flex: 0 0 auto; margin-top: 2px; padding: 5px 9px; border-radius: 4px; font-size: 10px; line-height: 1.5; }
+.verifiedSource { color: #207448; background: #edf7f0; border: 1px solid #d6eadd; }
+.unverifiedSource { color: #697784; background: #f3f5f7; border: 1px solid #dfe5eb; }
+.primaryVideo,.candidatePlayer { width: min(880px,100%); margin-inline: auto; }
+.primaryVideo :global(.hatch),.submittedVideo :global(.hatch) { padding: 0; background: none; }
+.primaryVideo :global(.panel),.submittedVideo :global(.panel) { border-color: #d7dee5; border-radius: 7px; overflow: hidden; box-shadow: none; background: #fff; }
+.primaryVideo video { max-height: 560px; }
+.candidatePlayer { overflow: hidden; border: 1px solid #d7dee5; border-radius: 7px; background: #fff; }
+.candidatePlayer iframe { display: block; width: 100%; aspect-ratio: 16/9; border: 0; background: #101316; }
+.candidatePlayer a { display: inline-flex; min-height: 44px; align-items: center; padding: 12px 16px; color: #486a85; font-size: 12px; text-underline-offset: 3px; }
+.primarySource > .note { max-width: 880px; margin: 16px auto 0; }
+.sourceEmpty { min-height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #f8fafb; border: 1px solid #e2e7ed; border-radius: 7px; color: #83919d; padding: 24px; text-align: center; }
+.sourceEmpty > span { color: #a6b2bd; font-size: 30px; }
+.sourceEmpty p { font-size: 13px; line-height: 1.7; }
+.submittedClip { margin: 0 0 26px; padding: 0 19px; border: 1px solid #dce2e8; border-radius: 7px; background: #fff; }
+.submittedClip > summary { display: flex; justify-content: space-between; align-items: center; min-height: 55px; gap: 16px; color: #546675; font-size: 12px; font-weight: 550; cursor: pointer; list-style: none; }
+.submittedClip > summary::-webkit-details-marker { display: none; }
+.submittedClip > summary > span + span { color: #93a0ab; font-size: 11px; font-weight: 400; }
+.submittedClip > summary > span > span { margin-left: 12px; font-size: 18px; }
+.submittedClip[open] { padding-bottom: 19px; }
+.submittedClip > summary:focus-visible { outline: 2px solid #4d657e; outline-offset: 4px; }
+.submittedVideo { width: min(560px,100%); margin-inline: auto; }
+.submittedVideo video { max-height: 390px; }
+.additionalLeads { padding-inline: 0; border-top: 1px solid var(--report-line); }
 .findings { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(260px,100%),1fr)); gap: 14px; }
 .finding { padding: 20px 22px; background: #fff; border: 1px solid #dce2e8; border-radius: 8px; }
 .finding > p { margin: 0 0 14px; color: #3f4d5a; font-size: 14px; line-height: 1.65; }
@@ -95,8 +118,11 @@
   .copyButton { gap: 12px; }
   .sectionHead { display: block; }
   .sectionHead > span { display: block; margin: -9px 0 17px; }
-  .recordings,.transcripts,.postGrid { grid-template-columns: minmax(0,1fr); }
-  .recordings video { max-height: 360px; }
+  .primarySource { padding: 20px 17px 18px; }
+  .primaryHead { flex-direction: column; gap: 12px; margin-bottom: 17px; }
+  .primaryHead h2 { font-size: 20px; }
+  .primaryVideo video { max-height: 440px; }
+  .transcripts,.postGrid { grid-template-columns: minmax(0,1fr); }
   .metrics { grid-template-columns: minmax(0,1fr); }
   .metrics > div { padding: 16px 20px; }
   .metrics > div + div { border-left: 0; border-top: 1px solid #e5e9ed; }
