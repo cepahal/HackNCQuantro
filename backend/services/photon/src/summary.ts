@@ -115,8 +115,21 @@ function shortExplanation(value: string): string {
     : prefix.slice(0, end + 1);
 }
 
+function shortContext(value: string): string {
+  const text = plainText(value);
+  return text.length <= 650 ? text : `${text.slice(0, 649).trimEnd()}…`;
+}
+
 /** Use supplied report wording; formatting never infers truth, intent, or authenticity. */
 export function formatSummaryMessages(input: SummaryInput): readonly [string, string, string] {
+  const context = input.summary.trim().match(/^Context before:\s*([\s\S]+?)\n\s*\nContext after:\s*([\s\S]+)$/);
+  if (context?.slice(1).every(section => section.trim())) {
+    return [
+      `Context before: ${shortContext(context[1]!)}`,
+      `Context after: ${shortContext(context[2]!)}`,
+      `Full report:\n${input.report_url}`,
+    ];
+  }
   const parsed = input.summary.trim().match(/^Takeaways:\s*([\s\S]+?)\n\s*\nWhat this means:\s*([\s\S]+?)\n\s*\nReliability:\s*([\s\S]+)$/);
   const sections = parsed?.slice(1).every(section => section.trim()) ? parsed : null;
   const reliability = sections ? plainText(sections[3]!) : "Reliability is unconfirmed from this summary alone.";

@@ -18,7 +18,12 @@ from ..reporting.save_report import (
     report_id_for_job,
     save_report_and_complete_job,
 )
-from ..reporting.send_summary import DeliveryTracker, MessagingProvider, send_summary
+from ..reporting.send_summary import (
+    DeliveryTracker,
+    MessagingProvider,
+    format_context_summary,
+    send_summary,
+)
 from ..shared.config import environment, validate_search_settings
 from ..shared.errors import (
     ErrorCode,
@@ -104,7 +109,7 @@ def _deliver(
         try:
             send_summary(
                 conversation_id,
-                report.summary or "Analysis is ready. Read the evidence in the report.",
+                format_context_summary(report),
                 _report_url(report_id_for_job(report.job_id)),
                 job_id=report.job_id,
                 provider=provider,

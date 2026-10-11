@@ -251,11 +251,13 @@ Content-Type: application/json
 {"conversation_id":"original chat GUID","summary":"Evidence-backed summary","report_url":"https://your-host/reports/report_001"}
 ```
 
-Reports arrive as three texts in order: a reliability TL;DR, a short explanation,
-then the report link. The formatter reads the report's exact `Takeaways`,
-`What this means`, and `Reliability` sections. Older free-form summaries receive
-a neutral reliability TL;DR. Text uses plain wording without em dashes; the first
-message is at most 247 characters and the explanation at most 650.
+New analysis replies arrive as three texts: `Context before: ...`,
+`Context after: ...`, then the report link. The backend selects the nearest whole
+source sentence before and after the verified matched passage, using the saved
+source transcript and its linked context windows. Each side is bounded to 650
+characters and explicitly says when source context is unavailable. The saved
+report and bridge payload schema stay unchanged. Legacy summary payloads retain
+their reliability TL;DR and short explanation formatting.
 
 Response after the SDK accepts all three texts and supplies their message IDs:
 
