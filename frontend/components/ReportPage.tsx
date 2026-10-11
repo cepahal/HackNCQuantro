@@ -63,6 +63,7 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
  const [pendingUrl,setPendingUrl]=useState<string|null>(null);
  const [sourceError,setSourceError]=useState<string|null>(null);
  const [checkedReportId,setCheckedReportId]=useState<string|null>(null);
+ const [playableContextId,setPlayableContextId]=useState<string|null>(null);
  const rechecking=useRef(false);
  const analytics=reportAnalytics(report,captured);
  useEffect(()=>{
@@ -96,7 +97,8 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
  const candidateMedia = !verifiedSource && !primaryLead ? source : null;
  const additionalLeadCount = leads.length - (primaryLead ? 1 : 0);
  return <article className={styles.report}>
-  <ReportAnalytics data={analytics} interpretation={interpretation} interpretationState={interpretationState}/>
+  <ReportAnalytics data={analytics} interpretation={interpretation} interpretationState={interpretationState}
+   spliceVideoReady={Boolean(verifiedSource && report.context_video && playableContextId===report.context_video.media_id)}/>
   {checkedReportId&&<Link href={`/results?id=${encodeURIComponent(checkedReportId)}`}>Open rechecked report ↗</Link>}
   {analytics.isVideoDetected&&<div className={styles.videoGrid}>
   <section className={styles.primarySource} aria-label="Submitted video">
@@ -131,7 +133,7 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
    {verifiedSource && report.context_video
     ? <div className={styles.primaryVideo}><ReportPlayer key={report.context_video.media_id}
       media={{...verifiedSource, post: {...verifiedSource.post, media: report.context_video}}}
-      label="Spliced context video" generated/></div>
+      label="Spliced context video" generated onPlaybackReady={ready=>setPlayableContextId(ready?report.context_video?.media_id??null:null)}/></div>
     : <div className={styles.sourceEmpty} role="status"><p>{verifiedSource
       ? "No generated context video is available for this report."
       : "A sufficiently confident source match is needed before generating a context video."}</p></div>}

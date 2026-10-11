@@ -254,6 +254,7 @@ test("stored context video appears alongside submitted and matched recordings", 
   assert.match(visible, /aria-label="Matched source recording"/);
   assert.match(visible, /aria-label="Spliced context video"/);
   assert.equal((visible.match(/<video/g) ?? []).length, 3);
+  assert.doesNotMatch(visible, /data-testid="splice-animation"/);
   assert.match(html,/https:\/\/api.example\/media\/context_test/);
   assert.ok(html.includes(value.source!.post.post_url.replaceAll("&", "&amp;")));
 });
@@ -287,6 +288,7 @@ test("the analytics view has four evidence layers and keeps source gaps separate
   assert.match(html, /Source-match confidence|Word overlap|Splice assessment|Detection limitations/);
   assert.match(html, /0 source gaps/);
   assert.match(html, /do not confirm a splice/);
+  assert.doesNotMatch(html, /data-testid="splice-animation"/);
   assert.doesNotMatch(html, /0 splices detected|95% accurate/);
 });
 
@@ -301,6 +303,18 @@ test("missing generated context stays hidden while submitted and matched recordi
   assert.match(primary, /aria-label="Matched source recording"/);
   assert.equal((primary.match(/<video/g) ?? []).length, 2);
   assert.doesNotMatch(primary, /Splice assessment|Generation time/);
+  assert.doesNotMatch(primary, /data-testid="splice-animation"/);
+});
+
+test("splice animation requires a loaded video and disappears after playback failure", () => {
+  const { default: Analytics } = componentRequire("../components/ReportAnalytics.tsx") as typeof import("../components/ReportAnalytics.tsx");
+  const { reportAnalytics } = componentRequire("../lib/report-analytics.ts") as typeof import("../lib/report-analytics.ts");
+  const data = reportAnalytics(report());
+  for (const spliceVideoReady of [false, true, false]) {
+    const html = renderToStaticMarkup(createElement(Analytics, { data, interpretationState: "unavailable", spliceVideoReady }));
+    assert.equal(html.includes('data-testid="splice-animation"'), spliceVideoReady);
+    assert.match(html, /Source-match confidence|Word overlap/);
+  }
 });
 
 

@@ -9,7 +9,7 @@ import styles from "./ReportPlayer.module.css";
 
 type ReportMedia = ReportV2["submitted"];
 
-export default function ReportPlayer({ media, label, generated = false }: { media: ReportMedia; label: string; generated?: boolean }) {
+export default function ReportPlayer({ media, label, generated = false, onPlaybackReady }: { media: ReportMedia; label: string; generated?: boolean; onPlaybackReady?: (ready: boolean) => void }) {
   const [failed, setFailed] = useState(false);
   const { width, height } = media.post.media;
   const [ratio, setRatio] = useState(width && height ? width / height : 16 / 9);
@@ -24,7 +24,8 @@ export default function ReportPlayer({ media, label, generated = false }: { medi
       {image ? <Image src={playback} alt={media.post.title || label} fill unoptimized
         sizes="(max-width: 600px) 100vw, 50vw" className={styles.image} onError={() => setFailed(true)} />
         : <video aria-label={label} controls playsInline preload="metadata" src={playback}
-          onError={() => setFailed(true)} onLoadedMetadata={event => {
+          onError={() => { setFailed(true); onPlaybackReady?.(false); }}
+          onLoadedData={() => onPlaybackReady?.(true)} onLoadedMetadata={event => {
             const video = event.currentTarget;
             if (video.videoWidth && video.videoHeight) setRatio(video.videoWidth / video.videoHeight);
           }} />}

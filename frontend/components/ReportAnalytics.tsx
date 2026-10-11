@@ -10,9 +10,10 @@ export interface ReportAnalyticsProps {
   data: AnalyticsData;
   interpretation?: ReportInterpretation | null;
   interpretationState: "loading" | "ready" | "unavailable";
+  spliceVideoReady?: boolean;
 }
 
-export default function ReportAnalytics({ data, interpretation, interpretationState }: ReportAnalyticsProps) {
+export default function ReportAnalytics({ data, interpretation, interpretationState, spliceVideoReady = false }: ReportAnalyticsProps) {
   const reducedMotion = useReducedMotion();
   if (!data.isVideoDetected) return null;
   const { metrics, wafer } = data;
@@ -40,8 +41,8 @@ export default function ReportAnalytics({ data, interpretation, interpretationSt
       {metrics.contextWindows.length > 0 && <div><dt>Source context window</dt><dd className={styles.window}>{metrics.contextWindows.length
         ? metrics.contextWindows.map((window, index) => <span key={index}>{time(window.start, true)} to {time(window.end, true)}</span>) : "Unavailable"}</dd><p>Requested transcript ranges, not guaranteed complete coverage</p></div>}
     </dl>
-    <div className={styles.wafer} aria-label="Recorded evidence">
-      <div className={styles.stack} aria-hidden="true">
+    <div className={`${styles.wafer} ${spliceVideoReady ? "" : styles.evidenceOnly}`} aria-label="Recorded evidence">
+      {spliceVideoReady && <div className={styles.stack} aria-hidden="true" data-testid="splice-animation">
         {layers.map((layer, index) => <motion.div key={layer.title} className={styles.disc}
           style={{ top: `${index * 53}px`, zIndex: 4 - index }}
           animate={reducedMotion ? { y: 0 } : { y: [0, -4, 0] }}
@@ -49,7 +50,7 @@ export default function ReportAnalytics({ data, interpretation, interpretationSt
           <div className={styles.grid}/><span className={styles.discNumber}>0{index + 1}</span>
           {index === 0 && <span className={styles.matchMark}>✓</span>}
         </motion.div>)}
-      </div>
+      </div>}
       <ol className={styles.layers}>{layers.map((layer, index) => <li key={layer.title} className={styles.layer}>
         <span className={styles.connector} aria-hidden="true"/><p className={styles.layerTitle}>0{index + 1} / {layer.title}</p>
         <h2>{layer.value}</h2><p className={styles.layerNote}>{layer.note}</p>
