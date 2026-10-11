@@ -483,3 +483,24 @@ titles. The initial keyword-only leak check falsely flagged that content. Both
 live JSON reports passed checks for configured credential values and internal
 paths; quoted speech was preserved. Original recovery and broader windows remain
 unverified, and the first hosted runs still returned no_verified_match.
+
+### Final hosted verification: d07ddbc
+
+The final revision is live on Render. Fresh analysis and saved-report requests
+both returned HTTP 200 for each example; all eight schema, sanitization and
+content checks passed in both runs.
+
+- Obama: `job_obama_context_live_20261010_v2` completed in 16.712 seconds.
+  Discovery returned four leads, including White House recording `T6-GOSw4yYc`,
+  listed as 20:44. That discovery lead does not establish a verified timed match:
+  candidate inspection still covers only the first 60 seconds.
+- Milkshake: `job_milkshake_context_live_20261010_v3` completed in 35.662 seconds.
+  The overview uses useful title/context details with explicit attribution and
+  retains four unverified source leads. The optional lexical-provider-unavailable
+  warning remains; successful report delivery does not mean that provider worked.
+
+Release checks passed: 484 backend tests, 81 frontend tests, lint, TypeScript and
+production build. These two hosted regressions verify functionality, not
+population accuracy, independent transcript/timestamp fidelity or original-source
+recovery. Broader candidate windows and exact timed source verification remain
+unaddressed.
