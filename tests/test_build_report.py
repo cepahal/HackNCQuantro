@@ -63,3 +63,10 @@ def test_normalize_exception_uses_stage_default_and_hides_raw_message():
         "message": "The source search failed.",
         "retryable": True,
     }
+
+
+def test_internal_field_names_are_removed_from_unavailable_metadata():
+    original = {"retrieval": {"unavailable_fields": ["media.local_path", "frames.image_path", "author.followers_count", "media.width"]}}
+    cleaned = sanitize_report(original)
+    assert cleaned["retrieval"]["unavailable_fields"] == ["author.followers_count", "media.width"]
+    assert original["retrieval"]["unavailable_fields"][0] == "media.local_path"

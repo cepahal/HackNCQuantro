@@ -249,7 +249,7 @@ async def resolve_media(
     ]
     if not download:
         unavailable.extend(
-            ["media.local_path", "media.width", "media.height", "media.fps"]
+            ["media.width", "media.height", "media.fps"]
         )
     warnings.append(
         "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence."

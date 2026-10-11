@@ -42,11 +42,19 @@ def sanitize_report(report: Any) -> Any:
     Raises QuantroError if any remaining string value points at a local file.
     """
     if isinstance(report, dict):
-        return {
-            key: sanitize_report(value)
-            for key, value in report.items()
-            if key.lower() not in _STRIPPED_KEYS
-        }
+        cleaned = {}
+        for key, value in report.items():
+            if key.lower() in _STRIPPED_KEYS:
+                continue
+            if key == "unavailable_fields" and isinstance(value, list):
+                # Internal field names are not browser-facing metadata either.
+                value = [
+                    field for field in value
+                    if not isinstance(field, str)
+                    or field.rsplit(".", 1)[-1].lower() not in _STRIPPED_KEYS
+                ]
+            cleaned[key] = sanitize_report(value)
+        return cleaned
     if isinstance(report, list):
         return [sanitize_report(item) for item in report]
     if isinstance(report, str) and any(marker in report for marker in _FORBIDDEN_SUBSTRINGS):
