@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Navbar from "./Navbar";
 import AnalysisLoadingScreen from "./AnalysisLoadingScreen";
-import {PersonalizedAnalysisLoading,AnalysisReplay} from "./PersonalizedAnalysis";
+
 import ReportPlayer from "./ReportPlayer";
 import ReportSummary, { reportAssessment, ReportVerdict } from "./ReportSummary";
 import SourceLeads from "./SourceLeads";
@@ -14,7 +14,7 @@ import { analysisInFlight, getReport, getDisplayModel, getReportDiagnostics, get
 import type { ReportV2 as Report, ReportInterpretation, DisplayModel } from "../lib/api-types";
 import { errorDisplay, type ErrorDisplay } from "../lib/display";
 import { compact, date, percent, time, unique } from "../lib/format";
-import { summaryText } from "../lib/report-summary";
+import { clipDisplayText, summaryText } from "../lib/report-summary";
 import { sourceLeads, type SourceLead } from "../lib/source-leads";
 import { reportAnalytics } from "../lib/report-analytics";
 import { analysisName, diagnosticFilename, diagnosticOutput, type ReportDiagnostics } from "../lib/report-diagnostics";
@@ -53,7 +53,7 @@ export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:
    </div>
   </header>
   {error?<><div className={styles.error} role="alert"><h2>We couldn’t load this report.</h2><p>{error.error.message}</p><p className={styles.note}>{error.error.code} · {error.error.stage}</p>{error.error.retryable&&<button className={styles.copyButton} onClick={retry}>Retry</button>}</div>{(jobId||reportId)&&<DiagnosticPanel key={jobId||reportId} jobId={jobId??reportId!.replace(/^report_/,"")}/>}</>:report&&display?<ReportContent key={report.job_id} report={report} display={display} onRecheckCompleted={id=>router.push(`/results?id=${encodeURIComponent(id)}`)}/>:null}
- </main><footer className={styles.footer}><Link href="/" aria-label="ZoomOut home"><Image src="/logo-light.png" alt="ZoomOut" width={129} height={25} unoptimized /></Link><p>The full record, in context.</p><span>Built at HackNC · © 2026 ZoomOut</span></footer></div>{!loadingDismissed&&<PersonalizedAnalysisLoading key={`${jobId}:${reportId}:${attempt}`} jobId={jobId??reportId?.replace(/^report_/,"")??null} complete={ready} onDone={finishLoading}/>}</>;
+ </main><footer className={styles.footer}><Link href="/" aria-label="ZoomOut home"><Image src="/logo-light.png" alt="ZoomOut" width={129} height={25} unoptimized /></Link><p>The full record, in context.</p><span>Built at HackNC · © 2026 ZoomOut</span></footer></div>{!loadingDismissed&&<AnalysisLoadingScreen key={`${jobId}:${reportId}:${attempt}`} complete={ready} onDone={finishLoading}/>}</>;
 }
 export function ReportLoading(){return <AnalysisLoadingScreen/>}
 
@@ -118,10 +118,7 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
    </div>
    {verifiedSource ? <div className={styles.primaryVideo}><ReportPlayer key={verifiedSource.post.media.media_id} media={verifiedSource} label="Matched source recording"/></div>
     : <div className={styles.sourceEmpty}><p>No verified source video is available.</p></div>}
-   <p className={styles.note}>{verifiedSource
-    ? "Matching speech was found in this recording. It may be a reupload; the earliest original upload has not been established."
-    : primaryLead || candidateMedia ? "This is the strongest available search lead. Its speech and surrounding context have not been verified against the excerpt."
-      : "No source found does not establish whether the excerpt is accurate or unedited."}</p>
+
   </section>
   <section className={styles.primarySource} aria-label="Spliced context video">
    <div className={styles.primaryHead}><h2>Clip in context</h2></div>
@@ -135,7 +132,7 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
    {verifiedSource && report.context_video && <p className={styles.note}>Generated from the matched recording, with timed labels for the excerpt and surrounding context.</p>}
   </section>
   </div>}
-  <ReportAnalytics data={analytics} interpretation={interpretation} interpretationState={interpretationState}
+  <ReportAnalytics data={analytics} interpretation={interpretation ? {...interpretation,summary:clipDisplayText(interpretation.summary,submitted.post.media.media_id,source?.post.media.media_id),context_gap:clipDisplayText(interpretation.context_gap,submitted.post.media.media_id,source?.post.media.media_id),source_review:interpretation.source_review?{...interpretation.source_review,fact_check:clipDisplayText(interpretation.source_review.fact_check,submitted.post.media.media_id,source?.post.media.media_id)}:interpretation.source_review}:null} interpretationState={interpretationState}
    sourceEvidence={verifiedSource&&report.context?.source_media_id===verifiedSource.post.media.media_id
     ?report.context.windows.filter(window=>window.coverage!=="unavailable").flatMap(window=>window.sentences.filter(sentence=>sentence.start_seconds<window.requested_end_seconds&&sentence.end_seconds>window.requested_start_seconds&&verifiedSource.transcript.sentences.some(recorded=>recorded.sentence_id===sentence.sentence_id&&recorded.text===sentence.text&&recorded.start_seconds===sentence.start_seconds&&recorded.end_seconds===sentence.end_seconds))).map(sentence=>({...sentence,media_id:verifiedSource.post.media.media_id})):[]}
    spliceVideoReady={Boolean(verifiedSource && report.context_video && playableContextId===report.context_video.media_id)}/>
@@ -144,7 +141,8 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
    <DiagnosticPanel key={report.job_id} report={report} display={display} initialDiagnostics={diagnostics} onDiagnostics={setCaptured}/>
   </div>
   {analytics.isVideoDetected&&<SourceOptions options={leads.slice(0,4)} isVideoDetected pendingUrl={pendingUrl} error={sourceError} onSelect={recheck}/>}
-  <AnalysisReplay report={report} videoPlayable={Boolean(verifiedSource && report.context_video && playableContextId===report.context_video.media_id)}/>
+
+  <aside className={styles.disclaimer}>AI analysis may be incomplete or incorrect. Source matching does not independently verify facts, identity or authenticity; confidence is not a calibrated probability or truth score.</aside>
   {/* Preserved for restoration after diagnostic mode; intentionally hidden. */}
   <div hidden className={styles.legacyPanels} data-testid="preserved-report-panels">
   <details className={styles.submittedClip} aria-label="Submitted clip">

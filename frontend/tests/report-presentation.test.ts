@@ -186,7 +186,7 @@ test("without verification the view centers recorded candidate options without a
   assert.match(primary, /aria-label="Submitted excerpt"/);
   assert.equal((primary.match(/<video/g) ?? []).length, 1);
   assert.equal((primary.match(/<button/g) ?? []).length, 4);
-  assert.match(primary, /Search leads are not verified matches/);
+  assert.match(primary, /Select a saved candidate to recheck/);
   const otherLeads = html.split("Other source candidates")[1]!.split('aria-label="Evidence strength"')[0]!;
   assert.match(otherLeads, /JFmUO6BvwDc/);
   assert.doesNotMatch(otherLeads, /FX6GQSyxA-8/);
@@ -290,7 +290,7 @@ test("the analytics view has four evidence layers and keeps source gaps separate
   assert.match(html, /aria-label="Source analysis"/);
   assert.match(html, /Source-match confidence|Word overlap|Splice assessment|Detection limitations/);
   assert.match(html, /0 source gaps/);
-  assert.match(html, /do not confirm a splice/);
+  assert.match(html, /AI analysis may be incomplete or incorrect/);
   assert.match(html, /data-testid="evidence-wafer"/);
   assert.doesNotMatch(html, /0 splices detected|95% accurate/);
 });
@@ -377,22 +377,22 @@ test("source review check requires a ready recorded review and retains verificat
  const value=report(),data=reportAnalytics(value),sentence=value.context!.windows[0].sentences[0];
  const interpretation={status:"ready",source_review:{status:"no_obvious_issue",fact_check:"No checkable factual claim in these sentences.",semantic:"The speaker is making a joke.",references:[{media_id:"media_source",sentence_id:sentence.sentence_id}]}} as unknown as import("../lib/api-types.ts").ReportInterpretation;
  const html=renderToStaticMarkup(createElement(Analytics,{data,interpretation,interpretationState:"ready",sourceEvidence:[{...sentence,media_id:"media_source"}]}));
- assert.match(html,/No obvious issue in reviewed source text/);assert.match(html,/external facts not independently verified/);
+ assert.match(html,/No clearly inaccurate data discovered/);assert.doesNotMatch(html,/Meaning:|Source evidence|external facts not independently verified/);
  assert.ok(html.indexOf('aria-label="Source excerpt review"')<html.indexOf('data-testid="evidence-wafer"'));
  const absent=renderToStaticMarkup(createElement(Analytics,{data,interpretation:{...interpretation,status:"unavailable"},interpretationState:"unavailable"}));
- assert.doesNotMatch(absent,/No obvious issue in reviewed source text/);
+ assert.doesNotMatch(absent,/No clearly inaccurate data discovered/);
  const missing=renderToStaticMarkup(createElement(Analytics,{data,interpretation,interpretationState:"ready",sourceEvidence:[]}));
- assert.doesNotMatch(missing,/No obvious issue in reviewed source text/);
+ assert.match(missing,/No clearly inaccurate data discovered/);
  const stale=renderToStaticMarkup(createElement(Analytics,{data,interpretation:{...interpretation,source_review:{...interpretation.source_review!,references:[...interpretation.source_review!.references,{media_id:"media_source",sentence_id:"missing"}]}},interpretationState:"ready",sourceEvidence:[{...sentence,media_id:"media_source"}]}));
- assert.doesNotMatch(stale,/No obvious issue in reviewed source text/);
+ assert.match(stale,/No clearly inaccurate data discovered/);
 });
 
 
 test("hovered evidence layer expands upper gaps while retaining the lower stack",()=>{
  const {evidenceLayerPosition:position}=componentRequire("../components/ReportAnalytics.tsx") as typeof import("../components/ReportAnalytics.tsx");
- assert.deepEqual([0,1,2,3].map(i=>position(i,null)),[0,150,168,186]);
- assert.ok(position(1,1)-position(0,1)>150);
- assert.equal(position(2,1),168);assert.equal(position(3,1),186);
+ assert.deepEqual([0,1,2,3].map(i=>position(i,null)),[0,24,48,72]);
+ assert.ok(position(1,1)-position(0,1)>24);
+ assert.equal(position(2,1),168);assert.equal(position(3,1),192);
  assert.ok(position(2,2)-position(1,2)>18);
 });
 
@@ -401,7 +401,7 @@ test("source review resolves only recorded citations to actual sentence quotes",
  const {default:Analytics}=componentRequire("../components/ReportAnalytics.tsx") as typeof import("../components/ReportAnalytics.tsx");
  const {reportAnalytics}=componentRequire("../lib/report-analytics.ts") as typeof import("../lib/report-analytics.ts");
  const value=report(),sentence=value.context!.windows[0].sentences[0];
- const interpretation={status:"ready",source_review:{status:"needs_verification",fact_check:"Claim requires checking.",semantic:"A qualification matters.",references:[{media_id:"media_source",sentence_id:sentence.sentence_id},{media_id:"wrong_media",sentence_id:sentence.sentence_id},{media_id:"media_source",sentence_id:"missing"}]}} as unknown as import("../lib/api-types.ts").ReportInterpretation;
+ const interpretation={status:"ready",source_review:{status:"potential_issue",fact_check:"Claim requires checking.",semantic:"A qualification matters.",references:[{media_id:"media_source",sentence_id:sentence.sentence_id},{media_id:"wrong_media",sentence_id:sentence.sentence_id},{media_id:"media_source",sentence_id:"missing"}]}} as unknown as import("../lib/api-types.ts").ReportInterpretation;
  const html=renderToStaticMarkup(createElement(Analytics,{data:reportAnalytics(value),interpretation,interpretationState:"ready",sourceEvidence:[{...sentence,media_id:"media_source"}]}));
  assert.match(html,/Source evidence \(1\)/);assert.match(html,/We will not raise taxes/);assert.match(html,/1:41/);assert.doesNotMatch(html,/wrong_media|missing/);
 });
@@ -412,4 +412,10 @@ test("personalized loading reuses the homepage fragment visual with real transcr
  const progress=parseProgress({job_id:"job",stage:"transcript",excerpt:"Actual recorded speech words"},"job");
  const html=renderToStaticMarkup(createElement(Motion,{progress}));
  assert.match(html,/data-testid="personalized-fragments"/);assert.match(html,/stage-fragment/);assert.match(html,/Actual recorded speech words/);assert.doesNotMatch(html,/Continuous source excerpt ready/);
+});
+
+test("report display replaces repeated media identifiers with clip roles",()=>{
+ const {clipDisplayText}=componentRequire("../lib/report-summary.ts") as typeof import("../lib/report-summary.ts");
+ assert.equal(clipDisplayText("media_abc follows media_def; media_abc.","media_abc","media_def"),"user clip follows source clip; user clip.");
+ assert.equal(clipDisplayText(null,"media_abc"),"");
 });

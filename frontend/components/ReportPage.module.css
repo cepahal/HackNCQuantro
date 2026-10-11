@@ -169,3 +169,5 @@
 /* Two text sizes across the analysis view. */
 .page :global(*) {font-size:14px!important;}
 .page :global(h1),.page :global(h2),.page :global(h3) {font-size:22px!important;}
+
+.primaryHead{flex-wrap:wrap;gap:12px}.primaryHead>div{flex:0 0 100%;width:100%;min-width:0}.primaryHead h2{max-width:none;width:100%}.disclaimer{margin-top:32px;padding:22px;background:#f5f5f7;border-top:1px solid #dfe3e8;color:#586373;font-size:18px;line-height:1.65}

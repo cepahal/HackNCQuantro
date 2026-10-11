@@ -1,6 +1,6 @@
 import type { ReportV2 } from "./api-types.ts";
 import type { ReportDiagnostics } from "./report-diagnostics.ts";
-import { buildReportSummary, conciseSummary, summaryText } from "./report-summary.ts";
+import { buildReportSummary, clipDisplayText, conciseSummary, summaryText } from "./report-summary.ts";
 
 export interface AnalyticsMetrics {
   generationSeconds: number | null;
@@ -61,9 +61,9 @@ export function reportAnalytics(report: ReportV2, diagnostics?: ReportDiagnostic
     })) : [];
   return {
     isVideoDetected,
-    contextText: concise?.meaning || contextText,
+    contextText: clipDisplayText(concise?.meaning || contextText, report.submitted.post.media.media_id, report.source?.post.media.media_id),
     metrics: { generationSeconds: timing && Number.isFinite(timing.elapsed_seconds) ? timing.elapsed_seconds : null,
-      summary: summaryText(concise?.takeaways || meaning?.paragraphs[0] || report.comparison?.summary || "No written summary was recorded."), contextWindows: windows },
+      summary: clipDisplayText(concise?.takeaways || meaning?.paragraphs[0] || report.comparison?.summary || "No written summary was recorded.", report.submitted.post.media.media_id, report.source?.post.media.media_id), contextWindows: windows },
     wafer: {
       confidence: isVideoDetected ? ({ high: "High", moderate: "Moderate", low: "Low", not_assessed: "Not assessed" }[alignment!.match_quality.confidence.level]) : "Not assessed",
       wordMatches,

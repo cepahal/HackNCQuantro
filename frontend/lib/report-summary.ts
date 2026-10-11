@@ -176,3 +176,9 @@ export function buildReportSummary(report: ReportV2): ReadableSummary {
   sections.push(limits);
   return { politicalAssumption, partialTranscript, evidenceStatus: evidenceStatus(report), metadataClues, sections };
 }
+
+export function clipDisplayText(text: string | null, clipId: string, sourceId?: string): string {
+ let result=text ?? "";
+ for(const [id,label] of [[clipId,"user clip"],[sourceId,"source clip"]] as const){if(id)result=result.split(id).join(label)}
+ return summaryText(result);
+}
