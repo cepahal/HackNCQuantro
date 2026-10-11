@@ -10,6 +10,8 @@ from urllib.parse import parse_qs, urlsplit
 from ..external_apis.retrieve_post import _validate_url
 from ..external_apis.tigerdata_storage import TigerDataPostStore
 from ..reporting.build_report import build_report
+from ..reporting.remote_youtube import build_remote_youtube_report
+from ..reporting.run_analysis import _discover_remote_sources
 from ..reporting.save_report import (
     _report_url,
     report_id_for_job,
@@ -25,7 +27,7 @@ from ..shared.errors import (
     normalize_exception,
 )
 from ..shared.post_identity import ensure_distinct_source, normalized_post_url
-from ..shared.types import AnalysisResult, IngestResult, Post, ReportV2
+from ..shared.types import AnalysisResult, IngestResult, MediaFeatures, Post, ReportV2
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from .alignment import build_alignment, build_context
 from .analysis import compare_clip, interpret_clip
@@ -173,10 +175,69 @@ def run_ingest(
             store.close()
 
 
+def _remote_inputs(report: ReportV2) -> tuple[Post, MediaFeatures]:
+    """Adapt observed speech without inventing a file or recording duration."""
+    submitted = report.submitted
+    raw = submitted.post.model_dump(mode="json")
+    raw["media"]["local_path"] = ""
+    raw["media"]["playback_url"] = submitted.post.post_url
+    post = Post.model_validate(raw)
+    # MediaFeatures requires a numeric bound; this is the observed speech end,
+    # not the unknown recording duration. Public media duration stays null.
+    features = MediaFeatures(
+        media_id=post.media.media_id,
+        duration_seconds=max(
+            (sentence.end_seconds for sentence in submitted.transcript.sentences),
+            default=0.0,
+        ),
+        transcript=submitted.transcript,
+        warnings=list(report.limitations),
+    )
+    return post, features
+
+
+def _build_remote_fallback(job_id: str, url: str, store: TigerStore) -> ReportV2:
+    """Restore native YouTube access plus the existing bounded source locator."""
+    report = build_remote_youtube_report(job_id, url)
+    post, features = _remote_inputs(report)
+    store.save_post_and_features(
+        job_id, post.model_dump(mode="json"), features.model_dump(mode="json")
+    )
+    store.set_job_status(job_id, "ingested")
+    report = _discover_remote_sources(report, store, assess_candidates=True)
+    post, features = _remote_inputs(report)
+    if report.context is not None and report.source is not None:
+        report.comparison = compare_clip(post, features, report.context)
+        report.summary = report.comparison.summary
+    else:
+        report.summary = interpret_clip(post, features)
+    return ReportV2.model_validate(report.model_dump(mode="json"))
+
+
 async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
     stage = Stage.RETRIEVE_POST
     try:
-        post, features = await resolve_media(url)
+        try:
+            post, features = await resolve_media(url)
+        except QuantroError as exc:
+            reason = getattr(exc, "retrieval_reason", None)
+            logger.warning(
+                "Resolver retrieval failed code=%s reason=%s", exc.code.value, reason
+            )
+            if (
+                exc.code == ErrorCode.MEDIA_UNAVAILABLE
+                and exc.stage == Stage.RETRIEVE_POST
+                and _validate_url(url)[1] == "youtube"
+                and (
+                    reason == "auth_required"
+                    or getattr(exc, "platform_challenge", False) is True
+                )
+            ):
+                logger.info("Using native YouTube recovery after a platform challenge.")
+                return await asyncio.to_thread(
+                    _build_remote_fallback, job_id, url, store
+                )
+            raise
         stage = Stage.SAVE_REPORT_AND_COMPLETE_JOB
         _persist_media(post)
         store.save_post_and_features(

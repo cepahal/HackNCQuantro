@@ -1,6 +1,6 @@
 # Groq resolver integration
 
-The public analyze, ingest and Photon webhook paths use `backend/services/resolution/run.py`. Existing ReportV2 2.1, Tiger tables, report URLs and Photon transport remain compatible. The supplied prototype replaces active source discovery and assessment; legacy specialist modules remain available for compatibility tests and historical reports. They are not called by the new resolver.
+The public analyze, ingest and Photon webhook paths use `backend/services/resolution/run.py`. Existing ReportV2 2.1, Tiger tables, report URLs and Photon transport remain compatible. The supplied prototype handles caption/audio-based source discovery and assessment. Analysis reuses the existing native YouTube reader and bounded source locator when a platform challenge blocks caption and audio retrieval.
 
 ## Active flow
 
@@ -12,9 +12,11 @@ The public analyze, ingest and Photon webhook paths use `backend/services/resolu
 6. Use Groq to explain the clip and compare the submitted caption with source context. Every quotation must occur within one supplied sentence. One bounded repair is allowed after invalid schema/evidence; validation is never relaxed. Incomplete coverage cannot establish that no material context is missing. Search/provider failure remains an error rather than being silently reported as no match.
 7. Persist the sanitized report in Tiger, complete the job, then deliver through the existing Photon bridge if a conversation was supplied. A delivery failure does not delete a saved report.
 
+When submitted YouTube retrieval fails specifically because of a platform challenge, analysis requests a bounded native Gemini video window instead. The existing Exa/SerpAPI discovery and timed-caption locator then check possible source recordings, and Groq writes the explanation. This recovery retains partial-transcript provenance, estimated timing and unknown recording duration. It never invents a downloaded file or claims audio, visual or full-recording verification. Private/deleted videos, invalid URLs, missing credentials and unrelated provider failures do not enter this recovery path. If native access also fails, the job remains failed with its structured error.
+
 ## Configuration and deployment
 
-Set `GROQ_API_KEY` privately on the backend, `GROQ_LLM_MODEL=openai/gpt-oss-120b` and `SEARCH_PROVIDER=youtube`. Keep the existing Tiger URLs, CA, table prefix, Photon credentials, `REPORT_BASE_URL` and frontend origin. The frontend needs only its existing public backend URL. Never put provider keys in frontend variables or tracked environment files.
+Set `GROQ_API_KEY` privately on the backend and `GROQ_LLM_MODEL=openai/gpt-oss-120b`. Keep `SEARCH_PROVIDER=hybrid` with the existing Gemini, Exa and SerpAPI configuration so the native recovery can reuse the established search adapters. Keep the existing Tiger URLs, CA, table prefix, Photon credentials, `REPORT_BASE_URL` and frontend origin. The frontend needs only its existing public backend URL. Never put provider keys in frontend variables or tracked environment files.
 
 The results-page redesign changes only the report components and their scoped styles. Landing, navigation, API types and frontend API wiring are preserved. Results distinguish a matching recording from verified context or factual truth; unknown assessments stay neutral rather than showing a red failure or green assurance.
 

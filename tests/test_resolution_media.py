@@ -293,17 +293,28 @@ async def test_blocked_optional_video_download_retains_timed_captions(monkeypatc
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "code",
-    ["auth_required", "private", "geo_restricted", "unavailable", "format_unavailable", "download_failed"],
+    [
+        "auth_required",
+        "private",
+        "geo_restricted",
+        "unavailable",
+        "format_unavailable",
+        "download_failed",
+    ],
 )
 @pytest.mark.parametrize("retryable", [False, True])
-async def test_whisper_download_failure_remains_safe_retrieval_error(monkeypatch, code, retryable):
+async def test_whisper_download_failure_remains_safe_retrieval_error(
+    monkeypatch, code, retryable
+):
     diagnostic = "private provider response with signed-token=unit-test-secret"
     download_error = download.MediaDownloadError(code, diagnostic, URL)
     if retryable:
         download_error.__cause__ = TimeoutError("private network diagnostic")
     transcript_error = transcribe.TranscriptionError(code, diagnostic, URL)
     transcript_error.__cause__ = download_error
-    monkeypatch.setattr(media, "get_video_transcript", AsyncMock(side_effect=transcript_error))
+    monkeypatch.setattr(
+        media, "get_video_transcript", AsyncMock(side_effect=transcript_error)
+    )
 
     with pytest.raises(QuantroError) as caught:
         await media.resolve_media(URL)
@@ -315,6 +326,33 @@ async def test_whisper_download_failure_remains_safe_retrieval_error(monkeypatch
     assert error.message == "The media could not be retrieved."
     assert diagnostic not in str(error.public_dict())
     assert error.__cause__ is transcript_error
+    assert error.retrieval_reason == code
+    assert error.platform_challenge is (code == "auth_required")
+    assert "retrieval_reason" not in error.public_dict()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "code", ["download_failed", "format_unavailable", "private", "missing_api_key"]
+)
+async def test_caption_block_marker_survives_audio_error_normalization(
+    monkeypatch, code
+):
+    def blocked(video_id):
+        raise RequestBlocked(video_id)
+
+    monkeypatch.setattr(transcribe, "_fetch_youtube_captions_sync", blocked)
+    failure = transcribe.TranscriptionError(code, "private provider diagnostic", URL)
+    monkeypatch.setattr(
+        transcribe, "transcribe_youtube_audio", AsyncMock(side_effect=failure)
+    )
+    with pytest.raises(QuantroError) as caught:
+        await media._transcript_for_media(URL)
+    assert caught.value.platform_challenge is (
+        code in {"download_failed", "format_unavailable"}
+    )
+    assert caught.value.retrieval_reason == code
+    assert "private provider diagnostic" not in str(caught.value.public_dict())
 
 
 @pytest.mark.asyncio

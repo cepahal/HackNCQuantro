@@ -650,6 +650,7 @@ async def get_video_transcript(
     metadata = dict(known_info or {})
     video_id = extract_youtube_id(url) if platform == "youtube" else None
     if video_id:
+        captions_blocked = False
         try:
             result = await asyncio.to_thread(_fetch_youtube_captions_sync, video_id)
             if result.get("segments"):
@@ -661,10 +662,20 @@ async def get_video_transcript(
                     result["duration"], _number(metadata.get("duration")) or 0.0
                 )
                 return result
-        except Exception:  # noqa: BLE001 - captions are optional and Whisper is the required fallback.
+        except Exception as exc:  # noqa: BLE001 - captions are optional and Whisper is the required fallback.
+            captions_blocked = isinstance(exc, RequestBlocked)
             logger.info("YouTube captions unavailable; trying Whisper.")
         if local_file is None:
-            return await transcribe_youtube_audio(video_id)
+            try:
+                return await transcribe_youtube_audio(video_id)
+            except TranscriptionError as exc:
+                if captions_blocked and exc.code in {
+                    "auth_required",
+                    "download_failed",
+                    "format_unavailable",
+                }:
+                    exc.platform_challenge = True
+                raise
     if not os.getenv("GROQ_API_KEY"):
         raise TranscriptionError(
             "missing_api_key",

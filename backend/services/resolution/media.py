@@ -71,17 +71,28 @@ async def _transcript_for_media(*args: Any, **kwargs: Any) -> dict[str, Any]:
         while cause is not None and id(cause) not in seen:
             seen.add(id(cause))
             retryable = retryable or (
-                isinstance(cause, (TimeoutError, ConnectionError, subprocess.TimeoutExpired))
+                isinstance(
+                    cause, (TimeoutError, ConnectionError, subprocess.TimeoutExpired)
+                )
                 or getattr(cause, "retryable", False) is True
                 or getattr(cause, "code", None) in {"network_error", "rate_limited"}
             )
             cause = cause.__cause__
         error = QuantroError(
-            ErrorCode.MEDIA_UNAVAILABLE if retrieval_failed else ErrorCode.TRANSCRIPTION_FAILED,
+            ErrorCode.MEDIA_UNAVAILABLE
+            if retrieval_failed
+            else ErrorCode.TRANSCRIPTION_FAILED,
             Stage.RETRIEVE_POST if retrieval_failed else Stage.EXTRACT_MEDIA_FEATURES,
             retryable=retryable,
         )
         error.exception_type = type(exc).__name__
+        if isinstance(exc, TranscriptionError):
+            # Private typed diagnostics survive normalization, never provider text.
+            error.retrieval_reason = exc.code
+            error.platform_challenge = (
+                exc.code == "auth_required"
+                or getattr(exc, "platform_challenge", False) is True
+            )
         raise error from exc
 
 

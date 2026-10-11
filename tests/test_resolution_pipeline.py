@@ -1,7 +1,8 @@
 """Offline integration checks for the supplied Groq resolver and existing API contract."""
 
 import json
-from unittest.mock import AsyncMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,7 +10,7 @@ from fastapi.testclient import TestClient
 from backend.main import app
 from backend.routes.common import get_tiger_store
 from backend.services.resolution import analysis, run
-from backend.services.shared.errors import QuantroError
+from backend.services.shared.errors import ErrorCode, QuantroError, Stage
 from backend.services.shared.types import (
     Author,
     Comparison,
@@ -18,6 +19,7 @@ from backend.services.shared.types import (
     MediaFeatures,
     Post,
     Retrieval,
+    TranscriptStatus,
 )
 from backend.services.storage.tiger import TigerStore
 
@@ -170,6 +172,152 @@ def test_matched_roundtrip_and_idempotency(store, wired):
         marker in json.dumps(report)
         for marker in ("local_path", "/tmp/", "api_key", "file://")
     )
+
+
+@pytest.fixture
+def remote_fallback(monkeypatch, wired):
+    post, features = media("remote_clip", CLIP)
+    post.media.duration_seconds = None
+    post.retrieval.provider = "gemini_native_youtube_transcript:test-model"
+    features.duration_seconds = 60.0
+    features.transcript.status = TranscriptStatus.PARTIAL
+    sentence = features.transcript.sentences[0]
+    sentence.start_seconds = 0.25
+    sentence.end_seconds = 11.75
+    report = run.build_report(
+        "job_remote_fixture", post, features, None, None, None, None, None,
+        extra_limitations=[
+            "Only a requested window from 0 to 60 seconds was submitted; this is not a complete-video analysis.",
+            "Transcript text and timestamps are provider estimates, not independently verified audio or recording duration.",
+        ],
+    )
+    native = Mock(side_effect=lambda job_id, url: report.model_copy(update={"job_id": job_id}, deep=True))
+    discovery = Mock(side_effect=lambda report, store, **kwargs: report)
+    interpretation = Mock(return_value=SUMMARY)
+    monkeypatch.setattr(run, "build_remote_youtube_report", native)
+    monkeypatch.setattr(run, "_discover_remote_sources", discovery)
+    monkeypatch.setattr(run, "interpret_clip", interpretation)
+    return SimpleNamespace(native=native, discovery=discovery, interpretation=interpretation)
+
+
+def _retrieval_failure(reason, *, code=ErrorCode.MEDIA_UNAVAILABLE, stage=Stage.RETRIEVE_POST):
+    error = QuantroError(code, stage)
+    error.retrieval_reason = reason
+    return error
+
+
+def test_youtube_auth_challenge_uses_one_bounded_native_fallback(store, remote_fallback, monkeypatch):
+    monkeypatch.setattr(run, "resolve_media", AsyncMock(side_effect=_retrieval_failure("auth_required")))
+
+    first = run.run_analysis("job_native_fallback", CLIP, store=store)
+    second = run.run_analysis("job_native_fallback", CLIP, store=store)
+
+    assert first == second
+    assert first.outcome.value == "no_verified_match"
+    remote_fallback.native.assert_called_once_with("job_native_fallback", CLIP)
+    remote_fallback.discovery.assert_called_once()
+    assert remote_fallback.discovery.call_args.args[1] is store
+    assert remote_fallback.discovery.call_args.kwargs == {"assess_candidates": True}
+    remote_fallback.interpretation.assert_called_once()
+    assert run.find_source_video.await_count == 0
+    assert store.get_job("job_native_fallback")["status"] == "completed"
+    assert len(store.get_job_reports("job_native_fallback")) == 1
+    report = store.get_report(first.report_id)
+    assert report["summary"] == SUMMARY
+    assert report["submitted"]["transcript"]["status"] == "partial"
+    sentence = report["submitted"]["transcript"]["sentences"][0]
+    assert (sentence["start_seconds"], sentence["end_seconds"], sentence["text"]) == (0.25, 11.75, WORDS)
+    assert report["submitted"]["post"]["media"]["duration_seconds"] is None
+    assert report["submitted"]["post"]["retrieval"]["provider"].startswith("gemini_native_youtube_transcript:")
+    limitations = " ".join(report["limitations"]).lower()
+    assert "60 seconds" in limitations and "not a complete-video analysis" in limitations
+    assert "provider estimates" in limitations and "not independently verified" in limitations
+    assert report["submitted"]["frames"] == report["submitted"]["visual_text"] == []
+    assert report["source"] is report["alignment"] is report["context"] is None
+    assert "retrieval_reason" not in json.dumps(report)
+
+
+def test_successful_caption_resolution_never_uses_native_fallback(store, remote_fallback):
+    result = run.run_analysis("job_caption_success", CLIP, store=store)
+
+    assert result.outcome.value == "matched"
+    remote_fallback.native.assert_not_called()
+    remote_fallback.discovery.assert_not_called()
+    assert run.find_source_video.await_count == 1
+
+
+@pytest.mark.parametrize(
+    ("reason", "code", "stage"),
+    [
+        ("private", ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST),
+        ("unavailable", ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST),
+        ("geo_restricted", ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST),
+        ("download_failed", ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST),
+        (None, ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_POST),
+        ("invalid_url", ErrorCode.INVALID_URL, Stage.RETRIEVE_POST),
+        ("missing_api_key", ErrorCode.TRANSCRIPTION_FAILED, Stage.EXTRACT_MEDIA_FEATURES),
+        ("auth_failed", ErrorCode.TRANSCRIPTION_FAILED, Stage.EXTRACT_MEDIA_FEATURES),
+        ("network_error", ErrorCode.TRANSCRIPTION_FAILED, Stage.EXTRACT_MEDIA_FEATURES),
+        ("auth_required", ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_CANDIDATE_MEDIA),
+    ],
+)
+def test_unrelated_failures_never_enter_native_fallback(store, remote_fallback, monkeypatch, reason, code, stage):
+    failure = _retrieval_failure(reason, code=code, stage=stage)
+    monkeypatch.setattr(run, "resolve_media", AsyncMock(side_effect=failure))
+
+    with pytest.raises(QuantroError) as caught:
+        run.run_analysis("job_no_native_fallback", CLIP, store=store)
+
+    assert caught.value.code == code
+    assert caught.value.stage == stage
+    remote_fallback.native.assert_not_called()
+    remote_fallback.discovery.assert_not_called()
+    remote_fallback.interpretation.assert_not_called()
+    assert store.get_job("job_no_native_fallback")["status"] == "failed"
+    assert store.get_job_reports("job_no_native_fallback") == []
+
+
+def test_instagram_auth_failure_never_uses_youtube_fallback(store, remote_fallback, monkeypatch):
+    monkeypatch.setattr(run, "resolve_media", AsyncMock(side_effect=_retrieval_failure("auth_required")))
+
+    with pytest.raises(QuantroError) as caught:
+        run.run_analysis("job_non_youtube", "https://www.instagram.com/reel/ABC123/", store=store)
+
+    assert caught.value.code == ErrorCode.MEDIA_UNAVAILABLE
+    remote_fallback.native.assert_not_called()
+    remote_fallback.discovery.assert_not_called()
+    assert store.get_job_reports("job_non_youtube") == []
+
+
+@pytest.mark.parametrize("failed_stage", ["transcript", "discovery"])
+def test_native_fallback_failure_saves_no_report(store, remote_fallback, monkeypatch, failed_stage):
+    monkeypatch.setattr(run, "resolve_media", AsyncMock(side_effect=_retrieval_failure("auth_required")))
+    expected = QuantroError(
+        ErrorCode.TRANSCRIPTION_FAILED if failed_stage == "transcript" else ErrorCode.SEARCH_FAILED,
+        Stage.EXTRACT_MEDIA_FEATURES if failed_stage == "transcript" else Stage.SEARCH_CANDIDATES,
+        retryable=True,
+    )
+    target = remote_fallback.native if failed_stage == "transcript" else remote_fallback.discovery
+    target.side_effect = expected
+
+    with pytest.raises(QuantroError) as caught:
+        run.run_analysis("job_failed_native_fallback", CLIP, store=store)
+
+    assert caught.value.code == expected.code
+    assert caught.value.stage == expected.stage
+    assert caught.value.retryable is True
+    remote_fallback.native.assert_called_once()
+    if failed_stage == "transcript":
+        remote_fallback.discovery.assert_not_called()
+    else:
+        remote_fallback.discovery.assert_called_once()
+    remote_fallback.interpretation.assert_not_called()
+    job = store.get_job("job_failed_native_fallback")
+    assert job["status"] == "failed"
+    assert job["error_code"] == expected.code.value
+    assert job["error_stage"] == expected.stage.value
+    assert job["error_retryable"] is True
+    assert store.get_job_reports("job_failed_native_fallback") == []
 
 
 def test_no_match_keeps_reading_and_leads(store, wired):
