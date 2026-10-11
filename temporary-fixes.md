@@ -272,3 +272,22 @@ Caption-fix verification: 945 backend tests passed, 7 explicitly skipped,
 frontend tests, frontend lint/typecheck, Ruff F/E9 and diff checks passed.
 Render served the refreshed demo with HTTP 200 and schema 2.1; sanitization
 passed, source confidence stayed moderate, and the original report was unchanged.
+
+
+### Production release and approved UI reconciliation (2026-10-10)
+
+Caption fix `b5e29c9` was published on the release branch and deployed successfully:
+Render deployment `dep-db5dde2jnfac73a38gig` is live; Vercel production deployment
+`dpl_BmBA6TTjmptQK2nMCCd5aqkChX1U` serves the refreshed demo. Browser verification
+confirmed both videos ready without media errors, safe report JSON, the distinct
+submitted/source captions and honest not-assessed context confidence.
+
+After deployment the user explicitly lifted the freeze on newer teammate pushes.
+Reconciled UI merge `e72d0af`: preserved accessibility, saved-report loading,
+structured not-found errors, safe formatting, transcript panels, correct post-date
+ordering, and the refreshed demo ID. Kept the already verified webpack build
+command so this demo release does not also switch production bundlers. Backend
+code from the tested caption release is unchanged by this UI reconciliation.
+
+Reconciled frontend verification: 51 tests passed; lint, typecheck and webpack
+production build passed. The backend tree matches the 945-test caption release.

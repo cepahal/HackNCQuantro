@@ -34,6 +34,14 @@ test("no verified match hides the source-match and coverage blocks", () => {
   assert.equal(display.context_assessment?.value, "Not assessed");
 });
 
+test("matched reports without alignment do not claim that no source was found", () => {
+  const report = { ...reportFixture, alignment: null, summary: null, comparison: null };
+  const display = confidenceDisplay(report);
+  assert.equal(display.no_source_message, null);
+  assert.equal(display.source_match, null);
+  assert.match(generatedSummary(report), /^A source recording was matched, but alignment details are unavailable\./);
+});
+
 test("not_assessed levels read 'Not assessed' and confidence is never a percentage or an accuracy claim", () => {
   const notAssessed = structuredClone(reportFixture) as ReportV2;
   notAssessed.alignment!.match_quality.confidence.level = "not_assessed";
@@ -89,6 +97,15 @@ test("not-assessed confidence never becomes a level word or a percentage in the 
   notAssessed.alignment!.match_quality.clip_coverage_ratio = null;
   assert.equal(generatedSummary(notAssessed),
     "A source recording was matched; source-match confidence was not assessed. The report lists 1 limitation.");
+});
+
+test("generated summaries use the capped coverage percentage formatter", () => {
+  const report = structuredClone(reportFixture) as ReportV2;
+  report.summary = null;
+  report.comparison!.summary = "";
+  report.alignment!.match_quality.clip_coverage_ratio = 0.996;
+  assert.match(generatedSummary(report), /99% of the submitted clip/);
+  assert.doesNotMatch(generatedSummary(report), /100% of the submitted clip/);
 });
 
 test("seconds labels round to a tenth and keep unknowns as 'Not assessed'", () => {

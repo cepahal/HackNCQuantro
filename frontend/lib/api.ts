@@ -155,13 +155,13 @@ export function analysisInFlight(jobId: string): AnalysisInFlight | undefined {
 }
 
 export async function getReport(reportId: string): Promise<ReportV2> {
-  if (!REPORT_ID.test(reportId)) throw new Error("The report identifier is invalid.");
-  return assertReport(await request(`/reports/${encodeURIComponent(reportId)}`, undefined, reportApiBase()));
+  if (!REPORT_ID.test(reportId)) throw new ReportNotFoundError();
+  return assertReport(await requestReport(`/reports/${encodeURIComponent(reportId)}`));
 }
 
 export async function getDisplayModel(reportId: string): Promise<DisplayModel> {
-  if (!REPORT_ID.test(reportId)) throw new Error("The report identifier is invalid.");
-  const data = await request(`/reports/${encodeURIComponent(reportId)}/display`, undefined, reportApiBase());
+  if (!REPORT_ID.test(reportId)) throw new ReportNotFoundError();
+  const data = await requestReport(`/reports/${encodeURIComponent(reportId)}/display`);
   if (!isRecord(data) || typeof data.confidence_note !== "string" || !isRecord(data.submitted_panel)
       || !Array.isArray(data.limitations) || !isRecordOrNull(data.source_match)
       || !isRecordOrNull(data.clip_coverage) || !isRecordOrNull(data.context_assessment)) {
@@ -170,13 +170,33 @@ export async function getDisplayModel(reportId: string): Promise<DisplayModel> {
   return data as unknown as DisplayModel;
 }
 
+async function requestReport(path: string): Promise<unknown> {
+  try {
+    return await request(path, undefined, reportApiBase());
+  } catch (error) {
+    if (error instanceof QuantroApiError && error.status === 404) throw new ReportNotFoundError();
+    throw error;
+  }
+}
+
+export class ReportNotFoundError extends Error {
+  readonly code = "REPORT_NOT_FOUND";
+  readonly stage = "load_report";
+  readonly retryable = false;
+
+  constructor() {
+    super("Report not found.");
+    this.name = "ReportNotFoundError";
+  }
+}
+
 export async function ingest(jobId: string, url: string): Promise<IngestResult> {
   if (!IDENTIFIER.test(jobId)) throw new Error("The job identifier is invalid.");
   return assertIngestResult(await postJson(`/ingest/${encodeURIComponent(jobId)}`, { url }), jobId);
 }
 
 export function publicUrl(value: string | null | undefined): string | null {
-  if (!value) return null;
+  if (!value || value.startsWith("//")) return null;
   try {
     const base = new URL(reportApiBase(), typeof window !== "undefined" ? window.location.origin : undefined);
     const url = new URL(value, base);

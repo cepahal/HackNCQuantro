@@ -1,8 +1,7 @@
 "use client";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import LoadingState from "../../components/LoadingState";
-import ReportPage from "../../components/ReportPage";
+import ReportPage, { ReportLoading } from "../../components/ReportPage";
 
 function ResultsContent() {
   const params = useSearchParams();
@@ -11,5 +10,5 @@ function ResultsContent() {
   return <ReportPage key={`${jobId}:${reportId}`} jobId={jobId} reportId={reportId}/>;
 }
 export default function ResultsPage() {
-  return <Suspense fallback={<main className="page-wrap" style={{paddingTop:80}}><LoadingState job={null}/></main>}><ResultsContent/></Suspense>;
+  return <Suspense fallback={<main className="page-wrap" style={{paddingTop:80}}><ReportLoading/></main>}><ResultsContent/></Suspense>;
 }
