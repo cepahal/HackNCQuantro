@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from backend.services.external_apis.exa_search import ExaSearch
+from backend.services.external_apis.exa_search import ExaSearch, _publisher_youtube_url
 from backend.services.external_apis.retrieve_post import _validate_url
 from backend.services.external_apis.search_candidates import search_candidates
 from backend.services.shared.errors import QuantroError
@@ -238,3 +238,120 @@ def test_transport_failure_is_retryable_and_client_cleanup_is_explicit():
     finally:
         provider.close()
     assert transport_client.is_closed
+
+
+@pytest.mark.parametrize('url', [
+    'https://www.youtube.com/watch?v=T6-GOSw4yYc',
+    'https://youtu.be/T6-GOSw4yYc?t=123',
+    'https://www.youtube.com/embed/T6-GOSw4yYc',
+    'https://www.youtube-nocookie.com/embed/T6-GOSw4yYc?rel=0',
+    'https://youtube-nocookie.com/embed/T6-GOSw4yYc/',
+    'https://m.youtube.com/shorts/T6-GOSw4yYc',
+])
+def test_publisher_recording_links_canonicalize_without_fetching(url):
+    assert _publisher_youtube_url(url) == 'https://www.youtube.com/watch?v=T6-GOSw4yYc'
+
+
+@pytest.mark.parametrize('url', [
+    None, {}, 123, 'file:///tmp/private', 'http://127.0.0.1/embed/T6-GOSw4yYc',
+    'https://youtube.com.attacker.example/watch?v=T6-GOSw4yYc',
+    'https://www.youtube-nocookie.com.attacker.example/embed/T6-GOSw4yYc',
+    'https://user:password@youtube.com/watch?v=T6-GOSw4yYc',
+    'https://youtube.com:444/watch?v=T6-GOSw4yYc',
+    'https://youtube-nocookie.com:80/embed/T6-GOSw4yYc',
+    'https://youtube.com/watch?v=T6-GOSw4yYc&v=77pnVFLkUjM',
+    'https://youtube.com/watch?v=short',
+    'https://youtube-nocookie.com/watch?v=T6-GOSw4yYc',
+    'https://youtube.com/redirect?url=https://youtube.com/watch?v=T6-GOSw4yYc',
+    'https://youtube.com/embed/T6-GOSw4yYc/extra', 'https://youtube.com/\\internal',
+])
+def test_hostile_or_malformed_publisher_links_are_ignored(url):
+    assert _publisher_youtube_url(url) is None
+
+
+def test_existing_requests_extract_publisher_links_with_metadata_provenance_and_no_extra_calls():
+    import json
+    calls = []
+    archive = 'https://obamawhitehouse.archives.gov/photos-and-video/video/example'
+    def handler(request):
+        calls.append(request)
+        assert request.url == 'https://api.exa.ai/search'
+        assert json.loads(request.content)['contents'] == {'extras': {'links': 10}}
+        return httpx.Response(200, json={'results': [{
+            'url': archive, 'title': 'Full manufacturing event',
+            'author': 'Archive publisher', 'publishedDate': '2024-01-01T12:00:00Z',
+            'extras': {'links': ['https://www.youtube-nocookie.com/embed/T6-GOSw4yYc',
+                                 'https://youtu.be/T6-GOSw4yYc', 'http://127.0.0.1/private']},
+        }]})
+    provider = ExaSearch('private-key', client=client(handler))
+    try:
+        result = search_candidates(['one', 'two', 'three', 'ignored'], 5, provider=provider)
+        assert len(calls) == 4
+        recording = result['candidates'][0]
+        assert recording['url'] == 'https://www.youtube.com/watch?v=T6-GOSw4yYc'
+        assert recording['title'] == 'Publisher-page title clue: Full manufacturing event'
+        assert recording['published_at'] is recording['publisher'] is None
+        assert archive in recording['snippet']
+        assert 'unverified' in recording['snippet']
+        assert recording['discovered_by_queries'] == ['one', 'two', 'three']
+        assert len(result['candidates']) == 2
+        assert 'private-key' not in json.dumps(result)
+        assert '127.0.0.1' not in json.dumps(result)
+    finally:
+        provider.close()
+
+
+@pytest.mark.parametrize('recording_first', [True, False])
+def test_actual_recording_result_wins_metadata_over_publisher_link(recording_first):
+    archive = {'url': 'https://example.org/event', 'title': 'Wrong video title clue',
+               'publishedDate': '2025-01-01T00:00:00Z', 'author': 'Page author',
+               'extras': {'links': ['https://youtube-nocookie.com/embed/T6-GOSw4yYc']}}
+    direct = {'url': 'https://youtu.be/T6-GOSw4yYc', 'title': 'Actual recording result title',
+              'publishedDate': '2014-02-25T00:00:00Z', 'author': 'Recording publisher'}
+    rows = [direct, archive] if recording_first else [archive, direct]
+    provider = ExaSearch('test', client=client(lambda request: httpx.Response(200, json={'results': rows})))
+    try:
+        result = search_candidates(['quote'], 5, provider=provider)
+        recording = result['candidates'][0]
+        assert recording['title'] == 'Actual recording result title'
+        assert recording['publisher'] == 'Recording publisher'
+        assert recording['published_at'] == '2014-02-25T00:00:00Z'
+        assert recording['snippet'] is None
+        assert sum('T6-GOSw4yYc' in row['url'] for row in result['candidates']) == 1
+        assert any('https://example.org/event' in warning for warning in result['warnings'])
+    finally:
+        provider.close()
+
+
+@pytest.mark.parametrize('extras', [None, [], 'invalid', {}, {'links': None}, {'links': 'not-an-array'},
+                                   {'links': [None, {}, 123, 'https://internal.local/video']}])
+def test_malformed_optional_extras_do_not_discard_primary_results(extras):
+    provider = ExaSearch('test', client=client(lambda request: httpx.Response(200, json={'results': [
+        {'url': 'https://example.org/event', 'extras': extras}]})))
+    try:
+        assert len(provider.find_posts(['quote'], 5)) == 1
+    finally:
+        provider.close()
+
+
+def test_link_and_page_caps_and_submitted_exclusion_are_enforced_before_limit():
+    from backend.services.shared.post_identity import post_identity
+    self_link = 'https://www.youtube.com/watch?v=77pnVFLkUjM'
+    source = 'https://www.youtube.com/watch?v=T6-GOSw4yYc'
+    rows = [{'url': 'https://example.org/event', 'extras': {'links': [
+        self_link, 'https://youtube-nocookie.com/embed/77pnVFLkUjM', source,
+        *[None] * 7, 'https://www.youtube.com/watch?v=aqz-KE-bpKQ']}}]
+    rows.extend({'url': f'https://example.org/event/{n}'} for n in range(9))
+    rows.append({'url': 'https://example.org/ignored', 'extras': {'links': [
+        'https://www.youtube.com/watch?v=YE7VzlLtp-4']}})
+    provider = ExaSearch('test', excluded_identities={post_identity(self_link)},
+                         client=client(lambda request: httpx.Response(200, json={'results': rows})))
+    try:
+        result = provider.find_posts(['quote'], 50)
+        urls = [post['post_url'] for post, _ in result]
+        assert source in urls
+        assert not any('77pnVFLkUjM' in url or 'aqz-KE-bpKQ' in url or 'YE7VzlLtp-4' in url for url in urls)
+        assert len(urls) == 11
+        assert len(urls) == len(set(urls))
+    finally:
+        provider.close()

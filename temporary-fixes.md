@@ -453,3 +453,12 @@ source discovery is incomplete, external platform access can fail, and text
 matching does not verify authenticity or factual truth. No model was trained or
 population accuracy measured by this change. Hosted smoke results follow after
 manual deployment.
+
+### Publisher links, follow-up
+
+Added bounded publisher-linked YouTube discovery through the existing Exa search
+requests. Validated URLs remain unverified leads; page author/date are not copied
+to recording metadata. 171 affected regression tests passed and one live Exa
+payload returned HTTP200. That probe returned no embedded YouTube link, so iframe
+extraction coverage is not claimed. Native candidate analysis still checks only
+seconds0–60; broader-window retrieval remains unaddressed.

@@ -1,5 +1,6 @@
 """Bounded Exa web discovery; results remain unverified candidate pages."""
 import logging
+import re
 import ssl
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
@@ -12,6 +13,31 @@ from ..shared.post_identity import post_identity
 from .retrieve_post import _validate_url
 
 logger = logging.getLogger(__name__)
+MAX_PUBLISHER_LINKS = 10
+
+
+def _publisher_youtube_url(value):
+    """Canonicalize returned public links without fetching their destinations."""
+    if not isinstance(value, str) or len(value) > 2_048:
+        return None
+    try:
+        value, _ = _validate_url(value, allow_webpage=True)
+        parsed = urlsplit(value)
+        host = (parsed.hostname or '').lower()
+        if parsed.port not in {None, 443 if parsed.scheme == 'https' else 80}:
+            return None
+        if host in {'youtube-nocookie.com', 'www.youtube-nocookie.com'}:
+            match = re.fullmatch(r'/embed/([A-Za-z0-9_-]{11})/?', parsed.path)
+            identity = 'youtube:' + match[1] if match else ''
+        elif host in {'youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'www.youtu.be'}:
+            identity = post_identity(value)
+        else:
+            return None
+        if re.fullmatch(r'youtube:[A-Za-z0-9_-]{11}', identity):
+            return 'https://www.youtube.com/watch?v=' + identity.removeprefix('youtube:')
+    except (QuantroError, ValueError, TypeError):
+        pass
+    return None
 
 
 class ExaSearch:
@@ -44,7 +70,8 @@ class ExaSearch:
             query, domains = search
             warnings = []
             try:
-                payload = {'query': query, 'type': 'auto', 'numResults': min(limit * 4, 10)}
+                payload = {'query': query, 'type': 'auto', 'numResults': min(limit * 4, 10),
+                           'contents': {'extras': {'links': MAX_PUBLISHER_LINKS}}}
                 if domains is not None:
                     payload['includeDomains'] = domains
                 response = self._client.post('https://api.exa.ai/search',
@@ -74,7 +101,27 @@ class ExaSearch:
                     page.append(({'post_url': url,
                         'title': item.get('title') if isinstance(item.get('title'), str) else None,
                         'caption': None, 'published_at': published,
-                        'author': {'display_name': item.get('author') if isinstance(item.get('author'), str) else None}}, query))
+                        'author': {'display_name': item.get('author') if isinstance(item.get('author'), str) else None}}, query, False))
+                    extras = item.get('extras')
+                    links = extras.get('links') if isinstance(extras, dict) else None
+                    if not isinstance(links, list):
+                        continue
+                    for link in links[:MAX_PUBLISHER_LINKS]:
+                        recording = _publisher_youtube_url(link)
+                        if recording is None or post_identity(recording) in self._excluded:
+                            continue
+                        # A page link is discovery provenance, never the video's
+                        # publication date, author, caption or verified title.
+                        title = item.get('title')
+                        title = 'Publisher-page title clue: ' + ' '.join(title[:1_000].split())[:180] if isinstance(title, str) and title.strip() else None
+                        page_clue = url[:350] + (' [truncated]' if len(url) > 350 else '')
+                        if any(marker in page_clue for marker in ('/tmp/', 'file://')):
+                            page_clue = 'URL omitted from display'
+                        provenance = f'Publisher page: {page_clue}. Linked recording; this page association is unverified.'
+                        page.append(({'post_url': recording, 'title': title, 'caption': provenance,
+                                      'published_at': None, 'author': {}}, query, True))
+                        warnings.append('Publisher-linked YouTube URLs are unverified discovery leads; a page title, author and publication date do not establish recording metadata or originality.')
+                        warnings.append(provenance)
                 return page, warnings, None
             except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
                 return [], warnings, exc
@@ -102,12 +149,17 @@ class ExaSearch:
             for page in pages:
                 if rank >= len(page):
                     continue
-                post, query = page[rank]
+                post, query, publisher_linked = page[rank]
                 url = post['post_url']
                 identity = post_identity(url)
                 if identity not in unique:
-                    unique[identity] = (post, [])
+                    unique[identity] = (post, [], publisher_linked)
                     order.append(identity)
+                elif unique[identity][2] and not publisher_linked:
+                    # An actual recording search result takes metadata priority
+                    # over a referring publisher page, regardless of rank.
+                    _, matched, _ = unique[identity]
+                    unique[identity] = (post, matched, False)
                 if query not in unique[identity][1]:
                     unique[identity][1].append(query)
         # Prefer recording-shaped URLs within the already-fetched results. Keep
@@ -123,4 +175,4 @@ class ExaSearch:
         if any(recording_priority(unique[identity][0]["post_url"]) == 0 for identity in order):
             self.warnings.append('Recording links were prioritized over general pages for retrieval; source identity still requires alignment.')
         self.warnings = list(dict.fromkeys(self.warnings))
-        return [unique[url] for url in order[:limit]]
+        return [(unique[url][0], unique[url][1]) for url in order[:limit]]

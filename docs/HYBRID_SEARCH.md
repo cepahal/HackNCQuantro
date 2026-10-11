@@ -227,3 +227,18 @@ Verified locally: 446 backend regression tests, 81 frontend tests, full frontend
 ESLint, TypeScript and the production build passed. Universal original recovery,
 Instagram/TikTok access, later source windows, physical edits and factual or
 intent judgments remain unverified. Hosted rollout is a separate verification.
+
+### Publisher-linked recording discovery
+
+Exa now requests at most ten page links in each existing search request. Strict
+YouTube and no-cookie embed links become deduplicated candidate recordings with
+publisher-page provenance. Actual recording search metadata wins over page clues;
+page author/date are never assigned to the linked recording. No arbitrary local
+HTTP fetch, new dependency or extra Exa endpoint request is introduced.
+
+Verified: 171 source/Exa/hybrid/discovery regression tests passed after this
+addition. One live bounded Exa request accepted the links payload with HTTP200,
+but returned no YouTube page links for that particular query. Exa page-link
+coverage does not guarantee iframe discovery. The official Obama source was
+independently located in the government archive; automatic discovery and timed
+alignment remain separate tests.
