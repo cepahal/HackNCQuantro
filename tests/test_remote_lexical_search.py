@@ -333,7 +333,7 @@ def test_unsupported_primary_leads_cannot_hide_later_youtube_assessment(report, 
     _assert_unverified(result)
 
 
-def test_active_assessment_uses_one_fuller_context_query_preserving_spoken_words(report, search_mocks, monkeypatch):
+def test_active_assessment_keeps_exact_speech_and_adds_one_less_restrictive_event_query(report, search_mocks, monkeypatch):
     monkeypatch.setenv('SEARCH_FALLBACK_PROVIDER', 'serpapi')
     monkeypatch.setenv('SEARCH_FALLBACK_API_KEY', 'test-key')
     report.submitted.post.title = 'Bush Texas Education Address'
@@ -351,8 +351,11 @@ def test_active_assessment_uses_one_fuller_context_query_preserving_spoken_words
     search_mocks[0].assert_called_once()
     search_mocks[1].assert_called_once()
     query = search_mocks[1].call_args.args[0]
-    assert query == ['Bush Texas Education Address school funding discussion ' + QUOTE
-                     + ' site:youtube.com/watch']
+    assert query == ['Bush Texas Education Address school funding discussion site:youtube.com/watch']
+    primary = search_mocks[0].call_args.args[0].queries
+    assert primary[0] == 'Bush Texas Education Address school funding discussion ' + QUOTE
+    assert QUOTE in primary
+    assert len(primary) <= 3
     assert any('unverified search clues' in item for item in result.limitations)
     assert len(query) == 1 and len(query[0]) <= 512
     assert report.model_dump(mode='json') == before
@@ -361,9 +364,9 @@ def test_active_assessment_uses_one_fuller_context_query_preserving_spoken_words
     _assert_unverified(result)
 
 
-def test_context_query_drops_only_optional_clues_before_a_long_exact_quote():
+def test_context_query_preserves_long_exact_quote_without_named_event_metadata():
     quote = '"' + ' '.join('distinctive' * 4 + str(index) for index in range(11)) + '"'
-    assert analysis._remote_context_query([quote], 'Unverified title clue') == quote + ' site:youtube.com/watch'
+    assert analysis._remote_context_query([quote], 'unverified title clue') == quote + ' site:youtube.com/watch'
     assert analysis._remote_context_query([], 'Unverified title') is None
 
 
@@ -424,7 +427,11 @@ def test_food_order_query_keeps_tail_scene_clues_and_caption_as_unverified_locat
     search_mocks[0].assert_called_once()
     search_mocks[1].assert_called_once()
     query = search_mocks[1].call_args.args[0][0]
-    assert '"We are going to order thirty milkshakes for everyone here"' in query
+    primary = search_mocks[0].call_args.args[0].queries
+    assert '"We are going to order thirty milkshakes for everyone here"' in primary
+    assert '"We are going to order thirty milkshakes for everyone here"' in primary[0]
+    assert 'Donald' in primary[0] and 'Trump' in primary[0]
+    assert len(primary) <= 3
     assert 'Chick' in query and 'Atlanta' in query
     assert 'Vine' in query and 'City' in query
     assert ' OR ' not in query and '"full video"' not in query
@@ -451,13 +458,13 @@ def test_short_numeric_utterance_and_joint_primary_locator_survive_lexical_failu
     result = analysis._discover_remote_sources(report, object(), assess_candidates=True)
 
     primary_queries = search_mocks[0].call_args.args[0].queries
-    assert primary_queries[0] == '"30 milkshakes"'
+    assert primary_queries[1] == '"30 milkshakes"'
     assert len(primary_queries) <= analysis.REMOTE_SEARCH_QUERY_LIMIT
-    assert '"30 milkshakes"' in primary_queries[-1]
-    assert 'Trump' in primary_queries[-1] and 'Chick' in primary_queries[-1]
-    assert 'Vine' in primary_queries[-1] and 'City' in primary_queries[-1]
+    assert '"30 milkshakes"' in primary_queries[0]
+    assert 'Trump' in primary_queries[0] and 'Chick' in primary_queries[0]
+    assert 'Vine' in primary_queries[0] and 'City' in primary_queries[0]
     assert ' OR ' not in primary_queries[-1]
-    assert '"30 milkshakes"' in search_mocks[1].call_args.args[0][0]
+    assert 'Trump' in search_mocks[1].call_args.args[0][0]
     search_mocks[0].assert_called_once()
     search_mocks[1].assert_called_once()
     assert _links(result) == [PRIMARY]
@@ -477,7 +484,7 @@ def test_short_numeric_utterance_and_joint_primary_locator_survive_lexical_failu
         "You're making a lot of money?", 'Thank you very much.',
     ], '"So can I have 30 milkshakes"'),
 ])
-def test_live_failure_distinctive_speech_drives_first_primary_query(report, search_mocks, monkeypatch, title, texts, expected):
+def test_live_failure_event_and_distinctive_speech_share_recording_query(report, search_mocks, monkeypatch, title, texts, expected):
     report.submitted.post.title = title
     template = report.submitted.transcript.sentences[0]
     report.submitted.transcript.sentences = [template.model_copy(update={
@@ -490,10 +497,13 @@ def test_live_failure_distinctive_speech_drives_first_primary_query(report, sear
     before = report.submitted.transcript.model_dump(mode='json')
     analysis._discover_remote_sources(report, object(), assess_candidates=True)
     primary = search_mocks[0].call_args.args[0].queries
-    assert primary[0] == expected
+    assert expected in primary[0]
+    assert ('Obama' if 'Obama' in title else 'Trump') in primary[0]
+    assert expected in primary
     assert len(primary) <= 3 and all('Thank you' not in query for query in primary)
     lexical = search_mocks[1].call_args.args[0][0]
-    assert expected in lexical and ' OR ' not in lexical
+    assert ('Obama' if 'Obama' in title else 'Trump') in lexical
+    assert ' OR ' not in lexical
     assert report.submitted.transcript.model_dump(mode='json') == before
     search_mocks[0].assert_called_once()
     search_mocks[1].assert_called_once()

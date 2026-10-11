@@ -9,6 +9,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
+from ..external_apis.youtube_transcript import TimedCaptionCue, fetch_youtube_transcript
 from ..shared.errors import ErrorCode, QuantroError, Stage, normalize_exception
 from ..shared.post_identity import post_identities, post_identity
 from ..shared.types import (
@@ -22,7 +23,7 @@ from ..shared.types import (
     ReportV2,
     Transcript,
 )
-from ..specialist.alignment import _STOP, _align
+from ..specialist.alignment import _STOP, _align, _distinctive
 from ..specialist.comparison import compare_transcript_windows
 from .build_report import merge_limitations, sanitize_report
 from .remote_youtube import (
@@ -30,6 +31,7 @@ from .remote_youtube import (
     WINDOW_SECONDS,
     build_remote_youtube_report,
     canonical_youtube_url,
+    youtube_window_start,
 )
 
 MAX_SOURCE_CANDIDATES = 2
@@ -52,7 +54,7 @@ _WINDOW_LIMITS = [
 ]
 
 
-def _validate_window(media: ReportMedia) -> None:
+def _validate_window(media: ReportMedia, window_start_seconds: int = 0) -> None:
     """Require observed sentence bounds, never interpolate missing timing."""
     transcript = media.transcript
     if transcript.status != "partial" or not transcript.sentences or not transcript.processed_ranges:
@@ -62,13 +64,14 @@ def _validate_window(media: ReportMedia) -> None:
     if len(transcript.sentences) > 150 or sum(len(s.text) for s in transcript.sentences) > 16_000:
         raise ValueError("Native source evidence exceeds its bounded window")
     ids = set()
-    previous_end = 0.0
+    previous_end = float(window_start_seconds)
+    window_end = window_start_seconds + WINDOW_SECONDS
     for interval in transcript.processed_ranges:
-        if not 0 <= interval.start_seconds < interval.end_seconds <= WINDOW_SECONDS:
+        if not window_start_seconds <= interval.start_seconds < interval.end_seconds <= window_end:
             raise ValueError("Invalid observed interval")
     for sentence in transcript.sentences:
         if (not sentence.sentence_id.strip() or sentence.sentence_id in ids or not sentence.text.strip() or sentence.words
-                or not 0 <= sentence.start_seconds < sentence.end_seconds <= WINDOW_SECONDS
+                or not window_start_seconds <= sentence.start_seconds < sentence.end_seconds <= window_end
                 or sentence.start_seconds < previous_end):
             raise ValueError("Invalid observed speech")
         if not any(interval.start_seconds <= sentence.start_seconds < sentence.end_seconds <= interval.end_seconds
@@ -104,7 +107,7 @@ def _context(source: ReportMedia, alignment: Alignment) -> Context:
                                  if item.start_seconds < end and item.end_seconds > start])
         for index, (start, end, ids) in enumerate(spans, 1)
     ], limitations=[
-        "Context is restricted to observed speech within the requested 0–60-second source window, with up to 30 seconds of padding.",
+        "Context is restricted to observed speech within the requested source window, with up to 30 seconds of padding.",
         "Coverage is partial; absent surrounding words cannot establish that an edit removed context.",
         "Sentence text and timestamps are provider estimates; original sentence IDs and supplied bounds are preserved.",
     ])
@@ -160,6 +163,49 @@ def _safe_warning(candidate_url: str, exc: Exception) -> str:
     return f"Source candidate {candidate_url} could not be assessed ({error.code.value}); its unknown content was not treated as a mismatch."
 
 
+def _caption_window_start(transcript: Transcript, cues: list[TimedCaptionCue]) -> int | None:
+    """Locate unique speech across cue boundaries without treating captions as proof.
+
+    Eight-word fingerprints keep the scan linear in caption length. Caption cue
+    starts locate a 60-second native-video request; no cue endings are invented.
+    Repeated fingerprints cannot choose a timestamp. Native speech must still
+    pass the independent alignment and surrounding-context checks below.
+    """
+    def tokenize(text: str) -> list[str]:
+        return re.findall(r"\w+(?:['’]\w+)?", text.casefold())
+    spoken = tokenize(' '.join(sentence.text for sentence in transcript.sentences))[:1_000]
+    tokens: list[str] = []
+    starts: list[float] = []
+    for cue in cues:
+        words = tokenize(cue.text)
+        if len(tokens) + len(words) > 40_000:
+            break
+        tokens.extend(words)
+        starts.extend([cue.start_seconds] * len(words))
+    size = 8
+    positions: dict[tuple[str, ...], int | None] = {}
+    for index in range(len(tokens) - size + 1):
+        fingerprint = tuple(tokens[index:index + size])
+        positions[fingerprint] = None if fingerprint in positions else index
+    located: dict[tuple[str, ...], float] = {}
+    for index in range(len(spoken) - size + 1):
+        fingerprint = tuple(spoken[index:index + size])
+        position = positions.get(fingerprint)
+        if position is not None and _distinctive(fingerprint):
+            located[fingerprint] = starts[position]
+    if not located:
+        return None
+    times = sorted(located.values())
+    left = 0
+    best_count, best_start = 0, 0.0
+    for right, timestamp in enumerate(times):
+        while timestamp - times[left] > 30.0:
+            left += 1
+        if right - left + 1 > best_count:
+            best_count, best_start = right - left + 1, times[left]
+    return min(86_400, max(0, int(best_start) - 15))
+
+
 def _clean_stage_limits(media: ReportMedia) -> None:
     media.post.retrieval.warnings = [item for item in media.post.retrieval.warnings if item not in _UNASSESSED]
 
@@ -174,7 +220,7 @@ def assess_remote_sources(
     # aligned with shared/types.py on 2026-10-10
     result = ReportV2.model_validate(report.model_dump(mode="json"))
     try:
-        _validate_window(result.submitted)
+        _validate_window(result.submitted, youtube_window_start(result.submitted.post.post_url))
     except (TypeError, ValueError) as exc:
         raise QuantroError(ErrorCode.PROCESSING_FAILED, Stage.VERIFY_AND_ALIGN,
                           "Partial submitted speech failed source matching validation.") from exc
@@ -187,6 +233,11 @@ def assess_remote_sources(
             break
         try:
             url = canonical_youtube_url(candidate["url"])
+            try:
+                offset = youtube_window_start(candidate["url"])
+            except ValueError:
+                offset = 0
+                warnings.append("A candidate timestamp was invalid; its location remains unknown and was not guessed.")
         except (KeyError, TypeError, QuantroError):
             warnings.append("A source candidate was not a supported public YouTube recording and was not examined.")
             continue
@@ -197,13 +248,25 @@ def assess_remote_sources(
         attempted += 1
         heartbeat()  # Storage/liveness failures must propagate, not become candidate misses.
         try:
-            source_report = build_remote_youtube_report(result.job_id, url)
+            if not offset:
+                try:
+                    cues = fetch_youtube_transcript(url)
+                    located = _caption_window_start(result.submitted.transcript, cues) if cues else None
+                    if located is not None:
+                        offset = located
+                        warnings.append(f"Caption text located candidate {url} near {offset} seconds; captions are locator hints, and the requested video speech is checked separately.")
+                    elif cues:
+                        warnings.append(f"Candidate {url} had no unique distinctive caption locator; only its initial native window was checked.")
+                except QuantroError:
+                    warnings.append(f"Timed captions were unavailable for candidate {url}; only its initial native window was checked.")
+            source_report = (build_remote_youtube_report(result.job_id, url, window_start_seconds=offset)
+                             if offset else build_remote_youtube_report(result.job_id, url))
             source = ReportMedia.model_validate(source_report.submitted.model_dump(mode="json"))
             if (canonical_youtube_url(source.post.post_url) != url
                     or post_identities(result.submitted.post) & post_identities(source.post)
                     or result.submitted.post.media.media_id == source.post.media.media_id):
                 raise ValueError("Source evidence did not identify the distinct requested recording")
-            _validate_window(source)
+            _validate_window(source, offset)
             alignment = Alignment.model_validate(_align(_projection(result.submitted), _projection(source), None))
             if alignment.status != "verified" or not alignment.matches:
                 warnings.append(f"Source candidate {url} had no distinctive, uniquely located exact speech match in the observed window.")

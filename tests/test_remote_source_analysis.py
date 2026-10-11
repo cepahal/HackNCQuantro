@@ -15,6 +15,11 @@ OTHER = "The wildlife sanctuary opened a new enclosure for rescued elephants on 
 STALE = "Candidate recording downloads, alignment and source-context assessment were not performed in this fallback."
 
 
+@pytest.fixture(autouse=True)
+def _caption_provider_is_explicitly_mocked(monkeypatch):
+    monkeypatch.setattr(remote, 'fetch_youtube_transcript', lambda url: None)
+
+
 def make_report(url=SUBMITTED, text=SPEECH, *, source_context=False):
     suffix = url.split("=")[-1]
     sentences = [{"sentence_id": f"speech_{suffix}", "start_seconds": 5.0,

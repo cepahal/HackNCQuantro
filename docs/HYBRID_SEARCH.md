@@ -254,3 +254,27 @@ are excluded from publisher-link extraction. Helpful supplied names and venues
 must appear as attributed post context in the standalone overview. Final combined
 backend regression suite:484passed. Hosted source recovery remains independently
 verified after deployment; the initial live run missed the official Obama source.
+
+### Caption location and event relevance correction
+
+The first-minute-only source check missed excerpts later in a correctly found
+speech. Existing SerpAPI credentials now support one bounded timed-caption lookup
+per candidate. Unique eight-word speech fingerprints locate a short window
+anywhere within the supported 24-hour start range. Caption cues contain start
+markers only; end times and full recording duration are never inferred. Gemini
+then observes that requested 60-second video window independently. Exact speech
+alignment and additional surrounding speech are still required for a match.
+Explicit YouTube offsets are preserved and validated, and returned timestamps
+must be absolute original-video times within the requested window.
+
+Named event metadata now leads the search query budget. Candidate ranking uses
+distinct word overlap and leading-name anchors so generic recipe videos do not
+consume the limited verification slots. Unknown metadata stays unknown, and
+distinctive speech can rescue a source with differently labeled metadata. This
+heuristic can miss unusual titles and does not verify identity or originality.
+
+Verified locally: 595 affected backend tests passed. A live SerpAPI response for
+C-SPAN recording eWynt87PaJ0 returned 137 caption cues, including speech after
+13 minutes; the submitted short clip had no captions available. Caption location
+does not increase the two-candidate Gemini generation budget. Hosted matching
+is checked separately after deployment. No new API key or dependency is needed.

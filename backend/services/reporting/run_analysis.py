@@ -365,7 +365,8 @@ def _remote_metadata_clue(title: str | None, caption: str | None) -> str:
     # only the first six words. Metadata remains an unverified locator.
     title_parts = [_title_clue(' '.join((title or '').split()[offset:offset + 6]))
                    for offset in range(0, min(len((title or '').split()), 36), 6)]
-    title_words = list(dict.fromkeys(word for part in title_parts if part for word in part.split()))[:14]
+    title_words = list(dict.fromkeys(word for part in title_parts if part for word in part.split()
+                                    if word.casefold() not in _REMOTE_ANCHOR_NOISE))[:14]
     caption_clue = _title_clue(caption)
     caption_words = [word for word in (caption_clue or '').split()
                      if word.casefold() not in {item.casefold() for item in title_words}][:4]
@@ -379,9 +380,49 @@ _REMOTE_GENERIC_WORDS = _STOP | {
     'from', 'with', 'about', 'also', 'get', 'right', 'm', 're', 've',
 }
 
+_REMOTE_ANCHOR_NOISE = _REMOTE_GENERIC_WORDS | {
+    'former', 'current', 'president', 'presidential', 'minister', 'prime', 'senator',
+    'governor', 'representative', 'congressman', 'congresswoman', 'u', 's', 'us',
+    'usa', 'united', 'states', 'breaking', 'news', 'latest', 'watch', 'new', 'why',
+    'how', 'what', 'full', 'complete', 'entire', 'official', 'original', 'video',
+    'speech', 'remarks', 'interview', 'debate', 'clip', 'shorts', 'viral', 'visit',
+    'visits', 'order', 'orders', 'ordering', 'stops', 'speaks', 'talks', 'takes', 'unverified',
+}
+
 
 def _remote_distinctive_words(text: str) -> set[str]:
     return set(re.findall(r'\w+', text.casefold())) - _REMOTE_GENERIC_WORDS
+
+
+def _remote_metadata_anchors(title: str | None, caption: str | None) -> set[str]:
+    """Leading proper-name clues stay separate from an activity's venue/topic.
+
+    This bounded heuristic locates metadata, not a verified person. For a title
+    like "Person Name visits Place", a shared Place alone is insufficient.
+    """
+    for value in (title, caption):
+        if not value:
+            continue
+        prefix = re.split(r"[:|]|\b(?:orders?|ordering|buys?|buying|visits?|stops?|asks?|"
+                          r"speaks?|talks?|says?|said|discusses?|responds?|takes?|meets?)\b",
+                          value[:1_000], maxsplit=1, flags=re.IGNORECASE)[0]
+        anchors = {word.casefold() for word in re.findall(r'[^\W\d_]+', prefix)
+                   if len(word) >= 3 and word[0].isupper() and word.casefold() not in _REMOTE_ANCHOR_NOISE}
+        if anchors:
+            return anchors
+    return set()
+
+
+def _remote_candidate_relevant(candidate: dict[str, Any], title: str | None,
+                               caption: str | None, quote: str | None) -> bool:
+    """Topic-only overlap cannot link a candidate to a metadata-described event."""
+    anchors = _remote_metadata_anchors(title, caption)
+    words = _remote_distinctive_words(' '.join(value for key in ('title', 'snippet')
+                                     if isinstance(value := candidate.get(key), str))[:1_000])
+    if not anchors or not words:
+        return True  # Missing metadata cannot establish a conflict.
+    spoken = _remote_distinctive_words(quote or '')
+    return bool(words & anchors) or len(words & spoken) >= 3
 
 
 def _remote_context_quote(queries: list[str], title: str | None, caption: str | None) -> str | None:
@@ -400,11 +441,15 @@ def _remote_context_quote(queries: list[str], title: str | None, caption: str | 
 
 
 def _remote_context_query(queries: list[str], title: str | None, caption: str | None = None) -> str | None:
-    """Keep a spoken quote exact without requiring restrictive recording labels."""
+    """Use event clues when available, retaining exact speech in primary search."""
+    if not queries:
+        return None
+    metadata = _remote_metadata_clue(title, caption)
+    if metadata and _remote_metadata_anchors(title, caption):
+        return metadata + ' site:youtube.com/watch'
     quote = _remote_context_quote(queries, title, caption)
     if quote is None:
         return None
-    metadata = _remote_metadata_clue(title, caption)
     base = _with_clue(metadata, quote) or quote
     site = ' site:youtube.com/watch'
     if len(base + site) <= 512:
@@ -435,15 +480,23 @@ def _remote_context_priority(candidate: dict[str, Any]) -> tuple[int, float]:
 
 
 def _remote_relevance_priority(candidate: dict[str, Any], title: str | None,
-                               caption: str | None, quote: str | None) -> tuple[int, int, float, int]:
+                               caption: str | None, quote: str | None) -> tuple[int, int, int, int, float]:
     """Text relevance orders unverified leads; it is not match confidence."""
     words = _remote_distinctive_words(' '.join(value for key in ('title', 'snippet')
                                       if isinstance(value := candidate.get(key), str))[:1_000])
     metadata = _remote_distinctive_words(_remote_metadata_clue(title, caption))
     spoken = _remote_distinctive_words(quote or '')
-    overlap = len(words & metadata) + len(words & spoken)
+    anchors = _remote_metadata_anchors(title, caption)
+    anchor_hits = len(words & anchors)
+    # A shared topic word occurs once, even when both title and speech use it.
+    overlap = len(words & (metadata | spoken))
     fuller, duration = _remote_context_priority(candidate)
-    return (0 if overlap >= 2 else 1), fuller, duration, -overlap
+    relevance = 0 if anchor_hits else 1 if len(words & spoken) >= 3 else 2
+    if anchors:
+        # A long recording about the same person is weaker than a lead whose
+        # metadata also connects the actual event, activity and spoken wording.
+        return relevance, -anchor_hits, -overlap, fuller, duration
+    return relevance, fuller, -anchor_hits, -overlap, duration
 
 
 def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_candidates: bool = False) -> ReportV2:
@@ -488,11 +541,13 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
         primary_queries = queries
         if assess_candidates:
             spoken_quote = _remote_context_quote(queries.queries, post.title, post.caption)
-            locator = _with_clue(_remote_metadata_clue(post.title, post.caption), spoken_quote)
+            metadata = _remote_metadata_clue(post.title, post.caption)
+            locator = _with_clue(metadata, spoken_quote)
             if locator and locator != spoken_quote:
-                # Keep the first speech-only query and replace the last slot;
-                # one existing primary request now also carries event clues.
-                located = [*queries.queries[:-1], locator] if len(queries.queries) > 1 else [*queries.queries, locator]
+                # The recording-host request uses the first query. Carry event
+                # clues there, preserve actual speech separately, and reserve a
+                # metadata-only query for ASR wording that web pages do not quote.
+                located = [item for item in (locator, spoken_quote, metadata) if item]
                 primary_queries = queries.model_copy(update={'queries': list(dict.fromkeys(located))[:REMOTE_SEARCH_QUERY_LIMIT]})
         candidates = _discover_sources(primary_queries, store, _post_identities(post), warnings,
                                       SEARCH_LIMIT if assess_candidates else 3)
@@ -522,6 +577,10 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
         warnings.append("Source discovery was skipped because the partial transcript contains no distinctive searchable phrase.")
     if assess_candidates:
         quote = _remote_context_quote(queries.queries, post.title, post.caption)
+        relevant = [row for row in candidates if _remote_candidate_relevant(row, post.title, post.caption, quote)]
+        if len(relevant) < len(candidates):
+            warnings.append('Topic-only source candidates lacking an event or distinctive speech connection were excluded; metadata clues remain unverified and this relevance filter may miss differently labeled recordings.')
+        candidates = relevant
         candidates.sort(key=lambda row: _remote_relevance_priority(row, post.title, post.caption, quote))
     seen = _post_identities(post)
     eligible: list[dict[str, Any]] = []
@@ -533,7 +592,14 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
             continue
         if assess_candidates:
             try:
-                url = canonical_youtube_url(url)
+                canonical = canonical_youtube_url(url)
+                try:
+                    from .remote_youtube import youtube_window_start
+                    offset = youtube_window_start(url)
+                except ValueError:
+                    offset = 0
+                    warnings.append('A discovery timestamp was invalid; the source offset remains unknown and was not guessed.')
+                url = canonical + (f'&t={offset}' if offset else '')
             except QuantroError:
                 warnings.append("A source candidate outside the supported YouTube recording scope was excluded from remote assessment.")
                 continue

@@ -16,8 +16,8 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 from urllib.parse import parse_qsl, urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
 import httpx
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..shared.errors import ErrorCode, QuantroError, Stage
 from ..shared.types import (
@@ -40,6 +40,7 @@ from .build_report import sanitize_report
 logger = logging.getLogger(__name__)
 
 WINDOW_SECONDS = 60.0
+MAX_WINDOW_START_SECONDS = 86_400
 MAX_INPUT_TOKENS = 12_000
 MAX_OUTPUT_TOKENS = 4_096
 DEFAULT_MODEL = "gemini-3.1-flash-lite"
@@ -75,8 +76,8 @@ _PROVIDER_SCHEMA = {
 class _RemoteSentence(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
-    start_seconds: Annotated[float, Field(strict=True, ge=0, lt=WINDOW_SECONDS)]
-    end_seconds: Annotated[float, Field(strict=True, gt=0, le=WINDOW_SECONDS)]
+    start_seconds: Annotated[float, Field(strict=True, ge=0, lt=MAX_WINDOW_START_SECONDS + WINDOW_SECONDS)]
+    end_seconds: Annotated[float, Field(strict=True, gt=0, le=MAX_WINDOW_START_SECONDS + WINDOW_SECONDS)]
     text: Annotated[str, Field(strict=True, min_length=1, max_length=2_000)]
 
 
@@ -125,22 +126,48 @@ def _client_and_model() -> tuple[Any, str]:
     return client, os.getenv("GEMINI_COMPARISON_MODEL", "").strip() or DEFAULT_MODEL
 
 
+def youtube_window_start(url: str) -> int:
+    """Read an explicit public recording offset; never guess invalid/conflicting hints."""
+    canonical_youtube_url(url)
+    parsed = urlsplit(url)
+    values = [value for key, value in [*parse_qsl(parsed.query, keep_blank_values=True),
+                                      *parse_qsl(parsed.fragment, keep_blank_values=True)]
+              if key in {'t', 'start', 'time_continue'}]
+    offsets: list[int] = []
+    for value in values:
+        if re.fullmatch(r'[0-9]{1,6}', value):
+            seconds = int(value)
+        else:
+            units = re.fullmatch(r'(?:(\d{1,6})h)?(?:(\d{1,6})m)?(?:(\d{1,6})s)?', value)
+            if units is None or not any(units.groups()):
+                raise ValueError('The recording timestamp is invalid.')
+            seconds = sum(int(part or 0) * scale for part, scale in zip(units.groups(), (3_600, 60, 1), strict=True))
+        if not 0 <= seconds <= MAX_WINDOW_START_SECONDS:
+            raise ValueError('The recording timestamp exceeds the supported window range.')
+        offsets.append(seconds)
+    if len(set(offsets)) > 1:
+        raise ValueError('The recording has conflicting timestamps.')
+    return offsets[0] if offsets else 0
+
+
 def _youtube_metadata(url: str) -> dict[str, str]:
     """Read bounded public embed metadata; an uploader is not the speaker."""
     try:
         canonical = canonical_youtube_url(url)
-        with httpx.Client(timeout=5, follow_redirects=False, trust_env=False,
-                          verify=ssl.create_default_context()) as client:
-            with client.stream('GET', 'https://www.youtube.com/oembed',
-                               params={'url': canonical, 'format': 'json'}) as response:
-                response.raise_for_status()
-                if 'json' not in response.headers.get('content-type', '').lower():
+        with (
+            httpx.Client(timeout=5, follow_redirects=False, trust_env=False,
+                         verify=ssl.create_default_context()) as client,
+            client.stream('GET', 'https://www.youtube.com/oembed',
+                          params={'url': canonical, 'format': 'json'}) as response,
+        ):
+            response.raise_for_status()
+            if 'json' not in response.headers.get('content-type', '').lower():
+                return {}
+            body = bytearray()
+            for chunk in response.iter_bytes():
+                if len(body) + len(chunk) > 32_768:
                     return {}
-                body = bytearray()
-                for chunk in response.iter_bytes():
-                    if len(body) + len(chunk) > 32_768:
-                        return {}
-                    body.extend(chunk)
+                body.extend(chunk)
         raw = json.loads(body)
         if not isinstance(raw, dict):
             return {}
@@ -169,7 +196,7 @@ def _token_count(value: Any) -> int:
     return value
 
 
-def _validate_generation(response: Any) -> _RemoteTranscript:
+def _validate_generation(response: Any, *, window_start_seconds: int = 0) -> _RemoteTranscript:
     candidates = getattr(response, "candidates", None)
     if not candidates:
         raise _failure("The remote transcription provider returned no completed response.")
@@ -192,11 +219,12 @@ def _validate_generation(response: Any) -> _RemoteTranscript:
         payload = _RemoteTranscript.model_validate(json.loads(raw_text))
         if not payload.sentences:
             raise ValueError("No intelligible speech was returned")
-        previous_end = 0.0
+        previous_end = float(window_start_seconds)
         total_characters = 0
         for sentence in payload.sentences:
             if (not sentence.text.strip() or sentence.start_seconds >= sentence.end_seconds
-                    or sentence.start_seconds < previous_end):
+                    or sentence.start_seconds < previous_end
+                    or sentence.end_seconds > window_start_seconds + WINDOW_SECONDS):
                 raise ValueError("Invalid returned speech bounds")
             previous_end = sentence.end_seconds
             total_characters += len(sentence.text)
@@ -207,7 +235,7 @@ def _validate_generation(response: Any) -> _RemoteTranscript:
         raise _failure("The remote transcript failed validation; no recording evidence was accepted.") from None
 
 
-def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
+def build_remote_youtube_report(job_id: str, url: str, *, window_start_seconds: int = 0) -> ReportV2:
     """One preflight and one generation, returning an explicitly partial report.
 
     No media file, actual duration, source match, edit finding or semantic verdict
@@ -215,6 +243,10 @@ def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
     structured failure rather than declaring a successful analysis.
     """
     canonical = canonical_youtube_url(url)
+    if type(window_start_seconds) is not int or not 0 <= window_start_seconds <= MAX_WINDOW_START_SECONDS:
+        raise _failure('The requested recording window offset is invalid.')
+    window_end_seconds = window_start_seconds + int(WINDOW_SECONDS)
+    recording_url = canonical + f'&t={window_start_seconds}' if window_start_seconds else canonical
     if not isinstance(job_id, str) or not job_id.strip() or len(job_id) > 255:
         raise QuantroError(ErrorCode.PROCESSING_FAILED, Stage.RUN_ANALYSIS,
                            "The analysis job identifier is invalid.")
@@ -230,9 +262,13 @@ def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
         "These times are estimates. Never make up speech for inaccessible media or silence. "
         "If no intelligible speech is available, return sentences as an empty array."
     )
+    if window_start_seconds:
+        prompt = prompt.replace('first 60 seconds', f'window from {window_start_seconds} to {window_end_seconds} seconds')
+        prompt = prompt.replace('between 0 and 60', f'between {window_start_seconds} and {window_end_seconds}')
+        prompt += ' Use absolute original-video timestamps, never timestamps relative to this clipped window.'
     contents = [types.Content(role="user", parts=[
         types.Part(file_data=types.FileData(file_uri=canonical, mime_type="video/mp4"),
-                   video_metadata=types.VideoMetadata(start_offset="0s", end_offset="60s", fps=0.1)),
+                   video_metadata=types.VideoMetadata(start_offset=f'{window_start_seconds}s', end_offset=f'{window_end_seconds}s', fps=0.1)),
         types.Part.from_text(text=prompt),
     ])]
     client = None
@@ -247,7 +283,7 @@ def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
                     "temperature": 0, "max_output_tokens": MAX_OUTPUT_TOKENS,
                     "thinking_config": {"thinking_budget": 0}},
         )
-        evidence = _validate_generation(response)
+        evidence = _validate_generation(response, window_start_seconds=window_start_seconds)
     except QuantroError:
         raise
     except Exception as exc:  # noqa: BLE001 - Provider failures may expose credentials or signed URLs.
@@ -259,13 +295,13 @@ def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
             except Exception as exc:  # noqa: BLE001 - Cleanup must not discard validated evidence.
                 logger.warning("Remote transcription client cleanup failed (%s)", type(exc).__name__)
 
-    digest = hashlib.sha256(canonical.encode()).hexdigest()[:20]
+    digest = hashlib.sha256(recording_url.encode()).hexdigest()[:20]
     metadata = _youtube_metadata(canonical)
     # A remote reference must not look like an identifier for /media stored bytes.
     media_id = f"remote:youtube:{digest}"
     limitations = [
         "Limited transcript-only fallback: the platform blocked this server's recording download; no MP4 or JPEG file was acquired.",
-        "Only a requested window from 0 to 60 seconds was submitted to Gemini; this is not a complete-video analysis.",
+        f"Only a requested window from {window_start_seconds} to {window_end_seconds} seconds was submitted to Gemini; this is not a complete-video analysis.",
         "Transcript text and timestamps are provider estimates, not independently verified audio or recording duration.",
         NO_DISCOVERY_LIMITATION,
         "Splicing, visual edits, speaker identity, deepfakes, caption meaning and surrounding context were not assessed.",
@@ -273,7 +309,7 @@ def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
         "Playback and optional account/post metadata are unavailable; recording duration remains unknown.",
     ]
     post = PublicPost(
-        post_id=f"post_youtube_{digest}", post_url=canonical, platform="youtube",
+        post_id=f"post_youtube_{digest}", post_url=recording_url, platform="youtube",
         title=metadata.get('title'),
         author=Author(display_name=metadata.get('author_name'), profile_url=metadata.get('author_url')),
         engagement=Engagement(),
@@ -281,7 +317,7 @@ def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
         retrieval=Retrieval(
             retrieved_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             provider=f"gemini_native_youtube_transcript:{model}",
-            metadata_source_urls=[canonical],
+            metadata_source_urls=[recording_url],
             unavailable_fields=["title", "caption", "published_at", *(
                 f"author.{name}" for name in Author.model_fields
             ), *(f"engagement.{name}" for name in Engagement.model_fields), *(

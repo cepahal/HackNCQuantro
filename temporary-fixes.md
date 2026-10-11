@@ -504,3 +504,26 @@ production build. These two hosted regressions verify functionality, not
 population accuracy, independent transcript/timestamp fidelity or original-source
 recovery. Broader candidate windows and exact timed source verification remain
 unaddressed.
+
+### Later source windows and named-event relevance
+
+The prior native fallback checked only minute one even when discovery found the
+correct longer speech. Timed captions from the existing SerpAPI integration now
+locate a distinctive passage before a bounded independent Gemini video check.
+Only actual caption start markers are used. Missing end times and recording
+duration stay unknown. Absolute source offsets survive validation and report
+links. Caption-provider failure falls back to an explicitly limited initial
+window instead of inventing a match.
+
+Search sends named-event metadata first and avoids counting shared words twice.
+Named sources rank ahead of same-topic recipe videos, with distinctive actual
+speech and unknown metadata retained as alternative evidence. No scene-specific
+person or venue is hardcoded. This ranking remains a discovery heuristic.
+
+Verification: 595 backend regression tests passed, including malformed offsets,
+later-window alignment, repeated captions, cue-boundary matching, provider
+failures, false caption hits, and source self-exclusion. Live SerpAPI caption
+retrieval works for the full C-SPAN DNC speech with the existing key. Hosted
+source recovery remains a separate deployment test. General original-source
+recall, unavailable captions, large ASR differences, unobserved video, physical
+edits, deepfakes and factual truth remain unverified.
