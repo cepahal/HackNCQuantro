@@ -1,8 +1,7 @@
 # ZoomOut
 ### Team Quantro @ HackNC
 ### Members: Abdullah Siddique, Bhrigu Uppal, Grant Andrews, Jason Kasnicki 
-
-
+#### www.zoomout.tech
 
 ### Problem
 
