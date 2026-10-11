@@ -66,3 +66,10 @@
 @media(hover:none),(pointer:coarse){.custom-cursor{display:none}}
 @media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){body,body a,body button{cursor:none}}
 @media(prefers-reduced-motion:reduce){.conveyor .reel,.step-visual{transition:none}.rows span::before,.search-orbit,.passage-track i,.alignment-links path{animation:none!important}.custom-cursor{display:none}}
+.nav-links a,.report-back{min-height:44px;display:inline-flex;align-items:center}
+.report-back{padding:8px 6px}
+.mobile-player-toggle,.mobile-transcript-toggle{display:none}
+.transcript-grid .transcript-panel{display:block;min-width:0}
+.mobile-player-toggle [aria-pressed="true"],.mobile-transcript-toggle [aria-pressed="true"]{background:var(--black);color:#fff}
+@media(min-width:601px){.transcript-grid .transcript-panel{display:block}}
+@media(max-width:600px){.mobile-player-toggle,.mobile-transcript-toggle{display:flex;gap:8px;margin-bottom:12px}.transcript-grid .transcript-panel:not(.active){display:none}}

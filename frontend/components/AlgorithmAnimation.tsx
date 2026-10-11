@@ -168,7 +168,7 @@ export default function AlgorithmAnimation() {
           <div className="stage-status">SOURCE ALIGNMENT · {step + 1}/5</div>
         </div>
       </div>
-      <p className="stage-caption" aria-live="polite">{captions[step]}</p>
+      <p className="stage-caption">{captions[step]}</p>
       <p className="sr-only">A source clip is found, aligned to a timeline, and separated into gaps so missing context can be restored.</p>
     </div>
   );
