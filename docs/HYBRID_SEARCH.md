@@ -242,3 +242,15 @@ but returned no YouTube page links for that particular query. Exa page-link
 coverage does not guarantee iframe discovery. The official Obama source was
 independently located in the government archive; automatic discovery and timed
 alignment remain separate tests.
+
+### Final discovery ranking correction
+
+A hosted regression exposed generic greeting queries and unrelated video-page
+recommendations. Distinctive actual speech now drives the first provider request;
+metadata relevance precedes longer-recording hints. The optional lexical query
+uses compact metadata and exact speech without restrictive full-video OR labels,
+superseding the scene-specific query description above. YouTube recommendations
+are excluded from publisher-link extraction. Helpful supplied names and venues
+must appear as attributed post context in the standalone overview. Final combined
+backend regression suite:484passed. Hosted source recovery remains independently
+verified after deployment; the initial live run missed the official Obama source.

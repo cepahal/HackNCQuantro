@@ -352,7 +352,7 @@ def test_active_assessment_uses_one_fuller_context_query_preserving_spoken_words
     search_mocks[1].assert_called_once()
     query = search_mocks[1].call_args.args[0]
     assert query == ['Bush Texas Education Address school funding discussion ' + QUOTE
-                     + ' ("full remarks" OR "full interview" OR "full speech" OR "full video" OR "full context") site:youtube.com/watch']
+                     + ' site:youtube.com/watch']
     assert any('unverified search clues' in item for item in result.limitations)
     assert len(query) == 1 and len(query[0]) <= 512
     assert report.model_dump(mode='json') == before
@@ -427,8 +427,7 @@ def test_food_order_query_keeps_tail_scene_clues_and_caption_as_unverified_locat
     assert '"We are going to order thirty milkshakes for everyone here"' in query
     assert 'Chick' in query and 'Atlanta' in query
     assert 'Vine' in query and 'City' in query
-    assert '"full video"' in query and '"full visit"' in query and '"original footage"' in query
-    assert '"full speech"' not in query and '"full remarks"' not in query
+    assert ' OR ' not in query and '"full video"' not in query
     assert len(query) <= 512
     assert report.model_dump(mode='json') == before
     assert any('unverified search clues' in item for item in result.limitations)
@@ -452,7 +451,7 @@ def test_short_numeric_utterance_and_joint_primary_locator_survive_lexical_failu
     result = analysis._discover_remote_sources(report, object(), assess_candidates=True)
 
     primary_queries = search_mocks[0].call_args.args[0].queries
-    assert primary_queries[0] == '"I\'m going to take care of the customers"'
+    assert primary_queries[0] == '"30 milkshakes"'
     assert len(primary_queries) <= analysis.REMOTE_SEARCH_QUERY_LIMIT
     assert '"30 milkshakes"' in primary_queries[-1]
     assert 'Trump' in primary_queries[-1] and 'Chick' in primary_queries[-1]
@@ -464,3 +463,47 @@ def test_short_numeric_utterance_and_joint_primary_locator_survive_lexical_failu
     assert _links(result) == [PRIMARY]
     assert report.model_dump(mode='json') == before
     _assert_unverified(result)
+
+
+@pytest.mark.parametrize(('title', 'texts', 'expected'), [
+    ("Obama: 'We're building Iron Man'", [
+        'Today I am joined by researchers who invent some of the most advanced metals on the planet.',
+        "Basically, I'm here to announce that we're building Iron Man.",
+        "We've been this has been a secret project we've been working on for a long time.",
+        'Thank you very much.',
+    ], '"Basically I\'m here to announce that we\'re building Iron Man"'),
+    ('Former U.S. president Donald Trump orders 30 milkshakes at Atlanta Chick-fil-A', [
+        'So can I have 30 milkshakes?', "I'm going to take care of the customers.",
+        "You're making a lot of money?", 'Thank you very much.',
+    ], '"So can I have 30 milkshakes"'),
+])
+def test_live_failure_distinctive_speech_drives_first_primary_query(report, search_mocks, monkeypatch, title, texts, expected):
+    report.submitted.post.title = title
+    template = report.submitted.transcript.sentences[0]
+    report.submitted.transcript.sentences = [template.model_copy(update={
+        'sentence_id': f'observed_{index}', 'text': text,
+        'start_seconds': float(index * 6), 'end_seconds': float(index * 6 + 5),
+    }) for index, text in enumerate(texts)]
+    monkeypatch.setenv('SEARCH_FALLBACK_PROVIDER', 'serpapi')
+    monkeypatch.setenv('SEARCH_FALLBACK_API_KEY', 'test-key')
+    monkeypatch.setattr(analysis, 'assess_remote_sources', lambda result, *args: result)
+    before = report.submitted.transcript.model_dump(mode='json')
+    analysis._discover_remote_sources(report, object(), assess_candidates=True)
+    primary = search_mocks[0].call_args.args[0].queries
+    assert primary[0] == expected
+    assert len(primary) <= 3 and all('Thank you' not in query for query in primary)
+    lexical = search_mocks[1].call_args.args[0][0]
+    assert expected in lexical and ' OR ' not in lexical
+    assert report.submitted.transcript.model_dump(mode='json') == before
+    search_mocks[0].assert_called_once()
+    search_mocks[1].assert_called_once()
+
+
+def test_related_event_lead_precedes_unrelated_full_recording_without_filtering_everything():
+    related = {'title': 'Obama remarks on manufacturing innovation Iron Man', 'snippet': 'Full remarks'}
+    unrelated = {'title': 'Cuphead secret project full video', 'snippet': 'Duration: 20 minutes'}
+    rows = [unrelated, related]
+    rows.sort(key=lambda row: analysis._remote_relevance_priority(
+        row, "Obama: We're building Iron Man", None, '"we\'re building Iron Man"'))
+    assert rows == [related, unrelated]
+    assert analysis._remote_context_quote(['"Thank you very much"'], None, None) is None

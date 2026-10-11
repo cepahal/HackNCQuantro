@@ -323,6 +323,20 @@ def test_actual_recording_result_wins_metadata_over_publisher_link(recording_fir
         provider.close()
 
 
+def test_video_page_recommendation_links_are_not_publisher_source_evidence():
+    direct = 'https://www.youtube.com/watch?v=77pnVFLkUjM'
+    provider = ExaSearch('test', client=client(lambda request: httpx.Response(200, json={'results': [{
+        'url': direct, 'title': 'Actual search hit',
+        'extras': {'links': ['https://www.youtube.com/watch?v=YFsoSkcfQcw']},
+    }]})))
+    try:
+        result = search_candidates(['distinctive speech'], 5, provider=provider)
+        assert [item['url'] for item in result['candidates']] == [direct]
+        assert not any('Publisher page:' in warning for warning in result['warnings'])
+    finally:
+        provider.close()
+
+
 @pytest.mark.parametrize('extras', [None, [], 'invalid', {}, {'links': None}, {'links': 'not-an-array'},
                                    {'links': [None, {}, 123, 'https://internal.local/video']}])
 def test_malformed_optional_extras_do_not_discard_primary_results(extras):

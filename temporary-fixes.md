@@ -462,3 +462,24 @@ to recording metadata. 171 affected regression tests passed and one live Exa
 payload returned HTTP200. That probe returned no embedded YouTube link, so iframe
 extraction coverage is not claimed. Native candidate analysis still checks only
 seconds0–60; broader-window retrieval remains unaddressed.
+
+### Live-regression corrections
+
+The first hosted Obama/milkshake run exposed weak generic query ordering, overly
+restrictive lexical labels and YouTube recommendation-link pollution. The
+algorithm now sends the most distinctive metadata/numeric-correlated actual
+speech first, removes generic greetings, keeps more title clues, and ranks
+text-relevant candidates before fuller-recording hints. The lexical query uses
+compact metadata plus exact speech without requiring full-video label terms.
+YouTube page outbound recommendations are not publisher recording evidence.
+
+The overview must use helpful supplied names/activity/venue with explicit post
+attribution instead of anonymizing those clues. No identity verification is
+implied. Final combined backend regressions: 484 passed in8.78seconds. Frontend
+remains the separately verified81tests/build release.
+
+The literal word secret occurs in the actual Obama speech and some public video
+titles. The initial keyword-only leak check falsely flagged that content. Both
+live JSON reports passed checks for configured credential values and internal
+paths; quoted speech was preserved. Original recovery and broader windows remain
+unverified, and the first hosted runs still returned no_verified_match.

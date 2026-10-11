@@ -102,6 +102,10 @@ class ExaSearch:
                         'title': item.get('title') if isinstance(item.get('title'), str) else None,
                         'caption': None, 'published_at': published,
                         'author': {'display_name': item.get('author') if isinstance(item.get('author'), str) else None}}, query, False))
+                    # Video-page outbound links commonly contain unrelated
+                    # recommendations, not a publisher's event recording.
+                    if _publisher_youtube_url(url) is not None:
+                        continue
                     extras = item.get('extras')
                     links = extras.get('links') if isinstance(extras, dict) else None
                     if not isinstance(links, list):

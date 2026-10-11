@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Literal, TypeVar
 
 from ..external_apis.build_search_queries import (
+    _STOP,
     _phrase,
     _title_clue,
     _with_clue,
@@ -362,9 +363,8 @@ def _remote_metadata_clue(title: str | None, caption: str | None) -> str:
     """Bound unverified entity/event/activity hints without inferring new facts."""
     # Preserve scene/event clues at the end of long titles rather than using
     # only the first six words. Metadata remains an unverified locator.
-    title_parts = [_title_clue(title)]
-    if title and len(title.split()) > 8:
-        title_parts.append(_title_clue(' '.join(title.split()[-4:])))
+    title_parts = [_title_clue(' '.join((title or '').split()[offset:offset + 6]))
+                   for offset in range(0, min(len((title or '').split()), 36), 6)]
     title_words = list(dict.fromkeys(word for part in title_parts if part for word in part.split()))[:14]
     caption_clue = _title_clue(caption)
     caption_words = [word for word in (caption_clue or '').split()
@@ -372,37 +372,43 @@ def _remote_metadata_clue(title: str | None, caption: str | None) -> str:
     return ' '.join([*title_words, *caption_words])[:240]
 
 
+_REMOTE_GENERIC_WORDS = _STOP | {
+    'so', 'can', 'have', 'am', 'by', 'who', 'some', 'most', 'here', 'there',
+    'very', 'much', 'going', 'take', 'care', 'now', 'today', 'basically',
+    'been', 'has', 'will', 'would', 'could', 'should', 'our', 'your', 'their',
+    'from', 'with', 'about', 'also', 'get', 'right', 'm', 're', 've',
+}
+
+
+def _remote_distinctive_words(text: str) -> set[str]:
+    return set(re.findall(r'\w+', text.casefold())) - _REMOTE_GENERIC_WORDS
+
+
 def _remote_context_quote(queries: list[str], title: str | None, caption: str | None) -> str | None:
     """Rank unchanged speech by bounded numeric and metadata-overlap clues."""
     if not queries:
         return None
-    metadata_words = set(re.findall(r'\w+', _remote_metadata_clue(title, caption).casefold()))
+    metadata_words = _remote_distinctive_words(_remote_metadata_clue(title, caption))
 
     def priority(text: str) -> tuple[int, int, int]:
-        words = set(re.findall(r'\w+', text.casefold()))
+        words = _remote_distinctive_words(text)
         clue_score = 3 * len(words & metadata_words) + 4 * sum(any(c.isdigit() for c in word) for word in words)
         return clue_score, len(words), len(text)
 
-    return max(queries, key=priority)
+    searchable = [query for query in queries if _remote_distinctive_words(query)]
+    return max(searchable, key=priority) if searchable else None
 
 
 def _remote_context_query(queries: list[str], title: str | None, caption: str | None = None) -> str | None:
-    """Keep a spoken quote exact while spending one lexical request on fuller context."""
+    """Keep a spoken quote exact without requiring restrictive recording labels."""
     quote = _remote_context_quote(queries, title, caption)
     if quote is None:
         return None
     metadata = _remote_metadata_clue(title, caption)
     base = _with_clue(metadata, quote) or quote
-    scene = ' '.join((title or '', caption or '', quote)).casefold()
-    everyday_scene = bool(re.search(r'\b(?:orders?|ordering|restaurant|milkshakes?|burgers?|chick|mcdonalds?|visits?|visiting|food)\b', scene))
-    intent = (' ("full video" OR "full visit" OR "extended" OR "original footage" OR "full context")'
-              if everyday_scene else
-              ' ("full remarks" OR "full interview" OR "full speech" OR "full video" OR "full context")')
     site = ' site:youtube.com/watch'
-    if len(base + intent + site) <= 512:
-        return base + intent + site
-    if len(quote + intent + site) <= 512:
-        return quote + intent + site
+    if len(base + site) <= 512:
+        return base + site
     # Preserve an unusually long complete quote rather than truncating evidence.
     return quote + site
 
@@ -428,6 +434,18 @@ def _remote_context_priority(candidate: dict[str, Any]) -> tuple[int, float]:
     return priority, -(duration or 0)
 
 
+def _remote_relevance_priority(candidate: dict[str, Any], title: str | None,
+                               caption: str | None, quote: str | None) -> tuple[int, int, float, int]:
+    """Text relevance orders unverified leads; it is not match confidence."""
+    words = _remote_distinctive_words(' '.join(value for key in ('title', 'snippet')
+                                      if isinstance(value := candidate.get(key), str))[:1_000])
+    metadata = _remote_distinctive_words(_remote_metadata_clue(title, caption))
+    spoken = _remote_distinctive_words(quote or '')
+    overlap = len(words & metadata) + len(words & spoken)
+    fuller, duration = _remote_context_priority(candidate)
+    return (0 if overlap >= 2 else 1), fuller, duration, -overlap
+
+
 def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_candidates: bool = False) -> ReportV2:
     """Discover leads from partial text without inventing timed source evidence."""
     post = report.submitted.post
@@ -450,7 +468,14 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
                          if assess_candidates and re.search(r'\d', part)
                          and (phrase := _phrase(part, minimum=2))))
     distinctive = _remote_context_quote([*clues, *numeric_clues], post.title, post.caption) if assess_candidates else None
-    if len(clues) > 1:
+    if assess_candidates:
+        available = list(dict.fromkeys([*clues, *numeric_clues]))
+        available = [clue for clue in available if _remote_distinctive_words(clue)]
+        # The first query drives the recording-host request and provider round-robin.
+        # Spend that slot on actual distinctive speech, never a generic greeting.
+        clues = ([distinctive] if distinctive else []) + [clue for clue in available if clue != distinctive]
+        clues = clues[:REMOTE_SEARCH_QUERY_LIMIT]
+    elif len(clues) > 1:
         # A short clip's distinctive payoff can follow a generic opening.
         # Cover its end, beginning and middle instead of dropping the last quote.
         clues = list(dict.fromkeys(clues[index] for index in (len(clues) - 1, 0, len(clues) // 2)))[:REMOTE_SEARCH_QUERY_LIMIT]
@@ -496,7 +521,8 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
     else:
         warnings.append("Source discovery was skipped because the partial transcript contains no distinctive searchable phrase.")
     if assess_candidates:
-        candidates.sort(key=_remote_context_priority)
+        quote = _remote_context_quote(queries.queries, post.title, post.caption)
+        candidates.sort(key=lambda row: _remote_relevance_priority(row, post.title, post.caption, quote))
     seen = _post_identities(post)
     eligible: list[dict[str, Any]] = []
     for candidate in candidates:

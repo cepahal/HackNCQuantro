@@ -94,6 +94,9 @@ def test_exact_title_caption_and_uploader_are_supplied_as_attributed_metadata(re
     assert payload["caption"] == report.submitted.post.caption
     assert payload["sentences"][0]["text"] == report.submitted.transcript.sentences[0].text
     assert "explicit attribution" in prompt
+    assert "include those helpful details in the overview" in prompt
+    assert "Lead with this attributed context" in prompt
+    assert "Do not anonymize a supplied relevant name into 'a person'" in prompt
     assert "not necessarily the speaker" in prompt
     assert "Never claim that a person's face, voice, identity" in prompt
     assert "explicitly assuming it is political speech" not in prompt
@@ -114,15 +117,15 @@ def test_real_food_order_words_allow_a_concrete_nonpolitical_no_match_reading(re
     ]
     report.submitted.transcript.processed_ranges[0].end_seconds = float(len(words) * 2)
     provider.payload["overview"] = (
-        "The speaker orders 30 milkshakes and some chicken, offers to pay for customers, and chats about business. "
-        "The title identifies the speaker as Donald Trump and places the visit at an Atlanta Chick-fil-A."
+        "The post identifies this as Donald Trump placing an order at an Atlanta Chick-fil-A. "
+        "He asks for 30 milkshakes and chicken, offers to pay for customers, and jokes about business."
     )
     before = report.model_dump(mode="json")
     result = module.interpret_submitted(report)
     payload = json.loads(provider.calls[0]["prompt"].split("\n", 1)[1])
 
-    assert result.summary.startswith(module.SUMMARY_PREFIX + "The speaker orders 30 milkshakes")
-    assert "The title identifies the speaker as Donald Trump" in result.summary
+    assert result.summary.startswith(module.SUMMARY_PREFIX + "The post identifies this as Donald Trump")
+    assert "30 milkshakes and chicken" in result.summary
     assert "Chick-fil-A" in result.summary and "McDonald's" not in result.summary
     assert "Assuming this is political speech" not in result.summary
     assert [item["text"] for item in payload["sentences"]] == words
@@ -132,6 +135,21 @@ def test_real_food_order_words_allow_a_concrete_nonpolitical_no_match_reading(re
     assert report.model_dump(mode="json") == before
     assert module.FACT_INTENT_LIMIT in result.summary
     assert len(provider.calls) == 1 and provider.calls[0]["max_attempts"] == 1
+
+
+def test_attribution_instruction_is_generic_and_does_not_invent_a_person_or_venue(report, provider):
+    report.submitted.post.title = "Maya orders coffee at Pine Cafe"
+    provider.payload["overview"] = "The title describes Maya ordering coffee at Pine Cafe. The supplied speech discusses schools."
+
+    result = module.interpret_submitted(report)
+    prompt = provider.calls[0]["prompt"]
+
+    assert "Maya orders coffee at Pine Cafe" in prompt
+    assert "Donald Trump" not in prompt and "Chick-fil-A" not in prompt
+    assert "if metadata conflicts with the speech, describe that disagreement" in prompt
+    assert "The title describes Maya" in result.summary
+    assert result.source is result.context is result.comparison is None
+    assert len(provider.calls) == 1
 
 
 def test_metadata_is_bounded_without_changing_the_original_post(report, provider):
