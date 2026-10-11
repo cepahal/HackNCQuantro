@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import ssl
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -38,7 +39,10 @@ def _provider_failure(provider: str, exc: Exception | None = None) -> None:
         reason = "provider_unavailable"
     elif isinstance(exc, (TimeoutError, ConnectionError, httpx.TransportError)):
         reason = "network_failed"
-    elif isinstance(exc, (ValueError, TypeError, IndexError, AttributeError)):
+    elif isinstance(exc, (ValueError, TypeError, IndexError, AttributeError)) or (
+        isinstance(exc, QuantroError)
+        and exc.message == "The context assessment did not pass its evidence checks."
+    ):
         reason = "invalid_response"
     else:
         reason = "provider_failed"
@@ -137,12 +141,18 @@ def _gemini_json_response(prompt: str) -> dict[str, Any]:
     raise ValueError("No usable language response")
 
 
-def _json_response(prompt: str) -> dict[str, Any]:
-    """Keep the original Groq path; use Gemini if that optional provider fails."""
+def _json_response(
+    prompt: str,
+    *,
+    validate: Callable[[dict[str, Any], str], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Accept a provider only after its output passes the caller's evidence checks."""
     key = os.getenv("GROQ_API_KEY", "").strip()
     if key:
         try:
             value = _groq_json_response(prompt, key)
+            if validate is not None:
+                value = validate(value, "groq")
             record("language_assessment", "completed", {"provider": "groq"})
             return value
         except Exception as exc:  # noqa: BLE001 - SDK failures are projected to status/category only.
@@ -151,6 +161,8 @@ def _json_response(prompt: str) -> dict[str, Any]:
         _provider_failure("groq")
     try:
         value = _gemini_json_response(prompt)
+        if validate is not None:
+            value = validate(value, "gemini")
         record("language_assessment", "recovered", {"provider": "gemini"})
         return value
     except Exception as exc:  # noqa: BLE001 - Keep provider details out of public errors.
@@ -205,8 +217,13 @@ def interpret_clip(post: Post, features: MediaFeatures) -> str:
         "At most 85 words total. Plain text, no em dashes, Markdown or links. "
         "Evidence JSON:\n" + json.dumps(payload, ensure_ascii=False)
     )
+    def validate(data: dict[str, Any], _provider: str) -> dict[str, Any]:
+        _prose(data.get("takeaways"), 500)
+        _prose(data.get("meaning"), 650)
+        return data
+
     try:
-        data = _json_response(prompt)
+        data = _json_response(prompt, validate=validate)
         takeaway = _prose(data.get("takeaways"), 500)
         meaning = _prose(data.get("meaning"), 650)
     except (TypeError, ValueError):
@@ -303,7 +320,7 @@ def _compare_clip_once(
         "Return the following JSON with exact keys: "
         '{"context_assessment":"material_context_missing|no_material_difference_found|uncertain|not_assessed",'
         '"caption_assessment":"supported_by_context|contradicted_by_context|uncertain|not_provided|not_assessed",'
-        '"assessment_confidence":{"level":"moderate|low|not_assessed","method":"groq_transcript_context",'
+        '"assessment_confidence":{"level":"moderate|low|not_assessed","method":"transcript_context",'
         '"basis":["short reason"],"limitations":[]},'
         '"summary":"Takeaways: one concrete sentence.\\n\\nWhat this means: two sentences about the observed context.'
         '\\n\\nReliability: one short sentence about evidence limits.",'
@@ -326,7 +343,22 @@ def _compare_clip_once(
             "values, use one verbatim supplied sentence per quote and its media/sentence ID, "
             "and use not_provided for an absent caption. Omit any unsupported finding."
         )
-    raw = _json_response(prompt)
+    def validate(raw: dict[str, Any], provider: str) -> dict[str, Any]:
+        result = _validate_comparison(raw, post, features, context)
+        result.assessment_confidence.method = f"{provider}_transcript_context"
+        return result.model_dump(mode="json")
+
+    raw = _json_response(prompt, validate=validate)
+    return _validate_comparison(raw, post, features, context)
+
+
+def _validate_comparison(
+    raw: dict[str, Any], post: Post, features: MediaFeatures, context: Context
+) -> Comparison:
+    """Keep schema and exact-quotation validation identical for both providers."""
+    source_sentences = {
+        s.sentence_id: s for window in context.windows for s in window.sentences
+    }
     try:
         result = Comparison.model_validate(raw)
         result.summary = _prose(result.summary)

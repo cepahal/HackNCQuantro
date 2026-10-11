@@ -396,7 +396,7 @@ def test_comparison_citations_and_timestamps_are_checked(monkeypatch):
     context = run.build_context(run.build_alignment(clip, source, 96.3), source)
     raw = comparison().model_dump(mode="json")
     raw["findings"][0]["evidence"][0].update(start_seconds=0.0, end_seconds=1.0)
-    monkeypatch.setattr(analysis, "_json_response", lambda _: raw)
+    monkeypatch.setattr(analysis, "_json_response", lambda _, **kwargs: raw)
     checked = analysis.compare_clip(post, clip, context)
     assert checked.findings[0].evidence[0].start_seconds == 100.0
     raw["findings"][0]["evidence"][0]["quote"] = "Invented words"
@@ -424,7 +424,7 @@ def test_comparison_rejects_reordered_quote(monkeypatch):
         sentence_ids=["source_2", "source_1"],
         quote=source.transcript.sentences[2].text + " " + WORDS,
     )
-    monkeypatch.setattr(analysis, "_json_response", lambda _: raw)
+    monkeypatch.setattr(analysis, "_json_response", lambda _, **kwargs: raw)
     with pytest.raises(QuantroError):
         analysis.compare_clip(post, clip, context)
 
@@ -435,7 +435,7 @@ def test_incomplete_context_cannot_claim_no_difference(monkeypatch):
     context = run.build_context(run.build_alignment(clip, source, 96.3), source)
     context.windows[0].coverage = "partial"
     monkeypatch.setattr(
-        analysis, "_json_response", lambda _: comparison().model_dump(mode="json")
+        analysis, "_json_response", lambda _, **kwargs: comparison().model_dump(mode="json")
     )
     result = analysis.compare_clip(post, clip, context)
     assert result.context_assessment.value == "uncertain"
@@ -458,7 +458,7 @@ def test_numeric_or_negation_difference_survives_context_and_model_comparison(
     assert analysis.WORDING_DIFFERENCE_LIMITATION in context.limitations
     prompts = []
 
-    def respond(prompt):
+    def respond(prompt, **kwargs):
         prompts.append(prompt)
         return comparison().model_dump(mode="json")
 
@@ -480,7 +480,7 @@ def test_invalid_citation_gets_one_repair_without_relaxing_checks(monkeypatch):
     responses = iter([bad, comparison().model_dump(mode="json")])
     calls = []
 
-    def respond(prompt):
+    def respond(prompt, **kwargs):
         calls.append(prompt)
         return next(responses)
 
@@ -615,7 +615,7 @@ def test_wording_guard_replaces_stale_summary_with_or_without_headers(
     context.windows[0].coverage = coverage
     raw = comparison().model_dump(mode="json")
     raw["summary"] = summary
-    monkeypatch.setattr(analysis, "_json_response", lambda _: raw)
+    monkeypatch.setattr(analysis, "_json_response", lambda _, **kwargs: raw)
     result = analysis.compare_clip(post, clip, context)
     assert result.context_assessment.value == "uncertain"
     assert result.assessment_confidence.level.value == "low"
@@ -654,7 +654,7 @@ def test_absent_caption_does_not_block_extractive_transcript_summary(monkeypatch
         raw["context_assessment"] = "not_assessed"
         raw["assessment_confidence"]["level"] = "not_assessed"
     calls = []
-    def respond(prompt):
+    def respond(prompt, **kwargs):
         calls.append(prompt)
         return raw
     monkeypatch.setattr(analysis, "_json_response", respond)
@@ -679,7 +679,7 @@ def test_absent_caption_repair_preserves_wording_difference_guard(monkeypatch):
     context = run.build_context(run.build_alignment(clip, source, 100), source)
     raw = comparison().model_dump(mode="json")
     raw["summary"] = "No caption was supplied, so a transcript comparison is impossible."
-    monkeypatch.setattr(analysis, "_json_response", lambda _: raw)
+    monkeypatch.setattr(analysis, "_json_response", lambda _, **kwargs: raw)
     result = analysis.compare_clip(post, clip, context)
     assert result.context_assessment.value == "uncertain"
     assert result.assessment_confidence.level.value == "low"
@@ -694,7 +694,7 @@ def test_harmless_absent_caption_note_preserves_substantive_summary(monkeypatch)
     context = run.build_context(run.build_alignment(clip, source, 96.3), source)
     raw = comparison().model_dump(mode="json")
     raw["summary"] = "Takeaways: No caption was provided, but the available transcript shows the speaker urging graduates to earn their success.\n\nWhat this means: The source expands the point by discussing fair opportunity.\n\nReliability: We cannot assess authenticity from the transcript."
-    monkeypatch.setattr(analysis, "_json_response", lambda _: raw)
+    monkeypatch.setattr(analysis, "_json_response", lambda _, **kwargs: raw)
     result = analysis.compare_clip(post, clip, context)
     assert "urging graduates to earn their success" in result.summary
     assert "discussing fair opportunity" in result.summary
