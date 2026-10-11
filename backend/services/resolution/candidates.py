@@ -28,6 +28,7 @@ from rapidfuzz import fuzz
 from ..shared.post_identity import post_identity
 from .diagnostics import record
 from .download import _guarded_call, fetch_media_info
+from .groq_search import search_source_links
 from .transcribe import (
     _fetch_youtube_captions_sync,
     extract_youtube_id,
@@ -38,7 +39,9 @@ logger = logging.getLogger(__name__)
 
 MATCH_THRESHOLD = 75.0
 MIN_DURATION_S = 30.0
-MAX_CANDIDATES = 6
+MAX_CANDIDATES = 12
+MAX_WHISPER_CANDIDATES = 6
+MAX_SEARCH_QUERIES = 6
 WHISPER_FALLBACK_MAX_S = 90 * 60
 _SEARCH_RESULTS = 12
 _LLM_TRANSCRIPT_CHARS = 6000
@@ -87,6 +90,7 @@ class SearchMetadata(TypedDict):
     query: str
     title_query: str
     visual_queries: NotRequired[list[str]]
+    secondary_phrase: NotRequired[str]
 
 
 class ScoredCandidate(TypedDict):
@@ -140,6 +144,23 @@ def _fallback_phrase(normalized: str, n_words: int = 8) -> str:
 def clean_title(title: str | None) -> str:
     cleaned = normalize_text(_TITLE_NOISE.sub(" ", title or ""))
     return cleaned if len(cleaned.split()) >= 2 else ""
+
+
+def _secondary_phrase(transcript: str, phrase: str) -> str:
+    """Select one substantive observed passage disjoint from the primary anchor."""
+    words = normalize_text(transcript[:_LLM_TRANSCRIPT_CHARS]).split()
+    anchor = normalize_text(phrase).split()
+    positions = [index for index in range(len(words) - len(anchor) + 1)
+                 if words[index:index + len(anchor)] == anchor] if anchor else []
+    if len(anchor) < 6 or not positions:
+        return ""
+    windows = [words[index:index + 8] for index in range(len(words) - 7)
+               if all(index + 8 <= position or index >= position + len(anchor)
+                      for position in positions)]
+    if not windows:
+        return ""
+    secondary = max(windows, key=lambda window: sum(map(len, window)))
+    return " ".join(secondary) if len(set(secondary)) >= 6 and sum(map(len, secondary)) >= 40 else ""
 
 
 def build_query(speaker_and_event: str, unique_phrase: str) -> str:
@@ -459,10 +480,17 @@ async def search_candidates(
     # speech anchor independently so a wrong attribution cannot constrain every query.
     phrase = meta["unique_phrase"]
     anchor_query = build_query("", phrase) if 6 <= len(normalize_text(phrase).split()) <= 8 else ""
+    secondary = meta.get("secondary_phrase", "")
+    secondary_query = build_query("", secondary) if len(normalize_text(secondary).split()) == 8 else ""
+    # A nonempty list of irrelevant exact-quote hits must not starve relaxed
+    # discovery. Prefer the independent observed secondary anchor over an
+    # attributed speaker/title; acceptance still requires timed alignment.
+    relaxed_phrase = normalize_text(secondary or phrase)
+    relaxed_query = relaxed_phrase if 6 <= len(relaxed_phrase.split()) <= 8 else ""
     queries = list(
-        dict.fromkeys(query for query in (meta["query"], meta["title_query"], anchor_query,
-                                         *meta.get("visual_queries", [])[:2]) if query)
-    )
+        dict.fromkeys(query for query in (meta["query"], meta["title_query"], anchor_query, secondary_query,
+                                         relaxed_query, *meta.get("visual_queries", [])[:2]) if query)
+    )[:MAX_SEARCH_QUERIES]
     result_lists = await asyncio.gather(
         *(run(query) for query in queries), return_exceptions=True
     )
@@ -478,7 +506,7 @@ async def search_candidates(
         loose = " ".join(
             part for part in (meta["speaker_and_event"], meta["unique_phrase"]) if part
         )
-        if loose and loose not in queries:
+        if loose and loose not in queries and len(queries) < MAX_SEARCH_QUERIES:
             try:
                 for candidate in await run(loose):
                     if candidate.video_id not in seen:
@@ -531,6 +559,25 @@ async def _whisper_workaround(candidate: Candidate) -> dict[str, Any] | None:
 _CAPTIONS_NOT_FETCHED = object()
 
 
+def _timed_candidate_text(transcript_result: Any) -> str:
+    """Score observed timed speech only; text without usable bounds needs fallback."""
+    if not isinstance(transcript_result, dict):
+        return ""
+    segments = transcript_result.get("segments")
+    if not isinstance(segments, list):
+        return ""
+    texts = []
+    for segment in segments:
+        if not isinstance(segment, dict):
+            continue
+        start, end, text = segment.get("start"), segment.get("end"), segment.get("text")
+        if (type(start) in (int, float) and type(end) in (int, float)
+                and math.isfinite(start) and math.isfinite(end) and 0 <= start < end
+                and isinstance(text, str) and text.strip()):
+            texts.append(text)
+    return normalize_text(" ".join(texts))
+
+
 async def _candidate_captions(candidate: Candidate) -> dict[str, Any] | None:
     try:
         return await asyncio.to_thread(
@@ -545,16 +592,12 @@ async def _candidate_captions(candidate: Candidate) -> dict[str, Any] | None:
 async def _score_candidate(
     candidate: Candidate, short_norm: str, *, caption_result: Any = _CAPTIONS_NOT_FETCHED,
     store: Any = None,
+    allow_whisper: bool = True,
 ) -> ScoredCandidate | None:
     # None is an already-attempted failure, not permission to fetch captions again.
     transcript_result = (await _candidate_captions(candidate)
                          if caption_result is _CAPTIONS_NOT_FETCHED else caption_result)
-    text = (
-        transcript_result.get("transcript")
-        if isinstance(transcript_result, dict)
-        else None
-    )
-    long_norm = normalize_text(text) if isinstance(text, str) else ""
+    long_norm = _timed_candidate_text(transcript_result)
     if not long_norm and callable(getattr(store, "get_cached_source", None)):
         # Reuse only a validated prior snapshot, never imply current URL bytes were read.
         def cached_transcript():
@@ -593,15 +636,15 @@ async def _score_candidate(
             transcript_result = await asyncio.to_thread(cached_transcript)
         except Exception:  # noqa: BLE001 - Optional storage failure must preserve Whisper fallback.
             transcript_result = None
-        text = transcript_result.get("transcript") if isinstance(transcript_result, dict) else None
-        long_norm = normalize_text(text) if isinstance(text, str) else ""
+        long_norm = _timed_candidate_text(transcript_result)
     if not long_norm:
         # A provider returning an empty transcript is also a caption failure.
+        if not allow_whisper:
+            return None
         transcript_result = await _whisper_workaround(candidate)
         if not isinstance(transcript_result, dict):
             return None
-        text = transcript_result.get("transcript")
-        long_norm = normalize_text(text) if isinstance(text, str) else ""
+        long_norm = _timed_candidate_text(transcript_result)
         if not long_norm:
             return None
     score = float(await asyncio.to_thread(fuzz.partial_ratio, short_norm, long_norm))
@@ -615,15 +658,20 @@ async def _score_candidate(
     }
 
 
-async def _archive_candidates(store, phrase: str, excluded: set[str]) -> list[Candidate]:
+async def _archive_candidates(store, phrase: str, excluded: set[str], *, transcript: str = "") -> list[Candidate]:
     """Archive metadata supplies leads only, never recording text or timing."""
     lookup = getattr(store, "find_transcript_posts", None)
     if not callable(lookup) or not phrase.strip():
         return []
+    queries = [phrase[:512]]
+    # A separate observed passage can survive a single ASR error in the anchor.
+    # Never derive archive queries from attributed titles or invented metadata.
+    if secondary := _secondary_phrase(transcript, phrase):
+        queries.append(secondary)
     try:
         excluded_identities = [post_identity(f"https://www.youtube.com/watch?v={video_id}")
                                for video_id in sorted(excluded) if _VIDEO_ID.fullmatch(video_id)]
-        rows = await asyncio.to_thread(lookup, [phrase[:512]], MAX_CANDIDATES, excluded_identities)
+        rows = await asyncio.to_thread(lookup, list(dict.fromkeys(queries)), MAX_CANDIDATES, excluded_identities)
     except Exception:  # noqa: BLE001 - Optional archive failure must preserve web discovery.
         return []
     found = []
@@ -670,31 +718,51 @@ async def find_source_video(
         raise CandidateSearchError("no_transcript", "Transcript is empty.")
     started = time.monotonic()
     meta = await extract_search_metadata(transcript, title)
+    if secondary := _secondary_phrase(short_norm, meta.get("unique_phrase", "")):
+        meta["secondary_phrase"] = secondary
     if discovery_hints and (visual_queries := _visual_queries(discovery_hints, meta.get("unique_phrase", ""))):
         meta["visual_queries"] = visual_queries
     record("build_search_queries", "completed", dict(meta), started=started)
     started = time.monotonic()
     excluded = set(exclude_ids or ())
-    if store is None:
-        candidates = await search_candidates(meta, excluded, max_candidates)
-    else:
-        web, local = await asyncio.gather(
-            search_candidates(meta, excluded, max_candidates),
-            _archive_candidates(store, meta["unique_phrase"] or _fallback_phrase(short_norm), excluded),
-            return_exceptions=True,
-        )
-        if isinstance(web, Exception) and not local:
-            raise web
-        web = web if isinstance(web, list) else []
-        local = local if isinstance(local, list) else []
-        candidates = []
-        seen = set(excluded)
-        # Reserve four web positions and two archive positions, then fill unused slots.
-        for candidate in [*web[:4], *local[:2], *web[4:], *local[2:]]:
-            if candidate.video_id not in seen:
-                seen.add(candidate.video_id)
-                candidates.append(candidate)
-        candidates = candidates[:max(0, min(max_candidates, MAX_CANDIDATES))]
+    searches = [
+        search_candidates(meta, excluded, max_candidates),
+        search_source_links(title=title or "", transcript=transcript, limit=12),
+    ]
+    if store is not None:
+        searches.append(_archive_candidates(
+            store, meta["unique_phrase"] or _fallback_phrase(short_norm),
+            excluded, transcript=short_norm,
+        ))
+    results = await asyncio.gather(*searches, return_exceptions=True)
+    web, groq = results[:2]
+    local = results[2] if len(results) > 2 and isinstance(results[2], list) else []
+    grounded = []
+    grounded_ids = set(excluded)
+    for row in groq[:12] if isinstance(groq, list) else []:
+        if not isinstance(row, dict):
+            continue
+        video_id = _serpapi_video_id({"link": row.get("url", row.get("link", ""))})
+        if video_id is not None and video_id not in grounded_ids:
+            grounded_ids.add(video_id)
+            found_title = row.get("title")
+            grounded.append(Candidate(
+                video_id, found_title[:500] if isinstance(found_title, str) else "", None,
+            ))
+            if len(grounded) == 4:
+                break
+    if isinstance(web, Exception) and not local and not grounded:
+        raise web
+    web = web if isinstance(web, list) else []
+    candidates = []
+    seen = set(excluded)
+    # Reserve independent search positions so twelve lexical hits cannot hide
+    # a grounded browser-search lead. All still require timed speech alignment.
+    for candidate in [*web[:4], *grounded, *local[:2], *web[4:], *local[2:]]:
+        if candidate.video_id not in seen:
+            seen.add(candidate.video_id)
+            candidates.append(candidate)
+    candidates = candidates[:max(0, min(max_candidates, MAX_CANDIDATES))]
     record("search_candidates", "discovered", {"search_metadata": meta, "candidate_count": len(candidates),
            "candidates": [{"video_id": item.video_id, "video_url": item.url, "title": item.title, "duration": item.duration} for item in candidates]}, started=started)
     leads = [
@@ -714,10 +782,11 @@ async def find_source_video(
             return await _candidate_captions(candidate), started
     prefetched = await asyncio.gather(*(prefetch(candidate) for candidate in candidates))
     scored: list[ScoredCandidate] = []
+    missing: list[tuple[Candidate, float]] = []
     for candidate, (caption_result, started) in zip(candidates, prefetched):
         data = {"video_id": candidate.video_id, "video_url": candidate.url, "title": candidate.title, "duration": candidate.duration}
         try:
-            kwargs = {"caption_result": caption_result}
+            kwargs = {"caption_result": caption_result, "allow_whisper": False}
             if store is not None:
                 kwargs["store"] = store
             result = await _score_candidate(candidate, short_norm, **kwargs)
@@ -731,14 +800,51 @@ async def find_source_video(
             scored.append(result)
             record("candidate_transcript", "scored", dict(result), started=started)
         else:
-            record("candidate_transcript", "unavailable", {**data, "reason": "no_usable_candidate_transcript"}, started=started)
-    # Python's stable sort resolves score ties by original interleaved search rank.
-    scored.sort(key=lambda candidate: candidate["match_score"], reverse=True)
+            missing.append((candidate, started))
+    # Expanded caption discovery must not expand paid/audio fallback work.
+    audio_attempts = 0
+    audio_budget_skipped = 0
+    for candidate, started in missing:
+        result = None
+        eligible = candidate.duration is None or MIN_DURATION_S <= candidate.duration <= WHISPER_FALLBACK_MAX_S
+        reason = "audio_duration_outside_budget" if not eligible else "no_usable_candidate_transcript"
+        if eligible and audio_attempts < MAX_WHISPER_CANDIDATES:
+            # Unknown-duration probes count too; repeated failures cannot expand work.
+            audio_attempts += 1
+            try:
+                result = await _score_candidate(candidate, short_norm, caption_result=None)
+            except Exception as exc:  # noqa: BLE001 - One audio failure must not abort other leads.
+                logger.warning("Skipping audio candidate %s (%s).", candidate.video_id, type(exc).__name__)
+        elif eligible:
+            reason = "audio_fallback_budget_exhausted"
+            audio_budget_skipped += 1
+        data = {"video_id": candidate.video_id, "video_url": candidate.url,
+                "title": candidate.title, "duration": candidate.duration}
+        if result is not None:
+            scored.append(result)
+            record("candidate_transcript", "scored", dict(result), started=started)
+        else:
+            record("candidate_transcript", "unavailable", {**data, "reason": reason}, started=started)
+    # Two phases must still resolve equal scores by original discovery rank.
+    ranks = {candidate.video_id: index for index, candidate in enumerate(candidates)}
+    scored.sort(key=lambda candidate: (-candidate["match_score"], ranks[candidate["video_id"]]))
     scored_ids = {candidate["video_id"] for candidate in scored}
     leads_by_id = {lead["video_id"]: lead for lead in leads}
     leads = [leads_by_id[candidate["video_id"]] for candidate in scored] + [
         lead for lead in leads if lead["video_id"] not in scored_ids
     ]
+    if grounded:
+        # Presentation only: garbled captions must not promote an unrelated
+        # lexical hit above the independent browser-search leads. Matching
+        # still uses the unchanged timed-transcript scores and alignment.
+        browser_ids = {candidate.video_id for candidate in grounded}
+        scores = {candidate["video_id"]: candidate["match_score"] for candidate in scored}
+        title_clue = clean_title(title)
+        leads.sort(key=lambda lead: (
+            scores.get(lead["video_id"], 0) >= threshold,
+            lead["video_id"] in browser_ids,
+            fuzz.token_set_ratio(title_clue, clean_title(lead["title"])) if title_clue else 0,
+        ), reverse=True)
     unavailable_count = len(candidates) - len(scored)
     warnings = (
         [
@@ -747,6 +853,8 @@ async def find_source_video(
         if unavailable_count
         else []
     )
+    if audio_budget_skipped:
+        warnings.append(f"Audio transcription fallback was limited to {MAX_WHISPER_CANDIDATES} source candidates; additional unavailable transcripts remain unverified leads.")
     if meta.get("visual_queries"):
         warnings.append("Visual search clues are provider estimates; they do not verify speaker identity, the event or a source match.")
     for item in scored:

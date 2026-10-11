@@ -168,21 +168,28 @@ test("submitted and matched recordings remain separately visible", () => {
   assert.match(primary, /aria-label="Source video result"/);
   assert.match(primary, /aria-label="Matched source recording"/);
   assert.match(primary, /Verified speech match/);
+  const sourceVideo = primary.split('aria-label="Source video result"')[1]!.split('aria-label="Spliced context video"')[0]!;
+  assert.doesNotMatch(sourceVideo, /Unverified candidate:|youtube-nocookie\.com\/embed\/FX6GQSyxA-8/);
   assert.match(primary, /aria-label="Submitted excerpt"/);
   assert.ok(html.indexOf('aria-label="Source video result"') < html.indexOf('aria-label="Report verdict"'));
   assert.match(html, /<details[^>]*aria-label="Submitted clip"[^>]*><summary/);
   assert.doesNotMatch(html, /<details[^>]*aria-label="Submitted clip"[^>]* open|Compare the recordings/);
 });
 
-test("without verification the view centers recorded candidate options without analytics or invented matches", () => {
+test("without verification the first lead is previewed with an explicit unmatched-speech note", () => {
   const value = unmatchedReport();
   const before = JSON.stringify(value);
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
   const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
   assert.match(primary, /Top candidate recording/);
-  assert.match(primary, /No verified source video is available/);
+  assert.match(primary, /Unverified lead/);
+  assert.match(primary, /Search found this recording, but its speech has not been matched to your clip\./);
+  assert.match(primary, /<iframe[^>]+src="https:\/\/www\.youtube-nocookie\.com\/embed\/FX6GQSyxA-8\?playsinline=1&amp;rel=0"/);
+  assert.match(primary, /title="Unverified candidate: Top candidate recording"/);
+  assert.match(primary, /Open candidate on YouTube/);
   assert.match(primary, /Recheck Possible related recording/);
-  assert.doesNotMatch(primary, /Source analysis|Four layers|Verified speech match|<iframe/);
+  assert.doesNotMatch(primary, /Source analysis|Four layers|Verified speech match|autoplay|autoPlay/);
+  assert.equal((primary.match(/<iframe/g) ?? []).length, 1);
   assert.match(primary, /aria-label="Submitted excerpt"/);
   assert.equal((primary.match(/<video/g) ?? []).length, 1);
   assert.equal((primary.match(/<button/g) ?? []).length, 4);
@@ -204,6 +211,16 @@ test("an unmatched report with no lead has disabled empty options and preserves 
   assert.match(html, /&quot;submitted&quot;:/);
   assert.match(html, /aria-label="Submitted excerpt"/);
   assert.doesNotMatch(html, /Other source candidates/);
+  assert.doesNotMatch(primary, /<iframe|Unverified candidate:|Search found this recording/);
+});
+
+test("unsafe saved candidate URLs cannot create a primary preview", () => {
+  const value = unmatchedReport();
+  value.limitations = ["Unverified source candidate: https://youtube.com.attacker.example/watch?v=FX6GQSyxA-8"];
+  const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
+  const sourceVideo = html.split('aria-label="Source video result"')[1]!.split('aria-label="Spliced context video"')[0]!;
+  assert.match(sourceVideo, /No verified source video is available/);
+  assert.doesNotMatch(sourceVideo, /<iframe|attacker\.example|Search found this recording/);
 });
 
 test("stale unmatched source fields cannot acquire a verified label in the main result", () => {

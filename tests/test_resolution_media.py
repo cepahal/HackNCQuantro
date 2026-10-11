@@ -3,7 +3,7 @@
 import asyncio
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from youtube_transcript_api import InvalidVideoId, RequestBlocked, TranscriptsDisabled
@@ -69,6 +69,87 @@ def test_unavailable_video_does_not_invoke_remote_reader(monkeypatch):
     )
     with pytest.raises(QuantroError):
         asyncio.run(media.resolve_media(URL))
+
+
+@pytest.mark.parametrize("later_code", ["download_failed", "format_unavailable", "missing_api_key"])
+def test_initial_bot_challenge_survives_later_audio_failure(monkeypatch, later_code):
+    from backend.services.reporting import remote_youtube
+
+    monkeypatch.setenv("RESOLUTION_DOWNLOAD_VIDEO", "true")
+    monkeypatch.setattr(media, "download_short_media", AsyncMock(side_effect=download.MediaDownloadError(
+        "auth_required", "private signed-token=never-publish", URL
+    )))
+    monkeypatch.setattr(media, "get_video_transcript", AsyncMock(side_effect=transcribe.TranscriptionError(
+        later_code, "private provider response", URL
+    )))
+    remote = SimpleNamespace(submitted=SimpleNamespace(
+        transcript=SimpleNamespace(sentences=[SimpleNamespace(
+            text="Observed speech from the public recording.", start_seconds=0.0, end_seconds=4.0
+        )]), post=SimpleNamespace(title="Public clip")
+    ))
+    reader = Mock(return_value=remote)
+    monkeypatch.setattr(remote_youtube, "build_remote_youtube_report", reader)
+    _, features = asyncio.run(media.resolve_media(URL))
+    reader.assert_called_once()
+    assert features.transcript.status == TranscriptStatus.PARTIAL
+    assert features.transcript.sentences[0].text == "Observed speech from the public recording."
+    assert "private provider response" not in features.model_dump_json()
+
+
+@pytest.mark.parametrize("later_code", ["private", "unavailable", "geo_restricted", "no_audio", "auth_failed", "rate_limited"])
+def test_initial_bot_challenge_does_not_mask_different_failure(monkeypatch, later_code):
+    from backend.services.reporting import remote_youtube
+
+    monkeypatch.setenv("RESOLUTION_DOWNLOAD_VIDEO", "true")
+    monkeypatch.setattr(media, "download_short_media", AsyncMock(side_effect=download.MediaDownloadError(
+        "auth_required", "private provider response", URL
+    )))
+    monkeypatch.setattr(media, "get_video_transcript", AsyncMock(side_effect=transcribe.TranscriptionError(
+        later_code, "private provider response", URL
+    )))
+    monkeypatch.setattr(remote_youtube, "build_remote_youtube_report", lambda *args, **kwargs: pytest.fail("Different failure must not trigger the bot fallback"))
+    with pytest.raises(QuantroError) as caught:
+        asyncio.run(media.resolve_media(URL))
+    assert caught.value.retrieval_reason == later_code
+
+
+def test_typed_download_failure_uses_independent_remote_reader(monkeypatch):
+    from backend.services.reporting import remote_youtube
+
+    monkeypatch.setenv("RESOLUTION_DOWNLOAD_VIDEO", "true")
+    monkeypatch.setattr(media, "download_short_media", AsyncMock(side_effect=download.MediaDownloadError(
+        "download_failed", "private provider response", URL
+    )))
+    monkeypatch.setattr(media, "get_video_transcript", AsyncMock(side_effect=transcribe.TranscriptionError(
+        "download_failed", "private provider response", URL
+    )))
+    remote = SimpleNamespace(submitted=SimpleNamespace(
+        transcript=SimpleNamespace(sentences=[SimpleNamespace(
+            text="Observed speech from the public recording.", start_seconds=0.0, end_seconds=4.0
+        )]), post=SimpleNamespace(title="Public clip")
+    ))
+    reader = Mock(return_value=remote)
+    monkeypatch.setattr(remote_youtube, "build_remote_youtube_report", reader)
+    _, features = asyncio.run(media.resolve_media(URL))
+    reader.assert_called_once()
+    assert features.transcript.sentences[0].text == "Observed speech from the public recording."
+
+
+def test_download_failure_diagnostics_keep_code_without_provider_text(monkeypatch):
+    from backend.services.resolution.diagnostics import DiagnosticCapture
+
+    monkeypatch.setenv("RESOLUTION_DOWNLOAD_VIDEO", "true")
+    monkeypatch.setattr(media, "download_short_media", AsyncMock(side_effect=download.MediaDownloadError(
+        "auth_required", "private signed-token=never-publish", URL
+    )))
+    monkeypatch.setattr(media, "get_video_transcript", AsyncMock(return_value=RESULT))
+    capture = DiagnosticCapture("job_blocked", SimpleNamespace(save_diagnostics=lambda *args: None))
+    with capture.bind():
+        asyncio.run(media.resolve_media(URL))
+    event = capture.events[0]
+    assert event["stage"] == "retrieve_video"
+    assert event["data"] == {"code": "auth_required", "reason": "platform_challenge"}
+    assert "never-publish" not in json.dumps(capture.events)
 
 
 @pytest.fixture(autouse=True)

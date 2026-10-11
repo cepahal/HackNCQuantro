@@ -8,8 +8,10 @@ import math
 import os
 import re
 import subprocess
+import time
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import PrivateAttr, ValidationError
 
@@ -28,13 +30,50 @@ from ..shared.types import (
     TranscriptStatus,
     TranscriptWord,
 )
+from .diagnostics import record
 from .download import (
     MediaDownloadError,
     detect_platform,
     download_short_media,
     fetch_youtube_oembed,
 )
-from .transcribe import TranscriptionError, extract_youtube_id, get_video_transcript
+from .transcribe import (
+    TranscriptionError,
+    _timed_speech_words,
+    extract_youtube_id,
+    get_video_transcript,
+)
+
+_Result = TypeVar("_Result")
+
+
+def _temporary_transcription_failure(error: Exception) -> bool:
+    if isinstance(error, TranscriptionError):
+        return error.code in {"network_error", "rate_limited"}
+    if isinstance(error, QuantroError):
+        return (
+            error.retryable
+            and error.stage == Stage.EXTRACT_MEDIA_FEATURES
+            and error.code in {ErrorCode.TRANSCRIPTION_FAILED, ErrorCode.PROCESSING_FAILED}
+        )
+    return isinstance(error, (TimeoutError, ConnectionError, subprocess.TimeoutExpired))
+
+
+async def _retry_transcription(
+    operation: Callable[[], Awaitable[_Result]], *, stage: str
+) -> _Result:
+    """Retry temporary speech-provider failures twice, without restarting the job."""
+    for attempt in range(3):
+        try:
+            return await operation()
+        except Exception as error:
+            if attempt == 2 or not _temporary_transcription_failure(error):
+                raise
+            record(stage, "retrying", {
+                "reason": "temporary_transcription_failure", "retryable": True,
+            })
+            await asyncio.sleep(3)
+    raise AssertionError("Unreachable transcription retry state")
 
 
 class _ResolvedFeatures(MediaFeatures):
@@ -126,9 +165,20 @@ def _timed_words(
 
 async def _transcript_for_media(*args: Any, **kwargs: Any) -> dict[str, Any]:
     """Separate failed media access from speech extraction without provider text."""
+    started = time.monotonic()
+    record("transcribe_media", "started", {})
     try:
-        return await get_video_transcript(*args, **kwargs)
-    except QuantroError:
+        result = await _retry_transcription(
+            lambda: get_video_transcript(*args, **kwargs), stage="transcribe_media",
+        )
+        record("transcribe_media", "completed", {
+            "transcript_source": result.get("source"),
+        }, started=started)
+        return result
+    except QuantroError as error:
+        record("transcribe_media", "failed", {
+            "code": error.code.value, "retryable": error.retryable,
+        }, started=started)
         raise
     except Exception as exc:
         retrieval_failed = isinstance(exc, TranscriptionError) and exc.code in {
@@ -167,7 +217,95 @@ async def _transcript_for_media(*args: Any, **kwargs: Any) -> dict[str, Any]:
                 exc.code == "auth_required"
                 or getattr(exc, "platform_challenge", False) is True
             )
+        record("transcribe_media", "failed", {
+            "code": error.code.value, "retryable": error.retryable,
+        }, started=started)
         raise error from exc
+
+
+async def _native_youtube_transcript(
+    url: str,
+    *,
+    reason: str,
+    discovery_hints: list[str],
+    warnings: list[str],
+    minimum_timed_words: int = 0,
+) -> dict[str, Any]:
+    """Read one bounded public window without promoting metadata into speech."""
+    from ..reporting.remote_youtube import (
+        WINDOW_SECONDS,
+        build_remote_youtube_report,
+        youtube_window_start,
+    )
+
+    try:
+        window_start = youtube_window_start(url)
+    except ValueError:
+        raise QuantroError(ErrorCode.INVALID_URL, Stage.RETRIEVE_POST) from None
+    window_options = {"window_start_seconds": window_start} if window_start else {}
+    fallback_started = time.monotonic()
+    record("native_youtube_fallback", "started", {
+        "reason": reason, "start_seconds": window_start,
+        "end_seconds": window_start + WINDOW_SECONDS,
+    })
+
+    async def read_window():
+        attempt_hints: list[str] = []
+        result = await asyncio.to_thread(
+            build_remote_youtube_report, "retrieval_fallback", url,
+            discovery_hints=attempt_hints, **window_options,
+        )
+        discovery_hints.extend(attempt_hints)
+        return result
+
+    try:
+        remote = await _retry_transcription(
+            read_window, stage="native_youtube_fallback",
+        )
+    except QuantroError as error:
+        safe_message = error.message if re.fullmatch(
+            r"Gemini (?:request failed(?: \(HTTP [1-5][0-9]{2}\))?|request timed out|connection failed)\.",
+            error.message,
+        ) else QuantroError(error.code, error.stage).message
+        record("native_youtube_fallback", "failed", {
+            "code": error.code.value, "stage": error.stage.value,
+            "retryable": error.retryable, "message": safe_message,
+        }, started=fallback_started)
+        raise
+    except Exception as error:  # noqa: BLE001 - Record type only; caller decides whether recovery is optional.
+        record("native_youtube_fallback", "failed", {
+            "exception_type": type(error).__name__,
+        }, started=fallback_started)
+        raise
+    speech = remote.submitted.transcript.sentences
+    transcript = {
+        "transcript": " ".join(sentence.text for sentence in speech),
+        "segments": [{"text": sentence.text, "start": sentence.start_seconds,
+                      "end": sentence.end_seconds} for sentence in speech],
+        "source": "gemini_native_youtube_transcript", "coverage": "partial",
+        "duration_known": False, "title": remote.submitted.post.title,
+    }
+    if _timed_speech_words(transcript) <= minimum_timed_words:
+        record("native_youtube_fallback", "unavailable", {
+            "reason": "no_additional_timed_speech" if minimum_timed_words
+            else "no_usable_transcript",
+        }, started=fallback_started)
+        raise QuantroError(ErrorCode.TRANSCRIPTION_FAILED, Stage.EXTRACT_MEDIA_FEATURES)
+    record("native_youtube_fallback", "completed", {
+        "coverage": "partial", "start_seconds": window_start,
+        "end_seconds": window_start + WINDOW_SECONDS,
+    }, started=fallback_started)
+    observed_window = (
+        f"the window from {window_start} to {window_start + int(WINDOW_SECONDS)} seconds"
+        if window_start else "the first 60 seconds"
+    )
+    warnings.extend([
+        f"Local YouTube speech retrieval was limited; Gemini supplied a partial transcript from {observed_window}.",
+        "Gemini transcript words and timestamps are estimates; audio and visual authenticity were not assessed.",
+    ])
+    if discovery_hints:
+        warnings.append("Unverified visual search clues supplement discovery only; they do not establish identity, dates, speech or source context.")
+    return transcript
 
 
 async def resolve_media(
@@ -184,6 +322,9 @@ async def resolve_media(
     download: dict[str, Any] | None = None
     warnings: list[str] = []
     discovery_hints: list[str] = []
+    download_challenged = False
+    download_recoverable = False
+    download_terminal = False
     if transcript_result is not None:
         transcript = dict(transcript_result)
         if platform == "youtube":
@@ -193,13 +334,31 @@ async def resolve_media(
     elif platform == "youtube":
         # Follow the prototype: acquire the submitted clip, then prefer captions.
         # A blocked recording must not discard independently available captions.
-        if os.getenv("RESOLUTION_DOWNLOAD_VIDEO", "true").lower() == "true":
+        download_enabled = os.getenv("RESOLUTION_DOWNLOAD_VIDEO", "true").lower() == "true"
+        if download_enabled:
+            download_started = time.monotonic()
             try:
                 download = await download_short_media(url)
                 info = {**download, **info}
-            except MediaDownloadError:
+            except MediaDownloadError as exc:
+                download_challenged = exc.code == "auth_required"
+                download_recoverable = exc.code in {
+                    "auth_required", "download_failed", "format_unavailable",
+                }
+                download_terminal = exc.code in {
+                    "private", "unavailable", "geo_restricted", "file_too_large",
+                }
+                record("retrieve_video", "unavailable", {
+                    "code": exc.code if exc.code in {
+                        "auth_required", "private", "geo_restricted", "unavailable",
+                        "format_unavailable", "download_failed", "file_too_large",
+                    } else "download_failed",
+                    "reason": "platform_challenge" if download_challenged else "video_download_unavailable",
+                }, started=download_started)
                 warnings.append(
-                    "YouTube blocked the video download. Available captions can still be matched; audio and visual forensics were not assessed."
+                    ("YouTube blocked the video download." if download_challenged
+                     else "The YouTube video file could not be downloaded.")
+                    + " Available captions can still be matched; audio and visual forensics were not assessed."
                 )
         else:
             warnings.append(
@@ -210,30 +369,72 @@ async def resolve_media(
                 url, download["file_path"] if download else None, known_info=info or None
             )
         except QuantroError as error:
-            if not (error.code == ErrorCode.MEDIA_UNAVAILABLE
-                    and getattr(error, "platform_challenge", False)):
+            reason = getattr(error, "retrieval_reason", None)
+            # Independent native-video reading can recover acquisition failures,
+            # including format/network failures without an explicit bot message.
+            # It must not retry existing-file ASR or terminal/provider failures.
+            recoverable_after_download = download_recoverable and reason in {
+                "auth_required", "download_failed", "format_unavailable", "missing_api_key",
+            }
+            terminal_failure = download_terminal or reason in {
+                "private", "unavailable", "geo_restricted", "no_audio",
+                "auth_failed", "rate_limited", "file_too_large",
+            }
+            challenged = download_challenged or getattr(error, "platform_challenge", False)
+            fallback_allowed = download is None and not terminal_failure and (
+                error.code == ErrorCode.MEDIA_UNAVAILABLE and (
+                    challenged or reason in {"auth_required", "download_failed", "format_unavailable"}
+                ) or recoverable_after_download
+            )
+            fallback_reason = "platform_challenge" if challenged else "video_download_unavailable"
+            record("retrieve_transcript", "unavailable", {
+                "code": error.code.value,
+                "reason": fallback_reason if fallback_allowed else "transcript_unavailable",
+                "retryable": error.retryable,
+            })
+            if not fallback_allowed:
                 raise
-            # Reuse the bounded reader only after a classified automation block.
-            # Continue normal discovery rather than returning its standalone report.
-            from ..reporting.remote_youtube import build_remote_youtube_report
             try:
-                remote = await asyncio.to_thread(build_remote_youtube_report, "retrieval_fallback", url, discovery_hints=discovery_hints)
-            except QuantroError:
+                transcript = await _native_youtube_transcript(
+                    url, reason=fallback_reason,
+                    discovery_hints=discovery_hints, warnings=warnings,
+                )
+            except QuantroError as fallback_error:
+                if fallback_error.code == ErrorCode.INVALID_URL:
+                    raise
                 raise error from error.__cause__
-            speech = remote.submitted.transcript.sentences
-            if not speech:
-                raise
-            warnings.extend([
-                "YouTube blocked native retrieval; Gemini supplied a partial transcript from the first 60 seconds.",
-                "Gemini transcript words and timestamps are estimates; audio and visual authenticity were not assessed.",
-            ])
-            if discovery_hints:
-                warnings.append("Unverified visual search clues supplement discovery only; they do not establish identity, dates, speech or source context.")
-            transcript = {"transcript": " ".join(s.text for s in speech),
-                          "segments": [{"text": s.text, "start": s.start_seconds,
-                                        "end": s.end_seconds} for s in speech],
-                          "source": "gemini_native_youtube_transcript", "coverage": "partial",
-                          "duration_known": False, "title": remote.submitted.post.title}
+        if (
+            transcript.get("discovery_inadequate") is True
+            and download is None
+            and not download_terminal
+            and transcript.get("discovery_recovery_error") not in {
+                "private", "unavailable", "geo_restricted", "no_audio",
+                "auth_failed", "rate_limited", "file_too_large",
+            }
+            and (download_recoverable or not download_enabled)
+        ):
+            # Sparse captions are useful evidence, but may omit the quotation.
+            # Preserve them unless one independent window adds timed speech.
+            recovery_warnings: list[str] = []
+            recovery_hints: list[str] = []
+            try:
+                recovered = await _native_youtube_transcript(
+                    url, reason="sparse_caption_evidence",
+                    discovery_hints=recovery_hints, warnings=recovery_warnings,
+                    minimum_timed_words=_timed_speech_words(transcript),
+                )
+            except QuantroError as recovery_error:
+                if recovery_error.code == ErrorCode.INVALID_URL:
+                    raise
+                warnings.append("Independent video reading did not add usable timed speech; the available captions were retained.")
+            except Exception:  # noqa: BLE001 - Optional recovery cannot discard observed captions.
+                warnings.append("Independent video reading did not add usable timed speech; the available captions were retained.")
+            else:
+                warnings.extend(warning for warning in transcript.get("warnings", [])
+                                if isinstance(warning, str))
+                warnings.extend(recovery_warnings)
+                discovery_hints.extend(recovery_hints)
+                transcript = recovered
         if not info.get("title") and not transcript.get("title"):
             try:
                 info = {**(await fetch_youtube_oembed(url)), **info}

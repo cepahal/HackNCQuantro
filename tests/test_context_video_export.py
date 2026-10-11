@@ -160,6 +160,34 @@ def test_cached_source_rejects_wrong_mime_or_digest(monkeypatch, tmp_path, mime,
     assert store.closed and not output.exists()
 
 
+@pytest.mark.parametrize('mode,reason', [('miss', 'cache_miss'), ('failed', 'cache_read_failed'),
+                                      ('invalid', 'integrity_or_type_invalid'), ('hit', 'cache_hit')])
+def test_source_cache_diagnostics_are_fixed_safe_reasons(monkeypatch, tmp_path, mode, reason):
+    import hashlib
+    data = b'media bytes'
+    class Store:
+        closed = False
+        def read_media(self, media_id):
+            if mode == 'failed':
+                raise RuntimeError('secret=private /tmp/cache.mp4')
+            if mode == 'miss':
+                return None
+            return ('image/jpeg' if mode == 'invalid' else 'video/mp4', data, hashlib.sha256(data).hexdigest())
+        def close(self):
+            self.closed = True
+    store = Store()
+    monkeypatch.setattr(cv.TigerDataPostStore, 'from_env', lambda: store)
+    events = []
+    monkeypatch.setattr(cv, 'record', lambda *args: events.append(args))
+    output = tmp_path / 'source.mp4'
+    result = cv._cached_source('source_media', output)
+    assert bool(result) is (mode == 'hit')
+    assert store.closed
+    assert events == [('context_source_cache', 'completed' if mode == 'hit' else 'unavailable',
+                       {'media_id': 'source_media', 'reason': reason})]
+    assert 'secret' not in str(events) and '/tmp/' not in str(events)
+
+
 def test_existing_local_source_has_priority_over_tiger(monkeypatch, tmp_path):
     path = tmp_path / 'source.mp4'
     path.write_bytes(b'local')

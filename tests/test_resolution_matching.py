@@ -22,6 +22,157 @@ A, B, C, D, SELF = (
 )
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source_rank", range(7, 13))
+async def test_expanded_caption_budget_recovers_later_source(monkeypatch, source_rank):
+    from unittest.mock import AsyncMock
+    ids = [f"R{i:010d}" for i in range(12)]
+    monkeypatch.setattr(candidates, "extract_search_metadata", AsyncMock(return_value={
+        "query": "speech", "title_query": "", "unique_phrase": "speech", "speaker_and_event": ""}))
+    monkeypatch.setattr(candidates, "_search", AsyncMock(return_value=[
+        candidates.Candidate(video_id, "Full recording", 900) for video_id in ids]))
+    async def captions(candidate):
+        return transcript(PASSAGE if candidate.video_id == ids[source_rank-1] else "Unrelated engineering equipment calibration.")
+    monkeypatch.setattr(candidates, "_candidate_captions", captions)
+    audio = AsyncMock(side_effect=AssertionError("Caption leads must not require audio"))
+    monkeypatch.setattr(candidates, "_whisper_workaround", audio)
+    result = await candidates.find_source_video(PASSAGE)
+    assert result["video_id"] == ids[source_rank-1] and result["status"] == "success"
+    assert len(result["leads"]) == 12
+    audio.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_caption_failures_have_six_audio_attempts_after_all_captions(monkeypatch):
+    from unittest.mock import AsyncMock
+    ids = [f"R{i:010d}" for i in range(12)]
+    monkeypatch.setattr(candidates, "extract_search_metadata", AsyncMock(return_value={}))
+    monkeypatch.setattr(candidates, "search_candidates", AsyncMock(return_value=[
+        candidates.Candidate(video_id, "Recording", 900) for video_id in ids]))
+    captioned = []
+    async def captions(candidate):
+        captioned.append(candidate.video_id)
+    audio = []
+    async def whisper(candidate):
+        assert len(captioned) == 12
+        audio.append(candidate.video_id)
+        raise RuntimeError("Provider unavailable")
+    monkeypatch.setattr(candidates, "_candidate_captions", captions)
+    monkeypatch.setattr(candidates, "_whisper_workaround", whisper)
+    result = await candidates.find_source_video(PASSAGE)
+    assert result["status"] == "not_found" and audio == ids[:6]
+    assert len(result["leads"]) == 12
+
+
+@pytest.mark.asyncio
+async def test_rank_five_missing_caption_source_keeps_prior_audio_recovery(monkeypatch):
+    from unittest.mock import AsyncMock
+    ids = [f"R{i:010d}" for i in range(8)]
+    monkeypatch.setattr(candidates, "extract_search_metadata", AsyncMock(return_value={}))
+    monkeypatch.setattr(candidates, "search_candidates", AsyncMock(return_value=[
+        candidates.Candidate(video_id, "Recording", 300) for video_id in ids]))
+    monkeypatch.setattr(candidates, "_candidate_captions", AsyncMock(return_value=None))
+    audio = []
+    async def whisper(candidate):
+        audio.append(candidate.video_id)
+        return transcript(PASSAGE) if candidate.video_id == ids[4] else None
+    monkeypatch.setattr(candidates, "_whisper_workaround", whisper)
+    result = await candidates.find_source_video(PASSAGE)
+    assert result["status"] == "success" and result["video_id"] == ids[4]
+    assert audio == ids[:6]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("durations,expected", [([7200, 7200, *([300] * 6)], list(range(2, 8))),
+                                                ([*([None] * 6), 300, 300], list(range(6)))])
+async def test_audio_budget_skips_known_ineligible_but_counts_unknown_probes(monkeypatch, durations, expected):
+    from unittest.mock import AsyncMock
+    ids = [f"R{i:010d}" for i in range(8)]
+    monkeypatch.setattr(candidates, "extract_search_metadata", AsyncMock(return_value={}))
+    monkeypatch.setattr(candidates, "search_candidates", AsyncMock(return_value=[
+        candidates.Candidate(video_id, "Recording", duration) for video_id, duration in zip(ids, durations)]))
+    monkeypatch.setattr(candidates, "_candidate_captions", AsyncMock(return_value=None))
+    audio = AsyncMock(return_value=None)
+    monkeypatch.setattr(candidates, "_whisper_workaround", audio)
+    events = []
+    monkeypatch.setattr(candidates, "record", lambda stage, status, data, **kwargs: events.append(data))
+    result = await candidates.find_source_video(PASSAGE)
+    assert [call.args[0].video_id for call in audio.await_args_list] == [ids[i] for i in expected]
+    assert len(result["leads"]) == 8 and result["status"] == "not_found"
+    if durations[0] is not None:
+        assert sum(data.get("reason") == "audio_duration_outside_budget" for data in events) == 2
+        assert not any(data.get("reason") == "audio_fallback_budget_exhausted" for data in events)
+    else:
+        assert sum(data.get("reason") == "audio_fallback_budget_exhausted" for data in events) == 2
+
+
+@pytest.mark.asyncio
+async def test_secondary_observed_archive_phrase_recovers_one_asr_anchor_error(tmp_path):
+    from datetime import UTC, datetime
+
+    from backend.services.storage.tiger import TigerStore
+
+    text = candidates.normalize_text(PASSAGE + " The committee subsequently documented independent observations supporting continued scientific exploration.")
+    words = text.split()[:70]
+    # The injected token is absent everywhere in the recording, making the first
+    # conjunctive archive query fail without relying on a lexical score threshold.
+    anchor = [*words[:7], "nonexistentaudiotoken"]
+    submitted = " ".join([*anchor, *words[8:]])
+    store = TigerStore(f"sqlite:///{tmp_path / 'archive.db'}")
+    store.ensure_schema()
+    post = {"post_id": "source", "post_url": "https://youtu.be/AAAAAAAAAAA", "platform": "youtube",
+            "author": {}, "engagement": {}, "media": {"media_id": "source", "local_path": "/missing.mp4", "mime_type": "video/mp4"},
+            "retrieval": {"retrieved_at": datetime.now(UTC).isoformat(), "provider": "fixture"}}
+    features = {"media_id": "source", "duration_seconds": 60,
+                "transcript": {"status": "complete", "sentences": [
+                    {"sentence_id": "s1", "text": " ".join(words), "start_seconds": 0, "end_seconds": 60}]}}
+    try:
+        store.cache_source_features(post, features, "a" * 64, "b" * 64)
+        assert await candidates._archive_candidates(store, " ".join(anchor), set()) == []
+        recovered = await candidates._archive_candidates(store, " ".join(anchor), set(), transcript=submitted)
+        assert [candidate.video_id for candidate in recovered] == ["AAAAAAAAAAA"]
+        assert await candidates._archive_candidates(store, " ".join(anchor), {"AAAAAAAAAAA"}, transcript=submitted) == []
+    finally:
+        store.close()
+
+
+@pytest.mark.asyncio
+async def test_archive_secondary_query_requires_distinct_observed_substantive_words():
+    calls = []
+    store = SimpleNamespace(find_transcript_posts=lambda queries, *args: calls.append(queries) or [])
+    for transcript in ["", "one two three four five six", "one two three four five six " + "the " * 20]:
+        await candidates._archive_candidates(store, "one two three four five six", set(), transcript=transcript)
+    assert calls == [["one two three four five six"]] * 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("primary_fails", [False, True])
+async def test_secondary_observed_web_quote_recovers_corrupted_anchor_with_bounded_queries(monkeypatch, primary_fails):
+    from unittest.mock import AsyncMock
+    anchor = "the observatory measured hydrogen emissions from distant nonexistentaudiotoken"
+    submitted = anchor + " The expedition returned with unprecedented photographic evidence supporting scientific exploration."
+    secondary = candidates._secondary_phrase(submitted, anchor)
+    meta = {"query": "wrong speaker hypothesis", "title_query": "wrong celebrity title",
+            "unique_phrase": anchor, "speaker_and_event": "wrong speaker"}
+    monkeypatch.setattr(candidates, "extract_search_metadata", AsyncMock(return_value=meta))
+    searched = []
+    async def search(query, limit):
+        searched.append(query)
+        if query != candidates.build_query("", secondary):
+            if primary_fails:
+                raise candidates.CandidateSearchError("search_failed", "Offline simulated failure")
+            return []
+        return [candidates.Candidate(SELF, "self", 900), candidates.Candidate(A, "short", 10),
+                candidates.Candidate(B, "Source", 900), candidates.Candidate(B, "Duplicate", 900)]
+    monkeypatch.setattr(candidates, "_search", search)
+    monkeypatch.setattr(candidates, "_candidate_captions", AsyncMock(return_value=transcript(submitted)))
+    result = await candidates.find_source_video(submitted, exclude_ids=[SELF], discovery_hints=["OCR: NEWS NETWORK", "Scene: podium audience"])
+    assert result["status"] == "success" and result["video_id"] == B
+    assert [lead["video_id"] for lead in result["leads"]] == [B]
+    assert len(searched) == len(set(searched)) == candidates.MAX_SEARCH_QUERIES
+    assert result["search_metadata"]["secondary_phrase"] == secondary
+
+
 def test_visual_search_clues_are_bounded_and_do_not_replace_the_speech_anchor():
     phrase = "the observatory measured hydrogen emissions from distant galaxies"
     queries = candidates._visual_queries(
@@ -922,7 +1073,7 @@ async def test_independent_transcript_anchor_recovers_wrong_metadata_without_ver
     monkeypatch.setattr(candidates, "_search", search)
     monkeypatch.setattr(candidates, "_fetch_youtube_captions_sync", captions)
     result = await candidates.find_source_video(PASSAGE)
-    assert phrase_query in queried and len(queried) <= 3
+    assert phrase_query in queried and len(queried) <= candidates.MAX_SEARCH_QUERIES
     assert len(result["candidates"]) <= candidates.MAX_CANDIDATES
     if source_matches:
         assert result["status"] == "success" and result["video_id"] == C
@@ -955,7 +1106,7 @@ async def test_ninety_second_source_is_discovered_but_tiny_duplicate_is_filtered
 
 
 @pytest.mark.asyncio
-async def test_rank_five_original_is_scored_with_six_candidate_bound(monkeypatch):
+async def test_rank_five_original_is_scored_with_expanded_candidate_bound(monkeypatch):
     checked = []
     identities = [f"{index:011d}" for index in range(1, 8)]
 
@@ -984,8 +1135,8 @@ async def test_rank_five_original_is_scored_with_six_candidate_bound(monkeypatch
     monkeypatch.setattr(candidates, "_fetch_youtube_captions_sync", captions)
     result = await candidates.find_source_video(PASSAGE)
     assert result["status"] == "success" and result["video_id"] == identities[4]
-    assert sorted(checked) == identities[:6]
-    assert len(result["candidates"]) == 6 and len(result["leads"]) == 6
+    assert sorted(checked) == identities
+    assert len(result["candidates"]) == 7 and len(result["leads"]) == 7
 
 
 @pytest.mark.parametrize("replacement", ["helium", "oxygen", "carbon"])
@@ -1164,8 +1315,85 @@ async def test_archive_failure_preserves_web_and_merge_reserves_web_budget(monke
             ({"post_url": f"https://youtu.be/{B}"}, []),
         ]
     )
-    result = await candidates.find_source_video(PASSAGE, store=local)
+    result = await candidates.find_source_video(PASSAGE, store=local, max_candidates=6)
     assert [lead["video_id"] for lead in result["leads"]] == [
         item.video_id for item in web[:4]
     ] + [A, B]
     assert len(result["leads"]) == 6
+
+
+@pytest.mark.asyncio
+async def test_nonempty_irrelevant_quotes_do_not_starve_relaxed_observed_query(monkeypatch):
+    primary = "god works all things for good"
+    secondary = "our administration proposed comprehensive infrastructure investments supporting communities"
+    queries = []
+
+    async def search(query, _limit):
+        queries.append(query)
+        if query == secondary:
+            return [candidates.Candidate(SELF, "Self", 900),
+                    candidates.Candidate(A, "Short excerpt", 10),
+                    candidates.Candidate(B, "Actual source", 900),
+                    candidates.Candidate(B, "Duplicate source", 900)]
+        return [candidates.Candidate(C, "Unrelated sermon", 900)]
+
+    monkeypatch.setattr(candidates, "_search", search)
+    result = await candidates.search_candidates({
+        "speaker_and_event": "Unverified speaker",
+        "query": '"Unverified speaker" "god works all things for good"',
+        "title_query": "Unverified title",
+        "unique_phrase": primary,
+        "secondary_phrase": secondary,
+        "visual_queries": ["first visual clue", "second visual clue"],
+    }, [SELF])
+    assert secondary in queries
+    assert primary not in queries
+    assert len(queries) == len(set(queries)) == candidates.MAX_SEARCH_QUERIES
+    assert [item.video_id for item in result] == [C, B]
+    assert len(result) <= candidates.MAX_CANDIDATES
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("segments", [None, [], [{"text": PASSAGE, "start": 10, "end": 5}], [{"text": PASSAGE, "start": 0, "end": float("inf")}], [{"text": PASSAGE, "start": True, "end": 10}]])
+async def test_untimed_caption_text_uses_existing_whisper_fallback(monkeypatch, segments):
+    from unittest.mock import AsyncMock
+    caption = {"transcript": PASSAGE, "segments": segments}
+    fallback = AsyncMock(return_value={**transcript(PASSAGE), "source": "groq_whisper"})
+    monkeypatch.setattr(candidates, "_whisper_workaround", fallback)
+    candidate = candidates.Candidate(A, "Recording", 900)
+    assert await candidates._score_candidate(candidate, candidates.normalize_text(PASSAGE), caption_result=caption, allow_whisper=False) is None
+    fallback.assert_not_awaited()
+    result = await candidates._score_candidate(candidate, candidates.normalize_text(PASSAGE), caption_result=caption)
+    fallback.assert_awaited_once_with(candidate)
+    assert result["match_score"] == 100
+    assert result["transcript_result"]["source"] == "groq_whisper"
+
+
+@pytest.mark.asyncio
+async def test_valid_timed_segments_recover_missing_transcript_string_without_provider(monkeypatch):
+    from unittest.mock import AsyncMock
+    observed = {**transcript(PASSAGE), "transcript": ""}
+    fallback = AsyncMock(side_effect=AssertionError("Usable timed speech needs no audio call"))
+    monkeypatch.setattr(candidates, "_whisper_workaround", fallback)
+    result = await candidates._score_candidate(candidates.Candidate(A, "Recording", 900), candidates.normalize_text(PASSAGE), caption_result=observed)
+    assert result["match_score"] == 100
+    assert result["transcript_result"] is observed
+    fallback.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_untimed_whisper_text_is_not_promoted_to_candidate(monkeypatch):
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr(candidates, "_whisper_workaround", AsyncMock(return_value={"transcript": PASSAGE, "segments": []}))
+    result = await candidates._score_candidate(candidates.Candidate(A, "Recording", 900), candidates.normalize_text(PASSAGE), caption_result=None)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_untimed_matching_text_cannot_inflate_observed_segment_score():
+    observed = {"transcript": PASSAGE, "segments": [
+        {"text": "A completely unrelated garden and its flowers.", "start": 1, "end": 5},
+        {"text": PASSAGE, "start": 5},  # Hosted final cue has no observed end.
+    ]}
+    result = await candidates._score_candidate(candidates.Candidate(A, "Recording", 900), candidates.normalize_text(PASSAGE), caption_result=observed, allow_whisper=False)
+    assert result["match_score"] < candidates.MATCH_THRESHOLD

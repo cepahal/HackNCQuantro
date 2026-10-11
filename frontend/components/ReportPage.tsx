@@ -117,6 +117,12 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
     </span>}
    </div>
    {verifiedSource ? <div className={styles.primaryVideo}><ReportPlayer key={verifiedSource.post.media.media_id} media={verifiedSource} label="Matched source recording"/></div>
+    : primaryLead ? <><div className={styles.candidatePlayer}>
+     <iframe src={primaryLead.preview} title={`Unverified candidate: ${primaryLead.title}`} loading="lazy"
+      referrerPolicy="strict-origin-when-cross-origin"
+      allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+     <a href={primaryLead.url} target="_blank" rel="noopener noreferrer">Open candidate on YouTube ↗</a>
+    </div><p className={styles.note}>Search found this recording, but its speech has not been matched to your clip.</p></>
     : <div className={styles.sourceEmpty}><p>No verified source video is available.</p></div>}
 
   </section>

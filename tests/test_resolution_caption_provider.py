@@ -462,6 +462,8 @@ async def test_submitted_hosted_captions_return_before_whisper_and_keep_unknown_
 
 @pytest.mark.asyncio
 async def test_text_only_hosted_caption_remains_usable_and_cacheable(monkeypatch):
+    # Short final cues remain usable without an independent speech provider.
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
     result = provider._parse_transcript(
         {"transcript": [{"start_ms": 0, "snippet": "Retain this final cue."}]}
     )

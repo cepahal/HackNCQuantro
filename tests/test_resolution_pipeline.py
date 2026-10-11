@@ -202,7 +202,9 @@ def test_all_matching_nodes_receive_previous_outputs(store, wired, monkeypatch):
     assert store.get_job("job_connected")["status"] == "completed"
 
 
-def test_private_visual_clues_reach_discovery_without_changing_public_report(store, wired):
+def test_private_visual_clues_reach_discovery_without_changing_public_report(
+    store, wired
+):
     from backend.services.resolution.media import _ResolvedFeatures
 
     original = run.resolve_media.side_effect
@@ -216,7 +218,9 @@ def test_private_visual_clues_reach_discovery_without_changing_public_report(sto
 
     run.resolve_media.side_effect = resolve
     result = run.run_analysis("job_visual_clues", CLIP, store=store)
-    assert run.find_source_video.await_args.kwargs["discovery_hints"] == ["OCR: PBS NEWS HOUR"]
+    assert run.find_source_video.await_args.kwargs["discovery_hints"] == [
+        "OCR: PBS NEWS HOUR"
+    ]
     saved = json.dumps(store.get_report(result.report_id))
     assert "discovery_hints" not in saved and "PBS NEWS HOUR" not in saved
 
@@ -439,6 +443,34 @@ def test_incomplete_context_cannot_claim_no_difference(monkeypatch):
     assert "Incomplete coverage" in result.summary
 
 
+@pytest.mark.parametrize("coverage", ["complete", "partial"])
+def test_numeric_or_negation_difference_survives_context_and_model_comparison(
+    monkeypatch, coverage
+):
+    post, clip = media("clip", CLIP)
+    _, source = media("source", SOURCE, "candidate_1")
+    clip.transcript.sentences[0].text = WORDS.replace("have not earned", "have earned")
+    alignment = run.build_alignment(clip, source, 100)
+    assert alignment.status == "verified"
+    assert alignment.match_quality.confidence.level.value == "moderate"
+    context = run.build_context(alignment, source)
+    context.windows[0].coverage = coverage
+    assert analysis.WORDING_DIFFERENCE_LIMITATION in context.limitations
+    prompts = []
+
+    def respond(prompt):
+        prompts.append(prompt)
+        return comparison().model_dump(mode="json")
+
+    monkeypatch.setattr(analysis, "_json_response", respond)
+    result = analysis.compare_clip(post, clip, context)
+    assert result.context_assessment.value == "uncertain"
+    assert result.assessment_confidence.level.value == "low"
+    assert analysis.WORDING_DIFFERENCE_LIMITATION in result.limitations
+    assert "numbers or negation differ" in result.summary
+    assert "evidence_limitations" in prompts[0]
+
+
 def test_invalid_citation_gets_one_repair_without_relaxing_checks(monkeypatch):
     post, clip = media("clip", CLIP)
     _, source = media("source", SOURCE, "candidate_1")
@@ -559,3 +591,112 @@ def test_context_export_records_safe_failure_boundary(
     assert event["data"]["exception_type"] != "Exception"
     assert "private" not in json.dumps(event)
     assert store.get_report(result.report_id)["outcome"] == "matched"
+
+
+@pytest.mark.parametrize("coverage", ["complete", "partial"])
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "No material difference. The clip preserves the meaning exactly.",
+        (
+            "Takeaways: No material difference. The clip preserves the meaning exactly.\n\n"
+            "What this means: The original and clip say the same thing.\n\nReliability: Fully verified."
+        ),
+    ],
+)
+def test_wording_guard_replaces_stale_summary_with_or_without_headers(
+    monkeypatch, coverage, summary
+):
+    post, clip = media("clip", CLIP)
+    _, source = media("source", SOURCE, "candidate_1")
+    clip.transcript.sentences[0].text = WORDS.replace("have not earned", "have earned")
+    alignment = run.build_alignment(clip, source, 100)
+    context = run.build_context(alignment, source)
+    context.windows[0].coverage = coverage
+    raw = comparison().model_dump(mode="json")
+    raw["summary"] = summary
+    monkeypatch.setattr(analysis, "_json_response", lambda _: raw)
+    result = analysis.compare_clip(post, clip, context)
+    assert result.context_assessment.value == "uncertain"
+    assert result.assessment_confidence.level.value == "low"
+    assert "No material difference" not in result.summary
+    assert "preserves the meaning exactly" not in result.summary
+    assert result.summary.startswith("Takeaways:")
+    assert "What this means:" in result.summary and "Reliability:" in result.summary
+    assert "equivalent meaning is unconfirmed" in result.summary
+    assert "numbers or negation differ" in result.summary
+    assert (
+        "Factual claims and recording authenticity were not checked" in result.summary
+    )
+    if coverage == "partial":
+        assert "Incomplete coverage" in result.summary
+        assert any(
+            "Incomplete transcript coverage" in item for item in result.limitations
+        )
+    assert (
+        result.findings[0].evidence[0].quote
+        == raw["findings"][0]["evidence"][0]["quote"]
+    )
+    assert result.caption_assessment.value == "not_provided"
+    assert alignment.status == "verified" and alignment.matches
+
+
+@pytest.mark.parametrize("findings_present", [True, False])
+def test_absent_caption_does_not_block_extractive_transcript_summary(monkeypatch, findings_present):
+    post, clip = media("clip", CLIP)
+    _, source = media("source", SOURCE, "candidate_1")
+    context = run.build_context(run.build_alignment(clip, source, 96.3), source)
+    raw = comparison().model_dump(mode="json")
+    raw["summary"] = "Takeaways: No caption was provided for the clip, so no comparison to the source transcript is possible.\n\nWhat this means: Without a caption, we cannot assess whether the clip's meaning aligns with the source."
+    raw["assessment_confidence"]["basis"] = ["No caption supplied to compare with source transcript."]
+    if not findings_present:
+        raw["findings"] = []
+        raw["context_assessment"] = "not_assessed"
+        raw["assessment_confidence"]["level"] = "not_assessed"
+    calls = []
+    def respond(prompt):
+        calls.append(prompt)
+        return raw
+    monkeypatch.setattr(analysis, "_json_response", respond)
+    result = analysis.compare_clip(post, clip, context)
+    assert len(calls) == 1
+    assert result.caption_assessment.value == "not_provided"
+    assert "no comparison" not in result.summary.lower()
+    assert not any("No caption supplied" in basis for basis in result.assessment_confidence.basis)
+    assert "without a caption" not in result.summary.lower()
+    assert WORDS in result.summary
+    assert any(sentence.text in result.summary for window in context.windows for sentence in window.sentences)
+    assert "What this means:" in result.summary and "Reliability:" in result.summary
+    assert result.findings == comparison().findings if findings_present else result.findings == []
+    if not findings_present:
+        assert result.context_assessment.value == "not_assessed"
+
+
+def test_absent_caption_repair_preserves_wording_difference_guard(monkeypatch):
+    post, clip = media("clip", CLIP)
+    _, source = media("source", SOURCE, "candidate_1")
+    clip.transcript.sentences[0].text = WORDS.replace("have not earned", "have earned")
+    context = run.build_context(run.build_alignment(clip, source, 100), source)
+    raw = comparison().model_dump(mode="json")
+    raw["summary"] = "No caption was supplied, so a transcript comparison is impossible."
+    monkeypatch.setattr(analysis, "_json_response", lambda _: raw)
+    result = analysis.compare_clip(post, clip, context)
+    assert result.context_assessment.value == "uncertain"
+    assert result.assessment_confidence.level.value == "low"
+    assert "equivalent meaning is unconfirmed" in result.summary
+    assert "numbers or negation differ" in result.summary
+
+
+
+def test_harmless_absent_caption_note_preserves_substantive_summary(monkeypatch):
+    post, clip = media("clip", CLIP)
+    _, source = media("source", SOURCE, "candidate_1")
+    context = run.build_context(run.build_alignment(clip, source, 96.3), source)
+    raw = comparison().model_dump(mode="json")
+    raw["summary"] = "Takeaways: No caption was provided, but the available transcript shows the speaker urging graduates to earn their success.\n\nWhat this means: The source expands the point by discussing fair opportunity.\n\nReliability: We cannot assess authenticity from the transcript."
+    monkeypatch.setattr(analysis, "_json_response", lambda _: raw)
+    result = analysis.compare_clip(post, clip, context)
+    assert "urging graduates to earn their success" in result.summary
+    assert "discussing fair opportunity" in result.summary
+    assert "These are observed excerpts" not in result.summary
+    assert result.caption_assessment.value == "not_provided"
