@@ -13,10 +13,12 @@ const projectId = "12345678-1234-4123-8123-123456789abc";
 const projectSecret = "test-only-project-secret";
 const phone = "+15551234567";
 const assigned = "+15557654321";
+const userId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const key = `enroll_${createHash("sha256").update(phone).digest("hex")}`;
-const ledgerName = `${createHash("sha256").update(`${projectId}:${phone}`).digest("hex")}.json`;
+const legacyLedgerName = `${createHash("sha256").update(`${projectId}:${phone}`).digest("hex")}.json`;
+const ledgerName = (id = userId): string => `${createHash("sha256").update(`${projectId}:${phone}:${id}`).digest("hex")}.json`;
 const input = { phone_number: phone, consent: true };
-const user = { type: "shared", phoneNumber: phone, assignedPhoneNumber: assigned, id: "private-user-id" };
+const user = { type: "shared", phoneNumber: phone, assignedPhoneNumber: assigned, id: userId };
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -44,10 +46,13 @@ async function fixture(t: TestContext) {
     projectId, projectSecret, deliveryDirectory: directory,
     fetch: (async (url: string | URL | Request, init?: RequestInit) => {
       calls.push({ url: String(url), options: init! });
-      return json(init?.method === "GET" ? listed : created);
+      if (init?.method === "GET") return json(listed);
+      const createdUser = (created as { data?: unknown })?.data;
+      if (createdUser) listed = { succeed: true, data: { users: [createdUser], total: 1 } };
+      return json(created);
     }) as typeof fetch,
     sendWelcome: async (recipient: string, text: string) => {
-      const persisted = JSON.parse(await readFile(join(directory, ledgerName), "utf8"));
+      const persisted = JSON.parse(await readFile(join(directory, ledgerName()), "utf8"));
       assert.equal(persisted.state, "pending");
       sends.push({ recipient, text });
       return { id: "welcome-message-id" };
@@ -77,10 +82,10 @@ test("enrolls through fixed official API before one welcome and persists safe re
   assert.ok(create!.options.signal instanceof AbortSignal);
   assert.deepEqual(state.sends, [{ recipient: phone, text: WELCOME_MESSAGE }]);
   assert.doesNotMatch(WELCOME_MESSAGE, /STOP|opt.out/i);
-  const persisted = await readFile(join(state.directory, ledgerName), "utf8");
+  const persisted = await readFile(join(state.directory, ledgerName()), "utf8");
   assert.equal(JSON.parse(persisted).state, "accepted");
-  assert.doesNotMatch(persisted, /15551234567|test-only-project-secret|private-user-id/);
-  assert.doesNotMatch(JSON.stringify(result), /private-user-id|welcome-message-id|test-only-project-secret/);
+  assert.doesNotMatch(persisted, /15551234567|test-only-project-secret|aaaaaaaa-aaaa/);
+  assert.doesNotMatch(JSON.stringify(result), /aaaaaaaa-aaaa|welcome-message-id|test-only-project-secret/);
 });
 
 test("existing provider user without receipt history is recognized without create or welcome", async (t) => {
@@ -91,18 +96,99 @@ test("existing provider user without receipt history is recognized without creat
   assert.equal(result.welcome_status, "uncertain");
   assert.equal(state.calls.length, 1);
   assert.equal(state.sends.length, 0);
-  assert.equal(JSON.parse(await readFile(join(state.directory, ledgerName), "utf8")).state, "uncertain");
+  assert.equal(JSON.parse(await readFile(join(state.directory, ledgerName()), "utf8")).state, "uncertain");
   assert.equal((await createEnrollmentHandler(state.options)(input, key)).welcome_status, "uncertain");
-  assert.equal(state.calls.length, 1);
+  assert.equal(state.calls.length, 2);
 });
 
-test("duplicate after restart reuses ledger and sends no further message", async (t) => {
+test("duplicate after restart reconciles active provider user and sends no further message", async (t) => {
   const state = await fixture(t);
   await createEnrollmentHandler(state.options)(input, key);
   const result = await createEnrollmentHandler(state.options)(input, key);
   assert.equal(result.welcome_status, "accepted");
   assert.equal(result.already_enrolled, true);
-  assert.equal(state.calls.length, 2);
+  assert.equal(state.calls.length, 3);
+  assert.equal(state.sends.length, 1);
+});
+
+test("revoked cached enrollment is recreated with one fresh welcome for its new provider ID", async (t) => {
+  const state = await fixture(t);
+  await createEnrollmentHandler(state.options)(input, key);
+  const oldReceipt = await readFile(join(state.directory, ledgerName()), "utf8");
+  const newUserId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const newAssigned = "+15559876543";
+  state.setListed({ succeed: true, data: { users: [], total: 0 } });
+  state.setCreated({ succeed: true, data: { ...user, id: newUserId, assignedPhoneNumber: newAssigned } });
+  let sends = 0;
+  const options = { ...state.options, sendWelcome: async () => {
+    assert.equal(JSON.parse(await readFile(join(state.directory, ledgerName(newUserId)), "utf8")).state, "pending");
+    sends++;
+    return { id: "new-enrollment-welcome" };
+  } };
+  const enroll = createEnrollmentHandler(options);
+  const results = await Promise.all(Array.from({ length: 10 }, () => enroll(input, key)));
+  assert.ok(results.every((result) => result.assigned_phone_number === newAssigned && result.welcome_status === "accepted"));
+  assert.equal(results[0]!.already_enrolled, false);
+  assert.equal(sends, 1);
+  assert.equal(state.calls.filter((call) => call.options.method === "POST").length, 2);
+  const retry = await createEnrollmentHandler(options)(input, key);
+  assert.equal(retry.already_enrolled, true);
+  assert.equal(retry.welcome_status, "accepted");
+  assert.equal(retry.assigned_phone_number, newAssigned);
+  assert.equal(sends, 1);
+  assert.equal(await readFile(join(state.directory, ledgerName()), "utf8"), oldReceipt);
+  assert.equal((await readdir(state.directory)).length, 2);
+});
+
+test("cached success fails closed if current provider lookup is unavailable", async (t) => {
+  const state = await fixture(t);
+  await createEnrollmentHandler(state.options)(input, key);
+  let requests = 0;
+  const options = { ...state.options, fetch: (async () => {
+    requests++;
+    return json({ message: "provider-private-detail" }, 503);
+  }) as typeof fetch };
+  await assert.rejects(createEnrollmentHandler(options)(input, key), hasError(503, "ENROLLMENT_UNAVAILABLE"));
+  assert.equal(requests, 1);
+  assert.equal(state.sends.length, 1);
+});
+
+test("current assigned number overrides a stale accepted receipt without another welcome", async (t) => {
+  const state = await fixture(t);
+  await createEnrollmentHandler(state.options)(input, key);
+  const newAssigned = "+15559876543";
+  state.setListed({ succeed: true, data: { users: [{ ...user, assignedPhoneNumber: newAssigned }], total: 1 } });
+  const result = await createEnrollmentHandler(state.options)(input, key);
+  assert.equal(result.assigned_phone_number, newAssigned);
+  assert.equal(result.open_messages_url, `sms:${newAssigned}&body=Hi%20Quantro`);
+  assert.equal(result.welcome_status, "accepted");
+  assert.equal(state.sends.length, 1);
+});
+
+test("legacy receipt is preserved while an active user without a generation receipt stays uncertain", async (t) => {
+  const state = await fixture(t);
+  const legacy = JSON.stringify({ version: 1, state: "accepted", assigned_phone_number: assigned, message_id: "legacy-welcome" });
+  await writeFile(join(state.directory, legacyLedgerName), legacy);
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  const result = await createEnrollmentHandler(state.options)(input, key);
+  assert.equal(result.already_enrolled, true);
+  assert.equal(result.welcome_status, "uncertain");
+  assert.equal(state.sends.length, 0);
+  assert.equal(await readFile(join(state.directory, legacyLedgerName), "utf8"), legacy);
+  assert.equal(JSON.parse(await readFile(join(state.directory, ledgerName()), "utf8")).state, "uncertain");
+});
+
+test("revoked cached enrollment cannot return success when recreation fails", async (t) => {
+  const state = await fixture(t);
+  await createEnrollmentHandler(state.options)(input, key);
+  const methods: string[] = [];
+  const options = { ...state.options, fetch: (async (_url, init) => {
+    methods.push(init!.method!);
+    return init?.method === "GET" ? json({ succeed: true, data: { users: [], total: 0 } })
+      : json({ message: "provider-private-detail" }, 409);
+  }) as typeof fetch };
+  await assert.rejects(createEnrollmentHandler(options)(input, key), hasError(409, "ENROLLMENT_CAPACITY_OR_CONFLICT"));
+  assert.deepEqual(methods, ["GET", "POST"]);
   assert.equal(state.sends.length, 1);
 });
 
@@ -152,22 +238,23 @@ for (const mode of ["throw", "missing-id", "invalid-id", "timeout"] as const) {
     assert.equal(second.welcome_status, "uncertain");
     assert.equal(second.already_enrolled, true);
     assert.equal(sends, 1);
-    assert.equal(JSON.parse(await readFile(join(state.directory, ledgerName), "utf8")).state, "uncertain");
+    assert.equal(JSON.parse(await readFile(join(state.directory, ledgerName()), "utf8")).state, "uncertain");
   });
 }
 
-test("stored pending after a crash returns uncertainty without provider interaction", async (t) => {
+test("stored pending after a crash checks active provider before returning uncertainty", async (t) => {
   const state = await fixture(t);
-  await writeFile(join(state.directory, ledgerName), JSON.stringify({ version: 1, state: "pending", assigned_phone_number: assigned }));
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  await writeFile(join(state.directory, ledgerName()), JSON.stringify({ version: 1, state: "pending", assigned_phone_number: assigned }));
   const result = await createEnrollmentHandler(state.options)(input, key);
   assert.equal(result.welcome_status, "uncertain");
-  assert.equal(state.calls.length, 0);
+  assert.equal(state.calls.length, 1);
   assert.equal(state.sends.length, 0);
 });
 
 test("corrupt durable state fails closed instead of risking a resend", async (t) => {
   const state = await fixture(t);
-  await writeFile(join(state.directory, ledgerName), "provider-private-detail invalid-json");
+  await writeFile(join(state.directory, legacyLedgerName), "provider-private-detail invalid-json");
   await assert.rejects(createEnrollmentHandler(state.options)(input, key), hasError(503, "ENROLLMENT_STORAGE_UNAVAILABLE"));
   assert.equal(state.calls.length, 0);
   assert.equal(state.sends.length, 0);
@@ -214,6 +301,7 @@ for (const payload of [{}, { succeed: false, message: "provider-private-detail" 
 }
 
 for (const value of [{ ...user, type: "dedicated" }, { ...user, phoneNumber: "+15559876543" },
+  { ...user, id: undefined }, { ...user, id: "not-a-provider-user-id" },
   { ...user, assignedPhoneNumber: "javascript:alert(1)" }, { ...user, assignedPhoneNumber: "" }]) {
   test("invalid created user does not trigger a welcome", async (t) => {
     const state = await fixture(t);
@@ -265,6 +353,7 @@ for (const mode of ["network", "html", "oversize", "invalid-json"] as const) {
 test("a project change cannot reuse another project's welcome ledger", async (t) => {
   const state = await fixture(t);
   await createEnrollmentHandler(state.options)(input, key);
+  state.setListed({ succeed: true, data: { users: [], total: 0 } });
   let sends = 0;
   const options = { ...state.options, projectId: "12345678-1234-4123-8123-123456789abd",
     sendWelcome: async () => { sends++; return { id: "other-project-welcome" }; } };

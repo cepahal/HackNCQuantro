@@ -116,7 +116,12 @@ one person's assigned number publicly does not register other senders.
 
 Signup has input/body bounds, per-process throttling and private bridge
 authentication. Welcome attempts are recorded before sending; repeated signup
-does not resend an accepted or uncertain welcome while that ledger exists.
+checks active Photon registration before returning success. Receipts are scoped
+to the provider user ID, so removing and registering a number again creates a
+new enrollment and one fresh welcome. Old receipts remain intact. Repeating an
+active enrollment does not resend an accepted or uncertain welcome. An existing
+Photon user without receipt history is registered, but welcome delivery remains
+uncertain and is not automatically retried.
 Without a persistent mount, these markers and throttle counters reset on a
 deploy. Entering a number is consent to contact, not proof of phone ownership
 or authentication to private reports. An accepted send is not a delivery receipt.

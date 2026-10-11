@@ -140,12 +140,13 @@ async function boundedJson(response: Response): Promise<unknown> {
   }
 }
 
-function userPhone(value: unknown, phone: string): string {
+function providerUser(value: unknown, phone: string): { id: string; assignedPhoneNumber: string } {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw unavailable();
   const user = value as Record<string, unknown>;
   if (user.type !== "shared" || user.phoneNumber !== phone
+      || typeof user.id !== "string" || !PROJECT_ID.test(user.id)
       || typeof user.assignedPhoneNumber !== "string" || !E164.test(user.assignedPhoneNumber)) throw unavailable();
-  return user.assignedPhoneNumber;
+  return { id: user.id.toLowerCase(), assignedPhoneNumber: user.assignedPhoneNumber };
 }
 
 async function withDeadline<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
@@ -196,18 +197,23 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
   }
 
   async function enroll(phone: string): Promise<EnrollmentResult> {
-    const path = resolve(directory, `${digest(`${options.projectId}:${phone}`)}.json`);
-    const existing = await existingRecord(path);
-    if (existing) return result(existing, true);
+    // Keep legacy receipts intact, but never treat a receipt as current authorization.
+    const legacyPath = resolve(directory, `${digest(`${options.projectId}:${phone}`)}.json`);
+    await existingRecord(legacyPath);
     const listed = await request(`${endpoint}?type=shared&search=${encodeURIComponent(phone)}&limit=100`, "GET", phone);
     if (!Array.isArray(listed.users) || listed.users.length > 100) throw unavailable();
     const matching = listed.users.filter((value: unknown) => typeof value === "object" && value !== null
       && !Array.isArray(value) && (value as Record<string, unknown>).phoneNumber === phone);
     if (matching.length > 1) throw unavailable();
     const alreadyEnrolled = matching.length === 1;
-    const user = alreadyEnrolled ? matching[0] : await request(endpoint, "POST", phone);
+    const user = providerUser(alreadyEnrolled ? matching[0] : await request(endpoint, "POST", phone), phone);
+    // A deleted and explicitly recreated enrollment has a new provider user ID.
+    // Its independent receipt permits one fresh welcome without deleting old history.
+    const path = resolve(directory, `${digest(`${options.projectId}:${phone}:${user.id}`)}.json`);
+    const existing = await existingRecord(path);
+    if (existing) return result({ ...existing, assigned_phone_number: user.assignedPhoneNumber }, true);
     const pending: WelcomeRecord = { version: 1, state: alreadyEnrolled ? "uncertain" : "pending",
-      assigned_phone_number: userPhone(user, phone) };
+      assigned_phone_number: user.assignedPhoneNumber };
     try {
       await mkdir(directory, { recursive: true, mode: 0o700 });
       // A synced exclusive marker must precede every possible SDK send.
@@ -215,7 +221,7 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "EEXIST") {
         const concurrent = await existingRecord(path);
-        if (concurrent) return result(concurrent, true);
+        if (concurrent) return result({ ...concurrent, assigned_phone_number: user.assignedPhoneNumber }, true);
       }
       throw storageError();
     }
