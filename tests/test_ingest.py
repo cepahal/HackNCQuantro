@@ -1,11 +1,13 @@
 import pytest
 from fastapi.testclient import TestClient
 
-import backend.services.pipeline.run_ingest as ingest_module
+import backend.services.resolution.run as ingest_module
 from backend.main import app
 from backend.routes.ingest import get_tiger_store
 from backend.services.external_apis.retrieve_post import RetrievalError
+from backend.services.resolution import media as media_module
 from backend.services.shared.errors import QuantroError
+from backend.services.shared.types import MediaFeatures, Post
 from backend.services.storage.tiger import TigerConfigError, TigerStore
 
 
@@ -81,7 +83,7 @@ def _features():
                                       "end_seconds": 4.0, "text": "Hello there.", "speaker_id": None}]},
         "frames": [{"frame_id": "media_abc_frame_0001", "timestamp_seconds": 5.0,
                     "image_path": "/tmp/quantro_frames_x/frame_0001.jpg", "image_url": None}],
-        "visual_text": [], "warnings": ["Gemini transcript timestamps are estimates."],
+        "visual_text": [], "warnings": ["Transcript timestamps come from the caption provider."],
     }
 
 
@@ -89,16 +91,15 @@ def _features():
 def upstream(monkeypatch):
     calls = {}
 
-    def fake_retrieve(url):
-        calls["url"] = url
-        return _post()
+    async def fake_resolve(url, **kwargs):
+        calls["url"], calls["options"] = url, kwargs
+        return Post.model_validate(_post()), MediaFeatures.model_validate(_features())
 
-    def fake_extract(media, options):
-        calls["media"], calls["options"] = media.model_dump(mode="json") if hasattr(media, "model_dump") else media, options
-        return _features()
+    def fake_persist(post):
+        calls["media"] = post.media.model_dump(mode="json")
 
-    monkeypatch.setattr(ingest_module, "retrieve_post", fake_retrieve)
-    monkeypatch.setattr(ingest_module, "extract_media_features", fake_extract)
+    monkeypatch.setattr(ingest_module, "resolve_media", fake_resolve)
+    monkeypatch.setattr(ingest_module, "_persist_media", fake_persist)
     return calls
 
 
@@ -113,15 +114,18 @@ def test_happy_path_returns_ingest_result_and_persists(client, store, upstream):
     }
     assert body["persisted_at"].endswith("Z")
     assert upstream["media"] == _post()["media"]
-    assert upstream["options"] == ingest_module.EXTRACTION_OPTIONS
+    assert upstream["url"] == "https://www.youtube.com/watch?v=x"
+    assert upstream["options"] == {}
+    assert store.get_job("job_1")["post_json"] == _post()
+    assert store.get_job("job_1")["features_json"] == _features()
     assert store.get_job("job_1")["status"] == "ingested"
 
 
 def test_media_unavailable_returns_404_and_marks_job_failed(client, store, monkeypatch):
-    def fail(url):
+    async def fail(url):
         raise RetrievalError("MEDIA_UNAVAILABLE", "The submitted video could not be retrieved.")
 
-    monkeypatch.setattr(ingest_module, "retrieve_post", fail)
+    monkeypatch.setattr(ingest_module, "resolve_media", fail)
 
     response = client.post("/ingest/job_2", json={"url": "https://www.youtube.com/watch?v=gone"})
 
@@ -147,10 +151,10 @@ def test_bad_input_urls_return_400_before_storage_or_retrieval(client, store, up
 
 
 def test_transcription_failure_returns_502_and_marks_job_failed(client, store, monkeypatch, upstream):
-    def fail(media, options):
+    async def fail(url):
         raise QuantroError("TRANSCRIPTION_FAILED", "extract_media_features")
 
-    monkeypatch.setattr(ingest_module, "extract_media_features", fail)
+    monkeypatch.setattr(ingest_module, "resolve_media", fail)
 
     response = client.post("/ingest/job_4", json={"url": "https://www.youtube.com/watch?v=x"})
 
@@ -172,10 +176,10 @@ def test_transcription_failure_returns_502_and_marks_job_failed(client, store, m
 def test_extraction_preserves_typed_error(client, store, upstream, monkeypatch, code, retryable, status):
     original = QuantroError(code, "extract_media_features", retryable=retryable)
 
-    def fail(media, options):
+    async def fail(url):
         raise original
 
-    monkeypatch.setattr(ingest_module, "extract_media_features", fail)
+    monkeypatch.setattr(ingest_module, "resolve_media", fail)
     response = client.post("/ingest/job_typed_error", json={"url": "https://www.youtube.com/watch?v=x"})
     assert response.status_code == status
     assert response.json() == {"error": original.to_dict()}
@@ -185,10 +189,11 @@ def test_extraction_preserves_typed_error(client, store, upstream, monkeypatch, 
 
 @pytest.mark.parametrize("failure,retryable", [(ValueError("private provider detail"), False), (TimeoutError(), True)])
 def test_untyped_extraction_error_uses_safe_message_and_correct_retryability(client, upstream, monkeypatch, failure, retryable):
-    def fail(media, options):
+    async def fail(*args, **kwargs):
         raise failure
 
-    monkeypatch.setattr(ingest_module, "extract_media_features", fail)
+    monkeypatch.setattr(media_module, "get_video_transcript", fail)
+    monkeypatch.setattr(ingest_module, "resolve_media", media_module.resolve_media)
     response = client.post("/ingest/job_untyped_error", json={"url": "https://www.youtube.com/watch?v=x"})
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "TRANSCRIPTION_FAILED"
@@ -356,10 +361,11 @@ def test_ingest_storage_failures_are_safe(client, store, upstream, monkeypatch, 
 
 
 def test_real_error_type_is_logged_without_private_details(client, upstream, monkeypatch, caplog):
-    def fail(media, options):
+    async def fail(*args, **kwargs):
         raise ValueError("secret private evidence")
-    monkeypatch.setattr(ingest_module, "extract_media_features", fail)
-    response = client.post("/ingest/job_logged", json={"url": "https://example.com/video.mp4"})
+    monkeypatch.setattr(media_module, "get_video_transcript", fail)
+    monkeypatch.setattr(ingest_module, "resolve_media", media_module.resolve_media)
+    response = client.post("/ingest/job_logged", json={"url": "https://www.youtube.com/watch?v=x"})
     assert response.status_code == 502
     assert "stage=extract_media_features type=ValueError" in caplog.text
     assert "secret private evidence" not in caplog.text

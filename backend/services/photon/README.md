@@ -122,8 +122,11 @@ one person's assigned number publicly does not register other senders.
 Signup has input/body bounds, per-process throttling and private bridge
 authentication. Welcome attempts are recorded before sending; repeated signup
 checks active Photon registration before returning success. Receipts are scoped
-to the provider user ID, so removing and registering a number again creates a
-new enrollment and one fresh welcome. Old receipts remain intact. Repeating an
+to the provider user ID. A newly assigned provider ID permits one fresh welcome;
+Photon can also restore the same ID after removal. In that case a durable
+reconciliation marker keeps welcome status uncertain across retries and restarts.
+An assigned-line change also invalidates the old welcome status. Original receipts
+remain intact, and neither case automatically resends a message. Repeating an
 active enrollment does not resend an accepted or uncertain welcome. An existing
 Photon user without receipt history is registered, but welcome delivery remains
 uncertain and is not automatically retried.
@@ -236,7 +239,13 @@ Content-Type: application/json
 {"conversation_id":"original chat GUID","summary":"Evidence-backed summary","report_url":"https://your-host/reports/report_001"}
 ```
 
-Response after the SDK accepts the send and supplies a message ID:
+Reports arrive as three texts in order: a reliability TL;DR, a short explanation,
+then the report link. The formatter reads the report's exact `Takeaways`,
+`What this means`, and `Reliability` sections. Older free-form summaries receive
+a neutral reliability TL;DR. Text uses plain wording without em dashes; the first
+message is at most 247 characters and the explanation at most 650.
+
+Response after the SDK accepts all three texts and supplies their message IDs:
 
 ```json
 {"conversation_id":"original chat GUID","message_id":"provider message GUID","status":"accepted"}
@@ -248,12 +257,15 @@ for that conversation; terminal conversations must still be active. Summary text
 limited to 2,000 characters. The HTTP request is limited to 16 KiB and requires a private
 token and stable job ID. No CORS or public listener is enabled.
 
-Delivery records are keyed by job and conversation. Repeating an accepted request returns
-the cached provider ID. Changing its payload conflicts. A pending or failed provider attempt
+Delivery records are keyed by job and conversation. Each accepted part's provider ID is
+stored before sending the next part. The response `message_id` is the last part's ID.
+Repeating an accepted request returns the cached provider ID, including older single-message
+receipts. Changing its payload conflicts. A pending or failed provider attempt
 may have sent a message; it must be reconciled before another send. Never bypass this by
 changing the job ID or deleting its delivery record to force a retry. Errors use
 `{error: {code, stage: "send_summary", message, retryable}}` with safe fixed messages.
-Provider sends have a 12-second deadline; a timeout remains an uncertain outcome.
+All three texts share a 12-second deadline. Any failure stops the sequence; an accepted
+or uncertain part is never automatically resent. A timeout remains an uncertain outcome.
 
 Render logs distinguish welcome and summary failures with fixed diagnostic
 categories for SDK exceptions, deadlines, missing message IDs, and receipt-storage

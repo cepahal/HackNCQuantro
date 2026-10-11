@@ -27,9 +27,15 @@ services:
       - key: REPORT_STORE
         value: tiger
       - key: TRANSCRIPTION_PROVIDER
-        value: whisper
+        value: groq
       - key: SEARCH_PROVIDER
-        value: exa
+        value: youtube
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: YOUTUBE_API_KEY
+        sync: false
       - key: EXA_API_KEY
         sync: false
       - key: TIGERDATA_SSL_ROOT_CERT
