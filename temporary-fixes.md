@@ -330,9 +330,72 @@ the live helper in 2.97 seconds. This checks access and schema enforcement,
 not independent transcript or timing accuracy. Hosted verification follows the
 manual Render deployment of this backend revision.
 
-Remaining: independently validate transcript fidelity/timestamps; extend remote
+Remaining at that release: independently validate transcript fidelity/timestamps; extend remote
 evidence into verified source search/alignment without inventing recording
 duration; validate capacity and other platform restrictions. Gemini access,
 quota and intelligible speech are still required: upstream unavailability can
 still produce a structured failure. This change does not guarantee every URL
 can be processed and does not provide a deepfake/authenticity determination.
+
+### Bounded source discovery and partial-speech interpretation (2026-10-10)
+
+This extends the immediately preceding transcript-only fallback baseline; its
+earlier measured results remain historical. The classified YouTube download
+block now leads to a native partial 0–60-second transcript, immutable spoken
+search clues, Tiger/Exa discovery, and an optional single lexical YouTube search
+with the existing SerpAPI credential. Discovery excludes the submitted recording
+and duplicate sources. It then examines at most two distinct native YouTube
+candidate windows, each restricted to its first 0–60 seconds.
+
+Accepted correspondence requires distinctive exact normalized speech uniquely
+located in the observed source window. Source confidence is capped at moderate;
+full-clip coverage remains null, edit analysis remains not assessed, and confirmed
+edit counts remain null. No downloaded file, audio fingerprint, complete recording
+duration or earliest-original claim is manufactured. Best-effort public oEmbed
+metadata may supply title/uploader fields, never a fabricated caption or speaker.
+
+A matched source permits one bounded, source-cited partial-context interpretation.
+Actual supplied sentences/timestamps are expanded locally from validated citation
+IDs. Findings explain observed speech; context assessment stays uncertain, caption
+assessment is uncertain or not provided when absent, and assessment confidence
+stays low. If that call fails, valid source correspondence is
+retained. There is no physical-splicing, deepfake, external-fact or deceptive-intent
+determination.
+
+`SUBMITTED_INTERPRETATION_ENABLED=true` also permits one additional standalone
+interpretation before saving, including when no source matches. It explicitly
+conditions its reading on "Assuming this is political speech", bounds input and
+output, quotes only short complete cited sentences, keeps implementation IDs
+private and labels possible references as unverified hypotheses. It states that
+factual accuracy and deceptive intent are not established. A failed provider,
+invalid citation or invalid response preserves the preceding report with a safe
+limitation; it cannot discard saved evidence. The current flag applies to matched
+reports too, so this is an additional optional call, not a free replacement for
+source-context interpretation. Completed-job retries reuse the saved report and
+do not repeat the optional standalone call or change its persisted summary.
+
+No new API, key or dependency is required. Optional lexical search is selected
+with `SEARCH_FALLBACK_PROVIDER=serpapi`; `SEARCH_FALLBACK_API_KEY` uses the existing
+private SerpAPI credential or falls back to `SEARCH_PROVIDER_API_KEY` when blank.
+Primary Exa/Tiger discovery and the existing budget comparison-model setting
+remain in use. Secrets stay outside tracked files. All reports still use the
+existing sanitized, idempotent Tiger persistence and post-save delivery boundary;
+there are no frontend or public report-schema changes in this work.
+
+Verification reported for this extension: the initial focused backend run passed
+371 tests with one skip; the standalone interpretation component passed 30 tests
+and Ruff. A later local diagnostic using saved submitted speech took 11.37 seconds,
+accepted candidate `pJvRUL81ZU8` with one speech match and returned one cited
+finding. It did not establish hosted operation, fresh full-pipeline latency or
+independent speech/timestamp accuracy. A newer final full-suite or deployment
+pass is not claimed by this entry.
+
+Remaining: verify the final integrated revision and hosted behavior; independently
+check native transcript/timestamp fidelity; widen source coverage beyond first
+minute windows; measure real labeled source/context accuracy and concurrent load.
+Provider access/quota failures remain possible. A no-match means no source was
+verified within this bounded search, not that a source does not exist. Factual
+checking, intent attribution, deepfake analysis and confirmed physical-edit
+detection remain unimplemented by this path.
+
+Final pre-release verification: 445 focused backend tests passed, one skipped (23.32 seconds). Ruff F/E9, read-only frontend wire-type comparison, staged configured-secret scan and diff review passed. Final query/eligibility regression group separately passed 83 tests. Hosted verification is pending this release's manual Render deployment.

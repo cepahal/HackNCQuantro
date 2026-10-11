@@ -204,6 +204,27 @@ def test_empty_search_produces_no_verified_match(client, store, upstream):
     assert upstream["provider"].sent[0][1].startswith("No verified source was found for this excerpt.")
 
 
+def test_optional_submitted_interpretation_is_saved_once_and_reused(client, store, upstream, monkeypatch):
+    upstream["candidates"] = []
+    monkeypatch.setenv("SUBMITTED_INTERPRETATION_ENABLED", "true")
+    calls = []
+
+    def interpret(report):
+        calls.append(report.job_id)
+        return report.model_copy(update={"summary": "Assuming this is political speech, the transcript discusses a bridge closure."})
+
+    monkeypatch.setattr(analysis_module, "interpret_submitted", interpret)
+    first = _run(client, "job_interpreted")
+    second = _run(client, "job_interpreted")
+
+    assert first.status_code == second.status_code == 200
+    assert first.json()["report_id"] == second.json()["report_id"]
+    assert calls == ["job_interpreted"]
+    report = store.get_report(first.json()["report_id"])
+    assert report["summary"].startswith("Assuming this is political speech")
+    assert report["source"] is report["alignment"] is report["comparison"] is None
+
+
 def test_search_failure_is_an_error_not_a_no_match(client, store, upstream):
     upstream["search_error"] = RuntimeError("search provider 503")
 

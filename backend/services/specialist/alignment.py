@@ -71,6 +71,8 @@ def _align(clip, source, duration):
     limits = ['The earliest original upload was not established.',
               'Visual and audio matching were not performed.',
               'Matching uses supplied word timestamps where available, otherwise whole sentences; ASR timing remains approximate.']
+    if duration is None:
+        limits.append('Only partial provider-estimated transcript windows were compared; recording duration and full-clip coverage are unknown.')
     if unprocessed:
         limits.append('Usable speech is unavailable in at least one recording; transcript alignment was not assessed.')
     for features in (clip, source):
@@ -119,7 +121,7 @@ def _align(clip, source, duration):
     intervals = merge_ranges([(m['clip_start_seconds'], m['clip_end_seconds']) for m in matches])
     seconds = sum(end - start for start, end in intervals)
     gaps, unmatched = [], []
-    assessed = bool(matches) and clip['transcript']['status'] == 'complete' and source['transcript']['status'] == 'complete'
+    assessed = duration is not None and bool(matches) and clip['transcript']['status'] == 'complete' and source['transcript']['status'] == 'complete'
     if assessed:
         cursor = 0.0
         for start, end in intervals:
@@ -154,7 +156,7 @@ def _align(clip, source, duration):
                 'limitations': list(dict.fromkeys(limits)),
             },
             'matched_clip_seconds': seconds if matches else None,
-            'clip_coverage_ratio': seconds / duration if matches else None,
+            'clip_coverage_ratio': seconds / duration if matches and duration is not None else None,
             'metrics': [], 'methods_used': [] if unprocessed else ['transcript_alignment'],
         },
         'edit_analysis': {

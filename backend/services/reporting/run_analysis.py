@@ -13,16 +13,24 @@ and a messaging failure becomes a delivery warning rather than undoing the save.
 
 import logging
 import os
+import re
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, TypeVar
 
-from ..external_apis.build_search_queries import build_search_queries
+from ..external_apis.build_search_queries import (
+    _phrase,
+    _title_clue,
+    _with_clue,
+    build_search_queries,
+)
 from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
 from ..external_apis.retrieve_post import RetrievalError, _validate_url
 from ..external_apis.search_candidates import (
+    _candidate_url,
+    _web_search,
     check_search_settings,
     search_candidates,
     search_scope,
@@ -66,14 +74,21 @@ from ..specialist.alignment import verify_and_align
 from ..specialist.comparison import compare_context_and_caption
 from ..specialist.context import select_surrounding_context
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
-from .build_report import build_report
-from .remote_youtube import build_remote_youtube_report
+from .build_report import build_report, sanitize_report
+from .remote_source_analysis import assess_remote_sources
+from .remote_youtube import (
+    NO_DISCOVERY_LIMITATION,
+    build_remote_youtube_report,
+    canonical_youtube_url,
+)
 from .save_report import report_id_for_job, save_report_and_complete_job
 from .send_summary import DeliveryTracker, MessagingProvider, send_summary
+from .submitted_interpretation import interpret_submitted
 
 logger = logging.getLogger(__name__)
 
 SEARCH_LIMIT = 5
+REMOTE_SEARCH_QUERY_LIMIT = 3
 CONTEXT_OPTIONS = {"padding_seconds": 30.0, "merge_overlapping_windows": True}
 MULTIPLE_PLAUSIBLE_SOURCES = "Multiple plausible sources remain."
 NO_SOURCE_SUMMARY = "No verified source was found for this excerpt."
@@ -275,7 +290,7 @@ def run_analysis(
                 raise QuantroError(ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB)
             report = parse_stage_output(ReportV2, existing_report, Stage.BUILD_REPORT)
             ensure_distinct_source(report.submitted.post, report.source.post if report.source else None, Stage.BUILD_REPORT)
-            return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, []), _ContractStage.RUN_ANALYSIS, json_native=False)
+            return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, [], interpret=False), _ContractStage.RUN_ANALYSIS, json_native=False)
 
         check_search_settings()
         try:
@@ -292,6 +307,7 @@ def run_analysis(
             try:
                 _call(Stage.RUN_ANALYSIS, store.set_job_status, job_id, "running")
                 report = _call(Stage.EXTRACT_MEDIA_FEATURES, build_remote_youtube_report, job_id, url)
+                report = _discover_remote_sources(report, store, assess_candidates=True)
                 return validate_contract_result(
                     _ReturnModel,
                     _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, list(report.limitations)),
@@ -339,6 +355,100 @@ def _discover_sources(queries: _SearchQueries, store: TigerStore, excluded: set[
     if len(eligible) < len(rows):
         warnings.append(exclusion_warning)
     return eligible[:limit]
+
+
+def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_candidates: bool = False) -> ReportV2:
+    """Discover leads from partial text without inventing timed source evidence."""
+    post = report.submitted.post
+    warnings: list[str] = []
+    raw_queries = _call(Stage.BUILD_SEARCH_QUERIES, build_search_queries, {
+        "media_id": post.media.media_id,
+        "transcript": report.submitted.transcript.model_dump(mode="json"),
+        "visual_text": [],
+    }, post.model_dump(mode="json"))
+    queries = parse_stage_output(_SearchQueries, raw_queries, Stage.BUILD_SEARCH_QUERIES)
+    warnings.extend(queries.warnings)
+    # Search the actual speech. The public query builder also appends unverified
+    # titles/captions, so its last query is not necessarily a spoken payoff.
+    clues = list(dict.fromkeys(phrase for sentence in report.submitted.transcript.sentences[:500]
+                               for part in re.split(r"[.!?]+", sentence.text)
+                               if (phrase := _phrase(part, minimum=4))))
+    if len(clues) > 1:
+        # A short clip's distinctive payoff can follow a generic opening.
+        # Cover its end, beginning and middle instead of dropping the last quote.
+        clues = list(dict.fromkeys(clues[index] for index in (len(clues) - 1, 0, len(clues) // 2)))[:REMOTE_SEARCH_QUERY_LIMIT]
+    queries = queries.model_copy(update={"queries": clues})
+    candidates: list[dict[str, Any]] = []
+    if queries.queries:
+        _heartbeat(store, report.job_id)
+        candidates = _discover_sources(queries, store, _post_identities(post), warnings,
+                                      SEARCH_LIMIT if assess_candidates else 3)
+        fallback_provider = os.getenv('SEARCH_FALLBACK_PROVIDER', '').strip().lower()
+        if fallback_provider in {'serpapi', 'brave', 'google_cse'}:
+            # A lexical engine complements Exa's semantic web index. This uses
+            # an explicitly configured existing credential, never an inferred key.
+            exact_query = _with_clue(_title_clue(post.title), queries.queries[0])
+            if exact_query:
+                settings = dict(os.environ)
+                settings['SEARCH_PROVIDER'] = fallback_provider
+                settings['SEARCH_PROVIDER_API_KEY'] = (os.getenv('SEARCH_FALLBACK_API_KEY', '')
+                                                        or os.getenv('SEARCH_PROVIDER_API_KEY', ''))
+                try:
+                    exact = _call(Stage.SEARCH_CANDIDATES, _web_search,
+                                  [exact_query + ' site:youtube.com/watch'], 5, [], settings)
+                    if not isinstance(exact, dict) or not isinstance(exact.get('candidates'), list) or not isinstance(exact.get('warnings'), list):
+                        raise QuantroError(ErrorCode.SEARCH_FAILED, Stage.SEARCH_CANDIDATES)
+                    parsed = parse_stage_output(_CandidateSearch, exact, Stage.SEARCH_CANDIDATES)
+                    candidates = [*[item.model_dump(mode='json') for item in parsed.candidates], *candidates]
+                    warnings.extend(parsed.warnings)
+                    warnings.append('A bounded lexical YouTube search supplemented semantic discovery; all returned links still require speech alignment.')
+                except QuantroError:
+                    warnings.append('The optional lexical search was unavailable; semantic search coverage remains limited.')
+    else:
+        warnings.append("Source discovery was skipped because the partial transcript contains no distinctive searchable phrase.")
+    seen = _post_identities(post)
+    urls: list[str] = []
+    eligible: list[dict[str, Any]] = []
+    for candidate in candidates:
+        try:
+            url = _candidate_url(candidate["url"])
+        except (KeyError, TypeError, ValueError):
+            warnings.append("An unsafe source-discovery URL was excluded.")
+            continue
+        if assess_candidates:
+            try:
+                url = canonical_youtube_url(url)
+            except QuantroError:
+                warnings.append("A source candidate outside the supported YouTube recording scope was excluded from remote assessment.")
+                continue
+        identity = _post_identity(url)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        urls.append(url)
+        eligible.append(dict(candidate, url=url))
+        if len(urls) == 3:
+            break
+    result = report.model_copy(deep=True)
+    result.limitations = [item for item in result.limitations if item != NO_DISCOVERY_LIMITATION]
+    result.submitted.post.retrieval.warnings = [
+        item for item in result.submitted.post.retrieval.warnings if item != NO_DISCOVERY_LIMITATION
+    ]
+    if queries.queries:
+        result.summary = (
+            f"Limited transcript-only result: source discovery returned {len(urls)} unverified candidates. "
+            "Recording alignment and context analysis were not performed; no original source was verified."
+        )
+        warnings.append("Source discovery used partial, provider-estimated text; candidate links are leads, not verified originals.")
+    warnings.append("Candidate recording downloads, alignment and source-context assessment were not performed in this fallback.")
+    warnings.extend(f"Unverified source candidate: {url}" for url in urls)
+    result.limitations.extend(item for item in warnings if item not in result.limitations)
+    result.submitted.post.retrieval.warnings.extend(
+        item for item in warnings if item not in result.submitted.post.retrieval.warnings
+    )
+    if assess_candidates:
+        result = assess_remote_sources(result, eligible, warnings, lambda: _heartbeat(store, report.job_id))
+    return ReportV2.model_validate(sanitize_report(result.model_dump(mode="json")))
 
 
 def _analyze(
@@ -467,7 +577,12 @@ def _complete_and_deliver(
     provider: MessagingProvider | None,
     tracker: DeliveryTracker | None,
     warnings: list[str],
+    *,
+    interpret: bool = True,
 ) -> AnalysisResult:
+    if interpret and os.getenv('SUBMITTED_INTERPRETATION_ENABLED', '').strip().lower() in {'1', 'true', 'yes'}:
+        _heartbeat(store, job_id)
+        report = interpret_submitted(report)
     saved = _call(
         Stage.SAVE_REPORT_AND_COMPLETE_JOB, save_report_and_complete_job,
         job_id, report, report_store=TigerReportStore(store), job_store=TigerJobStore(store)

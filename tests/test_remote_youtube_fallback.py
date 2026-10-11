@@ -55,6 +55,7 @@ class FakeModels:
 
 @pytest.fixture
 def client(monkeypatch):
+    monkeypatch.setattr(remote, "_youtube_metadata", lambda url: {})
     models = FakeModels()
     state = SimpleNamespace(models=models, closed=False)
 
@@ -261,6 +262,7 @@ def pipeline_store(tmp_path, monkeypatch):
 
 
 def _fallback_spy(monkeypatch, client):
+    monkeypatch.setattr(analysis, "_discover_remote_sources", lambda report, store, **kwargs: report)
     calls = []
     original = remote.build_remote_youtube_report
 
@@ -302,6 +304,7 @@ def test_only_classified_youtube_challenge_recovers_and_saves_idempotently(
 def test_deferred_youtube_challenge_stays_running_until_remote_report_is_saved(
     monkeypatch, client, pipeline_store
 ):
+    monkeypatch.setattr(analysis, "_discover_remote_sources", lambda report, store, **kwargs: report)
     job_id = "job_remote_no_failed_poll_race"
     original = remote.build_remote_youtube_report
     states = []

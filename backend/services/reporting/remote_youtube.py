@@ -11,11 +11,13 @@ import json
 import logging
 import os
 import re
+import ssl
 from datetime import UTC, datetime
 from typing import Annotated, Any
 from urllib.parse import parse_qsl, urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+import httpx
 
 from ..shared.errors import ErrorCode, QuantroError, Stage
 from ..shared.types import (
@@ -41,6 +43,7 @@ WINDOW_SECONDS = 60.0
 MAX_INPUT_TOKENS = 12_000
 MAX_OUTPUT_TOKENS = 4_096
 DEFAULT_MODEL = "gemini-3.1-flash-lite"
+NO_DISCOVERY_LIMITATION = "Source search and alignment were not performed in this fallback; no original recording was verified."
 _VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
 _YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}
 _SHORT_HOSTS = {"youtu.be", "www.youtu.be"}
@@ -120,6 +123,39 @@ def _client_and_model() -> tuple[Any, str]:
     """Existing TLS/45-second/no-retry client; no expensive model fallback."""
     client, _ = client_and_model(Stage.EXTRACT_MEDIA_FEATURES)
     return client, os.getenv("GEMINI_COMPARISON_MODEL", "").strip() or DEFAULT_MODEL
+
+
+def _youtube_metadata(url: str) -> dict[str, str]:
+    """Read bounded public embed metadata; an uploader is not the speaker."""
+    try:
+        canonical = canonical_youtube_url(url)
+        with httpx.Client(timeout=5, follow_redirects=False, trust_env=False,
+                          verify=ssl.create_default_context()) as client:
+            with client.stream('GET', 'https://www.youtube.com/oembed',
+                               params={'url': canonical, 'format': 'json'}) as response:
+                response.raise_for_status()
+                if 'json' not in response.headers.get('content-type', '').lower():
+                    return {}
+                body = bytearray()
+                for chunk in response.iter_bytes():
+                    if len(body) + len(chunk) > 32_768:
+                        return {}
+                    body.extend(chunk)
+        raw = json.loads(body)
+        if not isinstance(raw, dict):
+            return {}
+        result = {key: raw[key].strip() for key in ('title', 'author_name')
+                  if isinstance(raw.get(key), str) and 0 < len(raw[key].strip()) <= 500}
+        profile = raw.get('author_url')
+        if isinstance(profile, str) and len(profile) <= 2_048:
+            parsed = urlsplit(profile)
+            if (parsed.scheme == 'https' and parsed.hostname in _YOUTUBE_HOSTS
+                    and parsed.username is None and parsed.password is None
+                    and parsed.port in {None, 443} and not any(c.isspace() for c in profile)):
+                result['author_url'] = profile
+        return result
+    except (httpx.HTTPError, ValueError, TypeError, OSError, QuantroError):
+        return {}
 
 
 def _failure(message: str, *, retryable: bool = False) -> QuantroError:
@@ -224,20 +260,23 @@ def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
                 logger.warning("Remote transcription client cleanup failed (%s)", type(exc).__name__)
 
     digest = hashlib.sha256(canonical.encode()).hexdigest()[:20]
+    metadata = _youtube_metadata(canonical)
     # A remote reference must not look like an identifier for /media stored bytes.
     media_id = f"remote:youtube:{digest}"
     limitations = [
         "Limited transcript-only fallback: the platform blocked this server's recording download; no MP4 or JPEG file was acquired.",
         "Only a requested window from 0 to 60 seconds was submitted to Gemini; this is not a complete-video analysis.",
         "Transcript text and timestamps are provider estimates, not independently verified audio or recording duration.",
-        "Source search and alignment were not performed in this fallback; no original recording was verified.",
+        NO_DISCOVERY_LIMITATION,
         "Splicing, visual edits, speaker identity, deepfakes, caption meaning and surrounding context were not assessed.",
         "No verified match does not establish that the recording is authentic, unedited or misleading.",
         "Playback and optional account/post metadata are unavailable; recording duration remains unknown.",
     ]
     post = PublicPost(
         post_id=f"post_youtube_{digest}", post_url=canonical, platform="youtube",
-        author=Author(), engagement=Engagement(),
+        title=metadata.get('title'),
+        author=Author(display_name=metadata.get('author_name'), profile_url=metadata.get('author_url')),
+        engagement=Engagement(),
         media=PublicMediaAsset(media_id=media_id, mime_type="video/x-youtube"),
         retrieval=Retrieval(
             retrieved_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -251,6 +290,12 @@ def build_remote_youtube_report(job_id: str, url: str) -> ReportV2:
             warnings=list(limitations),
         ),
     )
+    available = {'title': post.title, 'author.display_name': post.author.display_name,
+                 'author.profile_url': post.author.profile_url}
+    post.retrieval.unavailable_fields = [field for field in post.retrieval.unavailable_fields
+                                         if available.get(field) is None]
+    if metadata:
+        post.retrieval.warnings.append('YouTube embed metadata describes the uploader and title; it does not verify speaker identity or a caption claim.')
     sentences = [TranscriptSentence(
         sentence_id=f"{media_id}_sentence_{index:04d}", start_seconds=sentence.start_seconds,
         end_seconds=sentence.end_seconds, text=sentence.text,

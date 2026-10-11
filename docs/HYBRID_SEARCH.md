@@ -1,4 +1,4 @@
-# Transcript archive and web discovery
+# Transcript archive, web discovery and bounded YouTube fallback
 
 This backend adds `SEARCH_PROVIDER=hybrid` using the existing Tiger database and
 `EXA_API_KEY`. Explicit `exa`, `tiger` and other supported modes keep working.
@@ -7,7 +7,8 @@ No frontend or public v2 report/candidate fields change. No new API is required.
 ```mermaid
 flowchart TD
   A[Website or Photon URL] --> B[Retrieve submitted media]
-  B --> C[FFmpeg audio and Whisper transcript]
+  B -->|download succeeds| C[FFmpeg audio and Whisper transcript]
+  B -->|classified YouTube bot challenge| P[Native YouTube partial transcript: first 0-60 seconds]
   C --> D[Build immutable transcript search clues]
   D --> E[Tiger indexed transcript passages]
   E --> F[Exa discovery fills bounded candidate budget]
@@ -21,6 +22,16 @@ flowchart TD
   L --> M[Select source and surrounding context]
   M --> N[Bounded final Gemini caption/context comparison]
   N --> O[Save sanitized report in Tiger]
+  P --> Q[Immutable spoken search clues]
+  Q --> R[Tiger and Exa; optional one lexical YouTube search]
+  R --> S[At most two distinct native candidate windows: first 0-60 seconds]
+  S --> T[Exact distinctive uniquely located speech match]
+  T -->|accepted| U[At most moderate source confidence; full coverage unknown]
+  U --> V[One source-cited partial-context interpretation when matched]
+  V --> W[Optional one conditional submitted-speech interpretation]
+  T -->|no accepted match| W
+  W --> O
+  N --> W
 ```
 
 ## Runtime behavior
@@ -54,7 +65,7 @@ flowchart TD
 - Optional cache failures fall back to fresh retrieval or preserve fresh evidence
   with a warning. They do not turn failed discovery into a false no-match result.
 - Gemini is not used for indexing, search, deduplication or deterministic alignment.
-  The existing final comparison runs only after a viable source/context exists.
+  On the downloaded-media path the existing final comparison runs only after a viable source/context exists.
   Original ASR text is preserved; no semantic rewrite replaces quote evidence.
   A definitive comparison uses two requests normally, at most three with one
   evidence repair; unassessable input uses zero or one. Set
@@ -64,6 +75,63 @@ flowchart TD
   Flash-Lite returned 404 on generation for this account. Pricing checked on
   2026-10-10: $0.25/M text input, $1.50/M output for 3.1 Flash-Lite
   ([Google pricing](https://ai.google.dev/gemini-api/docs/pricing)).
+
+## Bounded native YouTube path
+
+A specifically classified YouTube bot-verification download block can use the
+existing Gemini native YouTube input. Invalid, deleted, private, unsupported and
+storage failures retain structured errors. `/ingest` still requires a real
+download. This fallback creates no pretend file, media bytes, Whisper/audio
+fingerprint evidence or recording duration. Native text and timestamps remain
+provider estimates, with partial coverage explicitly disclosed.
+
+The current fallback extends the earlier transcript-only baseline:
+
+1. Request only the submitted recording's first 0–60 seconds, with a token
+   preflight and bounded generation. Preserve the returned spoken words; do not
+   rewrite them into an assumed claim. Public oEmbed title/uploader metadata is
+   optional; uploader identity is not speaker identity and is not a caption.
+2. Build bounded clues from actual speech. Search Tiger and Exa through the
+   configured provider, excluding the submitted recording and duplicate links.
+   An optional single lexical YouTube search complements semantic discovery.
+   It is not a comprehensive web scan; discovered links are unverified leads.
+3. Examine at most two distinct public YouTube candidates through independent
+   native 0–60-second requests. Accept only distinctive exact normalized speech
+   with a unique location in the observed source window. Repeated passages stay
+   ambiguous; inaccessible candidates can be skipped with disclosed warnings.
+4. Cap accepted source confidence at **moderate**. Full-clip coverage stays
+   `null`, edit analysis stays `not_assessed`, and confirmed edit counts stay
+   `null`. A matching recording does not establish the earliest original upload.
+5. For an accepted match, make at most one cited partial-context interpretation
+   call. Citations are expanded locally into supplied sentences and timestamps.
+   Context assessment remains uncertain; caption assessment is uncertain or
+   `not_provided` when absent. Assessment confidence stays low, rather than a
+   definitive omission or misleading-caption verdict.
+   Interpretation failure preserves the observed speech match.
+6. When enabled, make at most one additional standalone submitted-transcript
+   interpretation call before saving, including on no-match results. Its summary
+   explicitly says **"Assuming this is political speech"**. The assumption and
+   suggested references are not established facts. The bounded reading uses
+   validated local sentence references and short exact quotes, never internal IDs.
+   Provider or validation failure retains the prior report and adds a limitation.
+7. Save the sanitized report through the existing idempotent Tiger boundary.
+   Completed-job retries reuse the stored summary and do not repeat the optional
+   standalone call. No public schema or frontend change is needed.
+
+Configuration uses existing credentials; no additional API or dependency is
+required. For the already available SerpAPI lexical provider, set
+`SEARCH_FALLBACK_PROVIDER=serpapi`. `SEARCH_FALLBACK_API_KEY` optionally selects
+its private key; if blank, the existing `SEARCH_PROVIDER_API_KEY` is used.
+Keep these in ignored local or private deployment settings. The existing Exa
+key and Tiger configuration continue to serve the primary discovery path.
+`SUBMITTED_INTERPRETATION_ENABLED=true` enables the optional standalone call
+(`false` or unset disables it). `.env.example` enables it without containing a
+credential. The existing `GEMINI_COMPARISON_MODEL` selects the budget text model.
+
+This path establishes neither factual truth, deceptive intent, speaker identity,
+deepfake status nor physical splicing. A no-match can reflect unobserved content
+outside the first minute, discovery limits or access failures; it does not prove
+there is no source. Native YouTube access and quotas remain external constraints.
 
 ## Archive and migration
 
@@ -87,6 +155,13 @@ are a small modern 2009–2025 seed plus the separately retained debate archive.
 ## Verification and limits
 
 See [HYBRID_VERIFICATION.md](HYBRID_VERIFICATION.md) for actual test outputs.
+The initial focused run for the native-source extension passed **371 tests with
+one skip**; the standalone interpretation component passed **30 focused tests**.
+A later local diagnostic using saved submitted speech completed in **11.37
+seconds**, accepted candidate `pJvRUL81ZU8` with one speech match and produced one
+source-cited finding. This is a bounded diagnostic, not an independently checked
+transcript/timestamp accuracy result, fresh full-pipeline timing, or hosted
+deployment proof. A new final-suite or deployment pass is not claimed here.
 Uncached acquisition, longer-video Whisper time, YouTube bot challenges, absent
 captions, and provider quotas remain external latency/access constraints.
 Text matching does not establish factual truth, voice identity or deepfake status.
