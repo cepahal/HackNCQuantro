@@ -59,6 +59,12 @@ def model_counts(before, passage, after):
 def select_context(analysis, chooser=model_counts):
     first = min(m.source_start for m in analysis.matches)
     last = max(m.source_end for m in analysis.matches)
+    duration = analysis.source.duration
+    # Unknown duration must not abort selection; encoding probes the real file.
+    if duration is None:
+        duration = math.inf
+    elif not math.isfinite(duration) or duration < last:
+        raise ValueError('Invalid source duration for matched passage')
     sentences = reconstruct_sentences(analysis.source_transcript.sentences)
     # Limit candidate context to three adjacent sentences and two minutes per side.
     before = [s for s in sentences if first-120 <= s['start'] < first and s['end'] <= first+.05][-3:]
@@ -75,13 +81,13 @@ def select_context(analysis, chooser=model_counts):
     chosen_before = before[-counts[0]:] if counts[0] else []
     chosen_after = after[:counts[1]]
     start = chosen_before[0]['start'] if chosen_before else max(0.,first-5)
-    end = chosen_after[-1]['end'] if chosen_after else min(analysis.source.duration,last+5)
+    end = chosen_after[-1]['end'] if chosen_after else min(duration,last+5)
     # Finish a sentence cut by the submitted clip in addition to adjacent context.
     if crossing_before:
         start = min(start, crossing_before[-1]['start'])
     if crossing_after:
         end = max(end,crossing_after[0]['end'])
-    return {'start_seconds':max(0.,start), 'end_seconds':min(analysis.source.duration,end),
+    return {'start_seconds':max(0.,start), 'end_seconds':min(duration,end),
             'strategy':strategy, 'before':chosen_before, 'after':chosen_after,
             'before_method':'sentences' if chosen_before else 'five_second_fallback',
             'after_method':'sentences' if chosen_after else 'five_second_fallback',

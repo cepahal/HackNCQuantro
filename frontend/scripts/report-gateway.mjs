@@ -98,6 +98,7 @@ async function mediaIsShared(mediaId, reports, backendOrigin) {
     const report = await response.json();
     if (report?.schema_version !== "2.1") continue;
     if ([report.submitted, report.source].some((item) => item?.post?.media?.media_id === mediaId)) return true;
+    if (report.context_video?.media_id === mediaId) return true;
   }
   return false;
 }

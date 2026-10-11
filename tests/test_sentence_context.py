@@ -52,3 +52,8 @@ def test_unreliable_long_unpunctuated_run_cannot_expand_export():
     a=analysis([row(0,500,'Long caption finally ends.')],first=300,last=310,duration=600)
     r=select_context(a,chooser=lambda *args:None)
     assert r['start_seconds']==295 and r['end_seconds']==315
+
+
+def test_unknown_duration_keeps_bounded_context_without_inventing_duration():
+    r = select_context(analysis([], duration=None), chooser=lambda *args: None)
+    assert r['start_seconds'] == 15 and r['end_seconds'] == 35

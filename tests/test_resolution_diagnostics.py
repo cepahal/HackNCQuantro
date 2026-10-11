@@ -149,3 +149,26 @@ def test_candidate_stage_records_search_metadata_and_unavailable_leads(store, mo
     events = store.get_diagnostics("job_candidates")
     assert [event["status"] for event in events] == ["completed", "discovered", "scored", "unavailable"]
     assert "youtube_captions" in json.dumps(diagnostic_response("job_candidates", events))
+
+
+def test_context_export_data_survives_public_projection_without_private_paths():
+    value = public_data({"context_video":{"media_id":"context_1","duration_seconds":12,"local_path":"/tmp/private"},
+                         "context_selection":{"start_seconds":10,"end_seconds":22,"strategy":"model_selected",
+                                              "before":[{"text":"A preceding sentence.","start":10,"end":12}],
+                                              "after_method":"sentences","api_key":"never-publish"}})
+    assert value["context_video"] == {"media_id":"context_1","duration_seconds":12}
+    assert value["context_selection"]["strategy"] == "model_selected"
+    assert value["context_selection"]["before"][0]["text"] == "A preceding sentence."
+    assert "never-publish" not in json.dumps(value) and "private" not in json.dumps(value)
+
+
+def test_timing_scope_distinguishes_stage_duration_from_cumulative_job_elapsed(store):
+    import time
+    store.try_create_job("job_clocks",CLIP)
+    capture = DiagnosticCapture("job_clocks",store)
+    capture.record("search_query","completed",{},started=time.monotonic())
+    capture.record("run_analysis","completed",{})
+    events = diagnostic_response("job_clocks",store.get_diagnostics("job_clocks"))["events"]
+    assert [e["timing_kind"] for e in events] == ["stage_duration","job_elapsed"]
+    old = diagnostic_response("job_old",[{"stage":"old","status":"completed","elapsed_seconds":1,"data":{}}])
+    assert "timing_kind" not in old["events"][0]

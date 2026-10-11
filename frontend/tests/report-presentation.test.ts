@@ -160,7 +160,7 @@ function unmatchedReport(): ReportV2 {
   return value;
 }
 
-test("a verified source is the single prominent video and the submitted clip is collapsed", () => {
+test("submitted and matched recordings remain separately visible", () => {
   const value = report();
   value.limitations.push("Unverified source candidate: https://www.youtube.com/watch?v=FX6GQSyxA-8");
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
@@ -168,7 +168,7 @@ test("a verified source is the single prominent video and the submitted clip is 
   assert.match(primary, /aria-label="Source video result"/);
   assert.match(primary, /aria-label="Matched source recording"/);
   assert.match(primary, /Verified speech match/);
-  assert.doesNotMatch(primary, /aria-label="Submitted excerpt"|youtube-nocookie/);
+  assert.match(primary, /aria-label="Submitted excerpt"/);
   assert.ok(html.indexOf('aria-label="Source video result"') < html.indexOf('aria-label="Report verdict"'));
   assert.match(html, /<details[^>]*aria-label="Submitted clip"[^>]*><summary/);
   assert.doesNotMatch(html, /<details[^>]*aria-label="Submitted clip"[^>]* open|Compare the recordings/);
@@ -182,7 +182,7 @@ test("without verification only the highest-ranked lead is promoted and remains 
   assert.match(primary, /Most likely source candidate|Top candidate recording/);
   assert.match(primary, /Unverified lead/);
   assert.match(primary, /youtube-nocookie.com\/embed\/FX6GQSyxA-8/);
-  assert.doesNotMatch(primary, /JFmUO6BvwDc|Verified speech match|aria-label="Submitted excerpt"/);
+  assert.doesNotMatch(primary, /JFmUO6BvwDc|Verified speech match/);
   assert.match(primary, /have not been verified against the excerpt/);
   const otherLeads = html.split("Other source candidates")[1]!.split('aria-label="Evidence strength"')[0]!;
   assert.match(otherLeads, /JFmUO6BvwDc/);
@@ -196,7 +196,8 @@ test("an unmatched report with no lead has a neutral empty source result and kee
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
   const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
   assert.match(primary, /No source candidate found/);
-  assert.doesNotMatch(primary, /<video|<iframe|Verified speech match|data-assessment="difference"/);
+  assert.doesNotMatch(primary, /Verified speech match|data-assessment="difference"/);
+  assert.match(primary, /aria-label="Submitted excerpt"/);
   assert.match(html, /aria-label="Submitted excerpt"/);
   assert.doesNotMatch(html, /Other source candidates/);
 });
@@ -225,6 +226,9 @@ test("diagnostic mode preserves old panels in a hidden container and shows every
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: model, diagnostics }));
   assert.match(html, /<div hidden=""[^>]*data-testid="preserved-report-panels"/);
   assert.match(html, /Analysis terminal|Copy output|Download \.txt/);
+  assert.match(html, /Available data markers/);
+  assert.match(html, /Data available for bars, labels and markers/);
+  assert.match(html, /Source-match confidence/);
   assert.match(html, /Candidate score: 88/);
   assert.match(html, /&lt;script&gt;unsafe\(\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>unsafe/);
@@ -236,11 +240,37 @@ test("diagnostic mode preserves old panels in a hidden container and shows every
   assert.equal(JSON.stringify(value), before);
 });
 
-test("stored context video replaces source playback without changing source attribution", () => {
+test("stored context video appears alongside submitted and matched recordings", () => {
   const value = report();
   value.context_video = {media_id:"context_test",mime_type:"video/mp4",playback_url:"https://api.example/media/context_test",duration_seconds:79,width:640,height:360,fps:30,has_audio:true};
   const html = renderToStaticMarkup(createElement(ReportContent, {report:value,display:display(value)}));
-  assert.match(html,/Your clip in context/);
+  const visible = html.split('aria-label="Analysis diagnostic output"')[0]!;
+  assert.match(visible, /aria-label="Submitted excerpt"/);
+  assert.match(visible, /aria-label="Matched source recording"/);
+  assert.match(visible, /aria-label="Spliced context video"/);
+  assert.equal((visible.match(/<video/g) ?? []).length, 3);
   assert.match(html,/https:\/\/api.example\/media\/context_test/);
   assert.ok(html.includes(value.source!.post.post_url.replaceAll("&", "&amp;")));
+});
+
+
+test("low confidence suppresses even a stale generated context asset", () => {
+  const value = report();
+  value.alignment!.match_quality.confidence.level = "low";
+  value.context_video = { ...value.source!.post.media, media_id: "context_stale", playback_url: "https://api.example/media/context_stale" };
+  const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
+  const visible = html.split('aria-label="Analysis diagnostic output"')[0]!;
+  assert.doesNotMatch(visible, /context_stale|aria-label="Spliced context video"[^>]*><h3/);
+  assert.match(visible, /sufficiently confident source match/);
+});
+
+test("generated videos cannot fall back to a YouTube original", () => {
+  const { default: Player } = componentRequire("../components/ReportPlayer.tsx") as typeof import("../components/ReportPlayer.tsx");
+  const media = report().source!;
+  media.post.media.media_id = "invalid/id";
+  media.post.media.playback_url = null;
+  media.post.media.mime_type = "application/x-unavailable";
+  const html = renderToStaticMarkup(createElement(Player, { media, label: "Generated context", generated: true }));
+  assert.doesNotMatch(html, /<iframe|Open on YouTube/);
+  assert.match(html, /generated context video could not be loaded/);
 });

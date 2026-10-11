@@ -30,6 +30,8 @@ test("diagnostics use the report endpoint and reject a different job or malforme
   await assert.rejects(getReportDiagnostics("report_job_1"), /invalid diagnostics/);
   fetch.mock.mockImplementation(async () => Response.json({...value,events:[{stage:"x",status:"x",elapsed_seconds:-1,data:{}}]}));
   await assert.rejects(getReportDiagnostics("report_job_1"), /invalid diagnostics/);
+  fetch.mock.mockImplementation(async () => Response.json({...value,events:[{stage:"x",status:"x",elapsed_seconds:1,timing_kind:"made_up",data:{}}]}));
+  await assert.rejects(getReportDiagnostics("report_job_1"), /invalid diagnostics/);
 });
 
 test("a 400 error envelope throws QuantroApiError with its code and stage", async (t) => {

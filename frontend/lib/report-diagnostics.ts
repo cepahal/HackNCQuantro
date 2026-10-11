@@ -1,4 +1,5 @@
 import type { DisplayModel, ReportV2 } from "./api-types";
+import { reportDataMarkers, reportTimelineMarkers } from "./view-model.ts";
 
 export type DiagnosticValue = null | boolean | number | string | DiagnosticValue[] | { [key: string]: DiagnosticValue };
 
@@ -6,7 +7,7 @@ export type DiagnosticValue = null | boolean | number | string | DiagnosticValue
 export interface ReportDiagnostics {
   job_id: string;
   capture_status: "recorded" | "unavailable";
-  events: Array<{ stage: string; status: string; elapsed_seconds: number; data: Record<string, DiagnosticValue> }>;
+  events: Array<{ stage: string; status: string; elapsed_seconds: number; timing_kind?: "stage_duration" | "job_elapsed"; data: Record<string, DiagnosticValue> }>;
   terminal_output: string;
 }
 
@@ -44,6 +45,8 @@ export function diagnosticOutput(
       report,
       display,
       diagnostics,
+      data_markers: report ? reportDataMarkers(report, diagnostics) : [],
+      timeline_markers: report ? reportTimelineMarkers(report) : [],
     }, null, 2),
   ].join("\n");
 }

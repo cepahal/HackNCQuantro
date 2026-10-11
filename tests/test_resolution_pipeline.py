@@ -426,3 +426,21 @@ def test_context_export_failure_keeps_source_report(store, wired, monkeypatch):
     assert report['outcome']=='matched' and report['context_video'] is None
     assert any('could not be exported' in s for s in report['limitations'])
     assert 'private diagnostics' not in json.dumps(report)
+
+
+def test_low_confidence_never_exports_context_video(store, wired, monkeypatch):
+    monkeypatch.setenv('CONTEXT_VIDEO_ENABLED', 'true')
+    original = run.build_alignment
+    def low_alignment(*args, **kwargs):
+        from backend.services.shared.types import ConfidenceLevel
+        alignment = original(*args, **kwargs)
+        alignment.match_quality.confidence.level = ConfidenceLevel.LOW
+        return alignment
+    monkeypatch.setattr(run, 'build_alignment', low_alignment)
+    exporter = AsyncMock()
+    monkeypatch.setattr(run.context_video, 'export', exporter)
+    result = run.run_analysis('job_low_context', CLIP, store=store)
+    report = store.get_report(result.report_id)
+    assert report['outcome'] == 'no_verified_match'
+    assert report['context_video'] is None
+    exporter.assert_not_awaited()

@@ -79,3 +79,19 @@ def test_failed_encoding_cleans_temp_and_never_exposes_asset(monkeypatch):
     with pytest.raises(subprocess.CalledProcessError):
         asyncio.run(cv.export(post,N(matches=[]),{}))
     assert folders and not folders[0].exists()
+
+
+def test_separate_matches_leave_source_gap_labeled_as_context(source, tmp_path):
+    from PIL import Image
+    output = tmp_path / 'gapped.mp4'
+    matches = N(matches=[N(source_start_seconds=2., source_end_seconds=3.),
+                         N(source_start_seconds=5., source_end_seconds=6.)])
+    cv.encode(source, output, {'start_seconds':1., 'end_seconds':7.}, matches)
+    colors = []
+    for timestamp in (1.5, 3., 4.5):
+        frame = tmp_path / f'gap-{timestamp}.png'
+        cv._run(['ffmpeg', '-y', '-v', 'error', '-ss', str(timestamp), '-i', str(output), '-frames:v', '1', str(frame)])
+        with Image.open(frame) as image:
+            colors.append(image.convert('RGB').getpixel((23, 35)))
+    assert colors[0][1] > colors[0][2] and colors[2][1] > colors[2][2]
+    assert colors[1][2] > colors[1][1]

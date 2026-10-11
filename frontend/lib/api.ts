@@ -183,6 +183,7 @@ export async function getReportDiagnostics(reportId: string): Promise<ReportDiag
       || typeof data.terminal_output !== "string" || !Array.isArray(data.events)
       || !data.events.every(event => isRecord(event) && typeof event.stage === "string" && typeof event.status === "string"
         && typeof event.elapsed_seconds === "number" && Number.isFinite(event.elapsed_seconds) && event.elapsed_seconds >= 0
+        && (event.timing_kind === undefined || ["stage_duration", "job_elapsed"].includes(String(event.timing_kind)))
         && isRecord(event.data))) {
     throw new Error("The analysis service returned invalid diagnostics.");
   }

@@ -15,6 +15,7 @@ _KEYS = frozenset(["url", "title", "platform", "duration", "duration_seconds", "
 _PRIVATE_KEY = re.compile(r"(?:secret|token|password|credential|api.?key|authorization|cookie|(?:^|_)path$|^file$)", re.IGNORECASE)
 _PRIVATE_VALUE = re.compile(r"file://|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|(?:/tmp/|/home/|/Users/)|\\\\[^\s\\]+\\", re.IGNORECASE)
 _CREDENTIAL = re.compile(r"\b(?:bearer\s+\S+|(?:api[_-]?key|token|secret|password|authorization)\s*[=:]\s*[^\s,;]+)", re.IGNORECASE)
+_KEYS = _KEYS | frozenset({"context_video", "context_selection", "strategy", "before", "after", "before_method", "after_method", "timing_note"})
 
 
 def safe_url(value: str) -> str | None:
@@ -70,6 +71,8 @@ def public_events(events: Any) -> list[dict[str, Any]]:
                        "status": public_data(str(event.get("status", ""))),
                        "elapsed_seconds": max(0.0, elapsed),
                        "data": public_data(event.get("data", {}))})
+        if event.get("timing_kind") in ("stage_duration", "job_elapsed"):
+            result[-1]["timing_kind"] = event["timing_kind"]
     return result
 
 
@@ -92,6 +95,7 @@ class DiagnosticCapture:
         """Capture failures must never change the core analysis result."""
         try:
             self.events.append({"stage": stage, "status": status,
+                                "timing_kind": "stage_duration" if started is not None else "job_elapsed",
                                 "elapsed_seconds": round(time.monotonic() - (started if started is not None else self.started), 6),
                                 "data": public_data(data)})
             self.store.save_diagnostics(self.job_id, self.events)

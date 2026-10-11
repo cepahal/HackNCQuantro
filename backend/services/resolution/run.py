@@ -239,7 +239,7 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
                 alignment = build_alignment(
                     features, source_features, candidate["match_score"]
                 )
-                if alignment.status != "verified":
+                if alignment.status != "verified" or alignment.match_quality.confidence.level not in ("high", "moderate"):
                     record("candidate_evaluation", "rejected", {**candidate_data, "reason": "timed_alignment_not_verified", "alignment": alignment.model_dump(mode="json")}, started=candidate_started)
                     continue
                 context = build_context(alignment, source_features)

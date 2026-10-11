@@ -9,13 +9,13 @@ import styles from "./ReportPlayer.module.css";
 
 type ReportMedia = ReportV2["submitted"];
 
-export default function ReportPlayer({ media, label }: { media: ReportMedia; label: string }) {
+export default function ReportPlayer({ media, label, generated = false }: { media: ReportMedia; label: string; generated?: boolean }) {
   const [failed, setFailed] = useState(false);
   const { width, height } = media.post.media;
   const [ratio, setRatio] = useState(width && height ? width / height : 16 / 9);
   const playback = mediaUrl(media.post.media);
-  const original = publicUrl(media.post.post_url);
-  const youtube = youtubePreviewUrl(media.post.post_url);
+  const original = generated ? null : publicUrl(media.post.post_url);
+  const youtube = generated ? null : youtubePreviewUrl(media.post.post_url);
   const image = media.post.media.mime_type.startsWith("image/");
   const direct = playback && !failed;
   return <div className="hatch"><section className="panel" aria-label={label}>
@@ -34,7 +34,7 @@ export default function ReportPlayer({ media, label }: { media: ReportMedia; lab
         allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
     </div> : <div className={styles.unavailable} role="status">
       <strong>{image ? "Image preview unavailable" : "Video preview unavailable"}</strong>
-      <p>{original ? "Open the original post to view this recording." : "No playable media or public post link is available."}</p>
+      <p>{generated ? "The generated context video could not be loaded. The matched recording remains available separately." : original ? "Open the original post to view this recording." : "No playable media or public post link is available."}</p>
     </div>}
     <div className={styles.footer}>
       {original && <a href={original} target="_blank" rel="noopener noreferrer">

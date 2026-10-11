@@ -57,10 +57,26 @@ def encode(source_path, output, selection, alignment):
     last = max(m.source_end_seconds for m in alignment.matches)
     if not all(math.isfinite(v) for v in (start,end,first,last,duration)) or not 0<=start<=first<last<=end or end-start>300:
         raise ValueError('Invalid or excessive export range')
+    # Merge overlapping passages, but never label omitted source speech as clip content.
+    intervals = []
+    for match in sorted(alignment.matches, key=lambda m: m.source_start_seconds):
+        a, b = match.source_start_seconds, match.source_end_seconds
+        if not all(math.isfinite(v) for v in (a, b)) or not start <= a < b <= end:
+            raise ValueError('Invalid matched passage')
+        if intervals and a <= intervals[-1][1]:
+            intervals[-1][1] = max(intervals[-1][1], b)
+        else:
+            intervals.append([a, b])
+    spans, cursor = [], start
+    for a, b in intervals:
+        if a > cursor:
+            spans.append(('CONTEXT BEFORE' if cursor == start else 'CONTEXT BETWEEN', cursor, a, '#38bdf8'))
+        spans.append(('YOUR CLIP’S PASSAGE', a, b, '#34d399'))
+        cursor = b
+    if end > cursor:
+        spans.append(('CONTEXT AFTER', cursor, end, '#38bdf8'))
     cues = [{'label':label,'start_seconds':a-start,'end_seconds':b-start,'color':color}
-            for label,a,b,color in [('CONTEXT BEFORE',start,first,'#38bdf8'),
-                                    ('YOUR CLIP’S PASSAGE',first,last,'#34d399'),
-                                    ('CONTEXT AFTER',last,end,'#38bdf8')] if b>a]
+            for label,a,b,color in spans]
     args = ['ffmpeg','-nostdin','-y','-v','error','-ss',str(start),'-i',str(source_path)]
     filters = ['[0:v]setpts=PTS-STARTPTS,scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v0]']
     for i,cue in enumerate(cues):

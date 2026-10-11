@@ -38,14 +38,15 @@ async function setup(t: TestContext, readAllowedReports: () => Promise<unknown> 
     response.setHeader("X-Internal-Key", "do-not-forward");
     if (incoming.url === "/reports/report_public") {
       response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify({ schema_version: "2.1", submitted: { post: { media: { media_id: "media_public" } } }, source: null }));
+      response.end(JSON.stringify({ schema_version: "2.1", submitted: { post: { media: { media_id: "media_public" } } }, source: null,
+        context_video: { media_id: "context_public" } }));
     } else if (incoming.url === "/reports/report_public/display") {
       response.setHeader("Content-Type", "application/json");
       response.end(JSON.stringify({ confidence_note: "Evidence, not a probability." }));
     } else if (incoming.url === "/reports/report_public/diagnostics") {
       response.setHeader("Content-Type", "application/json");
       response.end(JSON.stringify({ job_id: "public", capture_status: "recorded", events: [], terminal_output: "Per-job output" }));
-    } else if (incoming.url === "/media/media_public") {
+    } else if (incoming.url === "/media/media_public" || incoming.url === "/media/context_public") {
       const data = "0123456789";
       response.setHeader("Content-Type", "video/mp4");
       if (incoming.headers.range === "bytes=2-4") {
@@ -107,9 +108,13 @@ test("media access follows selected report IDs and preserves a byte-range stream
   assert.equal(response.headers["content-range"], "bytes 2-4/10");
   assert.equal(response.body, "234");
   assert.equal(calls.at(-1)?.headers.range, "bytes=2-4");
+  const context = await call(origin, "/api/media/context_public", "GET", { Range: "bytes=2-4" });
+  assert.equal(context.status, 206);
+  assert.equal(context.body, "234");
   assert.equal((await call(origin, "/api/media/media_public", "GET", { Range: "bytes=0-1,3-4" })).status, 416);
   ids = [];
   assert.equal((await call(origin, "/api/media/media_public")).status, 404);
+  assert.equal((await call(origin, "/api/media/context_public")).status, 404);
 });
 
 test("only fixed safe Next static asset paths reach the frontend", async (t) => {

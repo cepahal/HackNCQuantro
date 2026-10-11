@@ -15,6 +15,7 @@ import { compact, date, percent, time, unique } from "../lib/format";
 import { summaryText } from "../lib/report-summary";
 import { sourceLeads } from "../lib/source-leads";
 import { analysisName, diagnosticFilename, diagnosticOutput, type ReportDiagnostics } from "../lib/report-diagnostics";
+import { reportDataMarkers, reportTimelineMarkers } from "../lib/view-model";
 import styles from "./ReportPage.module.css";
 
 export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:string|null}){
@@ -61,13 +62,18 @@ export function ReportContent({ report, display, diagnostics }: { report: Report
   ...(alignment?.match_quality.confidence.limitations ?? []), ...(comparison?.assessment_confidence.limitations ?? []),
  ]);
  const findings = comparison?.findings.filter(finding => finding.evidence.length > 0) ?? [];
- const verifiedSource = reportAssessment(report).items[0].tone === "supported" ? source : null;
+ const verifiedSource = reportAssessment(report).items[0].tone === "supported"
+  && ["high", "moderate"].includes(alignment?.match_quality.confidence.level ?? "") ? source : null;
  const leads = sourceLeads(report);
  const primaryLead = verifiedSource ? undefined : leads[0];
  const candidateMedia = !verifiedSource && !primaryLead ? source : null;
  const additionalLeadCount = leads.length - (primaryLead ? 1 : 0);
  return <article className={styles.report}>
-  <div className={styles.diagnosticGrid}>
+  <div className={styles.videoGrid}>
+  <section className={styles.primarySource} aria-label="Submitted video">
+   <div className={styles.primaryHead}><h2>Submitted video</h2></div>
+   <div className={styles.primaryVideo}><ReportPlayer media={submitted} label="Submitted excerpt"/></div>
+  </section>
   <section className={styles.primarySource} aria-label="Source video result">
    <div className={styles.primaryHead}>
     <div><p className={styles.eyebrow}>{verifiedSource ? "Matched source recording" : primaryLead || candidateMedia ? "Most likely source candidate" : "Source recording"}</p>
@@ -77,7 +83,7 @@ export function ReportContent({ report, display, diagnostics }: { report: Report
      {verifiedSource ? "Verified speech match" : "Unverified lead"}
     </span>}
    </div>
-   {verifiedSource ? <div className={styles.primaryVideo}><ReportPlayer key={verifiedSource.post.media.media_id} media={report.context_video ? {...verifiedSource, post: {...verifiedSource.post, media: report.context_video}} : verifiedSource} label={report.context_video ? "Your clip in context" : "Matched source recording"}/></div>
+   {verifiedSource ? <div className={styles.primaryVideo}><ReportPlayer key={verifiedSource.post.media.media_id} media={verifiedSource} label="Matched source recording"/></div>
     : primaryLead ? <div className={styles.candidatePlayer}>
      <iframe src={primaryLead.preview} title={`Unverified source candidate: ${primaryLead.title}`} loading="lazy"
       referrerPolicy="strict-origin-when-cross-origin"
@@ -91,8 +97,19 @@ export function ReportContent({ report, display, diagnostics }: { report: Report
     : primaryLead || candidateMedia ? "This is the strongest available search lead. Its speech and surrounding context have not been verified against the excerpt."
       : "No source found does not establish whether the excerpt is accurate or unedited."}</p>
   </section>
-  <DiagnosticPanel key={report.job_id} report={report} display={display} initialDiagnostics={diagnostics}/>
+  <section className={styles.primarySource} aria-label="Spliced context video">
+   <div className={styles.primaryHead}><h2>Clip in context</h2></div>
+   {verifiedSource && report.context_video
+    ? <div className={styles.primaryVideo}><ReportPlayer key={report.context_video.media_id}
+      media={{...verifiedSource, post: {...verifiedSource.post, media: report.context_video}}}
+      label="Spliced context video" generated/></div>
+    : <div className={styles.sourceEmpty} role="status"><p>{verifiedSource
+      ? "No generated context video is available for this report."
+      : "A sufficiently confident source match is needed before generating a context video."}</p></div>}
+   {verifiedSource && report.context_video && <p className={styles.note}>Generated from the matched recording, with timed labels for the excerpt and surrounding context.</p>}
+  </section>
   </div>
+  <DiagnosticPanel key={report.job_id} report={report} display={display} initialDiagnostics={diagnostics}/>
   {/* Preserved for restoration after diagnostic mode; intentionally hidden. */}
   <div hidden className={styles.legacyPanels} data-testid="preserved-report-panels">
   <details className={styles.submittedClip} aria-label="Submitted clip">
@@ -177,6 +194,8 @@ export function DiagnosticPanel({ report=null, display=null, initialDiagnostics,
   return()=>{active=false};
  },[jobId,initialDiagnostics,attempt,savedDataNote]);
  const output=diagnosticOutput(report,display,diagnostics,state,jobId);
+ const markers=report?reportDataMarkers(report,diagnostics):[];
+ const timeline=report?reportTimelineMarkers(report):[];
  const copy=async()=>{
   try{await navigator.clipboard.writeText(output);setActionStatus("Output copied.")}
   catch{setActionStatus("Copy unavailable. Select the output or download it.")}
@@ -199,6 +218,13 @@ export function DiagnosticPanel({ report=null, display=null, initialDiagnostics,
   <p className={styles.diagnosticNote}>Per-job resolver events and saved public analysis data, without summary truncation. {reportAvailable?"The complete saved report is included.":"No saved report was loaded."} Credentials, private paths and other jobs’ server logs are excluded.</p>
   <p className={styles.diagnosticStatus} role="status">{actionStatus||state}</p>
   {!diagnostics&&state.startsWith("Captured output could")&&<button className={styles.copyButton} onClick={()=>{setState("Loading captured output...");setAttempt(value=>value+1)}}>Retry diagnostics</button>}
+  {report&&<details className={styles.dataMarkers}>
+   <summary>Available data markers ({markers.filter(marker=>marker.value!==null).length} available)</summary>
+   <p>Values retain their recorded units. Model confidence is a label, not an accuracy percentage. Unknown data stays unavailable. {timeline.length} timed markers are available for timeline charts.</p>
+   <div className={styles.tableWrap}><table><caption>Data available for bars, labels and markers</caption><thead><tr><th>Metric</th><th>Value</th><th>Unit</th><th>Origin and data path</th></tr></thead><tbody>
+    {markers.map(marker=><tr key={marker.id}><td>{marker.label}</td><td>{marker.value===null?"Unavailable":String(marker.value)}</td><td>{marker.unit}</td><td>{marker.origin}<br/><code>{marker.path}</code></td></tr>)}
+   </tbody></table></div>
+  </details>}
   <pre className={styles.diagnosticOutput} tabIndex={0} aria-label="Complete recorded analysis output">{output}</pre>
  </section>;
 }

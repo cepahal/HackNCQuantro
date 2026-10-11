@@ -14,7 +14,11 @@ test("diagnostic output retains all nested data, nulls and the entire captured o
   const text = diagnosticOutput(report, null, diagnostics, "loaded");
   assert.ok(text.includes(diagnostics.terminal_output));
   const saved = JSON.parse(text.split("=== ALL SAVED ANALYSIS DATA (JSON) ===\n")[1]!);
-  assert.deepEqual(saved, {report,display:null,diagnostics});
+  assert.deepEqual(saved.report, report);
+  assert.deepEqual(saved.diagnostics, diagnostics);
+  assert.equal(saved.display, null);
+  assert.ok(saved.data_markers.some((m: {id:string}) => m.id === "alignment.match_quality.clip_coverage_ratio"));
+  assert.ok(saved.timeline_markers.some((m: {kind:string}) => m.kind === "match"));
   assert.equal(saved.report.submitted.post.author.followers_count, null);
 });
 
