@@ -278,3 +278,20 @@ C-SPAN recording eWynt87PaJ0 returned 137 caption cues, including speech after
 13 minutes; the submitted short clip had no captions available. Caption location
 does not increase the two-candidate Gemini generation budget. Hosted matching
 is checked separately after deployment. No new API key or dependency is needed.
+When primary search is Exa, caption location requires the explicit existing
+`SEARCH_FALLBACK_PROVIDER=serpapi` and `SEARCH_FALLBACK_API_KEY` pair. Exa's
+primary key is never sent to SerpAPI. Without that pair, caption lookup is
+skipped and only the initial native window is available.
+
+The first hosted DNC regression located speech but rejected the source because
+the densest cue cluster was inside the submitted excerpt, leaving no new
+context. Location now subtracts the submitted sentence's position and requests
+30 seconds before the estimated clip beginning. Those coarse estimates select
+a window only and never become alignment evidence. A live independent window
+at 726 seconds contained preceding literacy, prescription-cost and civil-liberty
+examples plus matching speech, and passed the additional-context gate.
+The gate also recognizes substantive observed prefix/suffix text when the
+provider groups it into the same sentence as the match. Internal transcription
+differences, copied speech and boilerplate do not count. No word timestamps are
+invented. Final affected regression suite: 609 passed; Ruff and scoped mypy
+passed.

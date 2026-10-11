@@ -527,3 +527,15 @@ retrieval works for the full C-SPAN DNC speech with the existing key. Hosted
 source recovery remains a separate deployment test. General original-source
 recall, unavailable captions, large ASR differences, unobserved video, physical
 edits, deepfakes and factual truth remain unverified.
+
+The first hosted DNC regression found the speech at 754 seconds but correctly
+rejected the contextless selected window. The locator now accounts for where
+each phrase occurs in the submitted clip and reserves 30 seconds of preceding
+context. A live window at 726 seconds produced real preceding examples and
+passed independent speech matching and additional-context checks. The final
+hosted report is verified after deploying this correction.
+Sentence segmentation no longer hides substantial new introductory or concluding
+words inside an aligned sentence. Exact distinctive blocks and the existing
+novelty threshold remain required; internal differences and outro boilerplate
+are excluded. Final affected checks: 609 backend tests, Ruff and scoped mypy
+passed. Frontend files remain untouched by this release.

@@ -18,7 +18,7 @@ def test_fingerprint_crosses_caption_boundaries_and_locates_beyond_first_minute(
     cues = [cue(0, 'An unrelated opening and introductions.'),
             cue(823, 'If the employment numbers were accurate'),
             cue(831, 'we would reconsider the public program.')]
-    assert remote._caption_window_start(make_report().submitted.transcript, cues) == 808
+    assert remote._caption_window_start(make_report().submitted.transcript, cues) == 788
 
 
 def test_repeated_exact_caption_passage_cannot_choose_a_location():
@@ -60,11 +60,11 @@ def test_caption_locator_targets_one_later_native_window_and_preserves_absolute_
     warnings = []
     result = remote.assess_remote_sources(make_report(), [row()], warnings, lambda: None)
     captions.assert_called_once_with(SOURCE)
-    native.assert_called_once_with(result.job_id, SOURCE, window_start_seconds=808)
+    native.assert_called_once_with(result.job_id, SOURCE, window_start_seconds=788)
     assert result.outcome == 'matched'
-    assert result.source.post.post_url == SOURCE + '&t=808'
-    assert result.alignment.matches[0].source_start_seconds == 813
-    assert all(sentence.start_seconds >= 808 for sentence in result.context.windows[0].sentences)
+    assert result.source.post.post_url == SOURCE + '&t=788'
+    assert result.alignment.matches[0].source_start_seconds == 793
+    assert all(sentence.start_seconds >= 788 for sentence in result.context.windows[0].sentences)
     assert result.source.post.media.duration_seconds is None
     assert result.alignment.match_quality.clip_coverage_ratio is None
     assert any('locator hints' in warning for warning in warnings)
@@ -107,3 +107,12 @@ def test_explicit_candidate_offset_does_not_issue_a_caption_lookup(monkeypatch):
     assert result.outcome == 'matched'
     captions.assert_not_called()
     native.assert_called_once_with(result.job_id, SOURCE, window_start_seconds=125)
+
+
+def test_late_submitted_phrase_locates_clip_beginning_with_context_before_it():
+    submitted = make_report().submitted.transcript
+    submitted.sentences[0].start_seconds = 45.0
+    submitted.sentences[0].end_seconds = 52.0
+    # Speech at 800 in the source is 45 seconds into the submitted clip.
+    # Request starts before the inferred clip beginning, not at that late phrase.
+    assert remote._caption_window_start(submitted, [cue(800, SPEECH)]) == 725

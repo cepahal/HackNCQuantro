@@ -120,30 +120,45 @@ def _has_surrounding_speech(submitted: Transcript, source: Transcript, alignment
     heuristics, not a semantic verdict or evidence of an original uploader.
     Negation remains informative so short corrective qualifiers can qualify.
     """
-    submitted_words = set(re.findall(r"\w+(?:['’]\w+)?", " ".join(
+    from difflib import SequenceMatcher
+
+    submitted_tokens = re.findall(r"\w+(?:['’]\w+)?", " ".join(
         sentence.text for sentence in submitted.sentences
-    ).casefold()))
+    ).casefold())
+    submitted_words = set(submitted_tokens)
+
+    def substantive(words: list[str]) -> bool:
+        if any(phrase in " ".join(words) for phrase in (
+            "thanks for watching", "thank you for watching", "please subscribe",
+            "like and subscribe", "like and share", "subscribe to",
+        )):
+            return False
+        novel = set(words) - submitted_words - _CONTEXT_NOISE
+        return len(words) >= 4 and len(novel) >= 2
+
     matched_ids = {reference for match in alignment.matches for evidence in match.evidence
                    for reference in evidence.source_refs}
     for sentence in source.sentences:
-        if sentence.sentence_id in matched_ids or any(
-            sentence.start_seconds < match.source_end_seconds
-            and sentence.end_seconds > match.source_start_seconds
-            for match in alignment.matches
-        ):
-            continue
         if not any(sentence.start_seconds < match.source_end_seconds + CONTEXT_PADDING_SECONDS
                    and sentence.end_seconds > max(0.0, match.source_start_seconds - CONTEXT_PADDING_SECONDS)
                    for match in alignment.matches):
             continue
         words = re.findall(r"\w+(?:['’]\w+)?", sentence.text.casefold())
-        if any(phrase in " ".join(words) for phrase in (
-            "thanks for watching", "thank you for watching", "please subscribe",
-            "like and subscribe", "like and share", "subscribe to",
-        )):
+        if sentence.sentence_id in matched_ids or any(
+            sentence.start_seconds < match.source_end_seconds
+            and sentence.end_seconds > match.source_start_seconds
+            for match in alignment.matches
+        ):
+            # Alignment retains enclosing sentence bounds when word times are
+            # absent. Check only observed text outside distinctive exact blocks;
+            # never synthesize sub-sentence times or count internal ASR changes.
+            blocks = [block for block in SequenceMatcher(None, submitted_tokens, words, autojunk=False).get_matching_blocks()
+                      if _distinctive(words[block.b:block.b + block.size])]
+            if blocks and (substantive(words[:blocks[0].b])
+                           or substantive(words[blocks[-1].b + blocks[-1].size:])):
+                return True
             continue
-        novel = set(words) - submitted_words - _CONTEXT_NOISE
-        if len(words) >= 4 and len(novel) >= 2:
+        if substantive(words):
             return True
     return False
 
@@ -173,7 +188,14 @@ def _caption_window_start(transcript: Transcript, cues: list[TimedCaptionCue]) -
     """
     def tokenize(text: str) -> list[str]:
         return re.findall(r"\w+(?:['’]\w+)?", text.casefold())
-    spoken = tokenize(' '.join(sentence.text for sentence in transcript.sentences))[:1_000]
+    spoken: list[str] = []
+    spoken_starts: list[float] = []
+    for sentence in transcript.sentences:
+        words = tokenize(sentence.text)[:max(0, 1_000 - len(spoken))]
+        spoken.extend(words)
+        spoken_starts.extend([sentence.start_seconds] * len(words))
+        if len(spoken) == 1_000:
+            break
     tokens: list[str] = []
     starts: list[float] = []
     for cue in cues:
@@ -192,7 +214,9 @@ def _caption_window_start(transcript: Transcript, cues: list[TimedCaptionCue]) -
         fingerprint = tuple(spoken[index:index + size])
         position = positions.get(fingerprint)
         if position is not None and _distinctive(fingerprint):
-            located[fingerprint] = starts[position]
+            # Estimate the clip beginning only for window selection. These
+            # coarse cue/sentence starts never become alignment evidence.
+            located[fingerprint] = starts[position] - spoken_starts[index]
     if not located:
         return None
     times = sorted(located.values())
@@ -203,7 +227,7 @@ def _caption_window_start(transcript: Transcript, cues: list[TimedCaptionCue]) -
             left += 1
         if right - left + 1 > best_count:
             best_count, best_start = right - left + 1, times[left]
-    return min(86_400, max(0, int(best_start) - 15))
+    return min(86_400, max(0, int(best_start - CONTEXT_PADDING_SECONDS)))
 
 
 def _clean_stage_limits(media: ReportMedia) -> None:
