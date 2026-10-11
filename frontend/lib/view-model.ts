@@ -132,6 +132,28 @@ export function reportTimelineMarkers(report: Report): TimelineMarker[] {
   return rows.filter(r => Number.isFinite(r.startSeconds) && Number.isFinite(r.endSeconds) && r.startSeconds >= 0 && r.endSeconds > r.startSeconds);
 }
 
+export interface ContextSegment { kind: "before" | "match" | "after"; startSeconds: number; endSeconds: number }
+
+/** Source-recording ranges covered by the generated context video; empty unless every bound is recorded. */
+export function contextTimeline(report: Report): ContextSegment[] {
+  const confident = ["high", "moderate"].includes(report.alignment?.match_quality.confidence.level ?? "");
+  const markers = confident ? reportTimelineMarkers(report) : [];
+  const selection = report.context_video ? report.context_selection : null;
+  const start = selection?.start_seconds, end = selection?.end_seconds;
+  if (typeof start !== "number" || typeof end !== "number" || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end <= start) return [];
+  const matches = markers.filter(marker => marker.track === "source" && marker.kind === "match"
+    && marker.endSeconds > start && marker.startSeconds < end);
+  if (!matches.length) return [];
+  const matchStart = Math.max(start, Math.min(...matches.map(marker => marker.startSeconds)));
+  const matchEnd = Math.min(end, Math.max(...matches.map(marker => marker.endSeconds)));
+  const segments: ContextSegment[] = [
+    { kind: "before", startSeconds: start, endSeconds: matchStart },
+    { kind: "match", startSeconds: matchStart, endSeconds: matchEnd },
+    { kind: "after", startSeconds: matchEnd, endSeconds: end },
+  ];
+  return segments.filter(segment => segment.endSeconds - segment.startSeconds >= 0.5);
+}
+
 export function derive(report: Report) {
   const alignment = report.alignment;
   if (!alignment) return { gapSeconds: null, passageSpan: null, leftOutPct: null, sourceMatchedSeconds: null, outOfOrder: false };

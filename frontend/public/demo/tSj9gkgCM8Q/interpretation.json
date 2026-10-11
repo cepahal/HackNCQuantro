@@ -1,12 +1,21 @@
 {
  "report_id": "report_job_demo_tSj9gkgCM8Q_5",
- "status": "unavailable",
- "context_gap": null,
- "summary": null,
+ "status": "ready",
+ "context_gap": "Joe Biden says America has \"the strongest economy in the world\" and \"the most productive workers,\" then closes by saying \"Hillary Clinton will write the next chapter\" and \"we own the finish line.\" The source opens with him saying it has \"never been a good bet to bet against America,\" so the available window shows the clip continuing the same optimistic argument.",
+ "summary": "Joe Biden praises America's economy and workers, says he is more optimistic than ever, and says Hillary Clinton will write the next chapter.",
  "reliability": "This reading compares recorded words. It does not verify factual accuracy, identity or video authenticity.",
- "references": [],
+ "references": [
+  {
+   "media_id": "media_3bd11d4bca84cf1958566b53",
+   "sentence_id": "s1"
+  },
+  {
+   "media_id": "media_fc803652038d7713262a24c9",
+   "sentence_id": "s2"
+  }
+ ],
  "source_review": null,
  "provider": "gemini",
  "model": null,
- "generated_at": "2026-10-11T12:20:10.360778Z"
+ "generated_at": "2026-10-11T13:02:49.905758Z"
 }

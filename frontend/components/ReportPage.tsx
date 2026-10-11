@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -18,7 +18,7 @@ import { clipDisplayText, summaryText } from "../lib/report-summary";
 import { sourceLeads, type SourceLead } from "../lib/source-leads";
 import { reportAnalytics } from "../lib/report-analytics";
 import { analysisName, diagnosticFilename, diagnosticOutput, type ReportDiagnostics } from "../lib/report-diagnostics";
-import { reportDataMarkers, reportTimelineMarkers } from "../lib/view-model";
+import { contextTimeline, reportDataMarkers, reportTimelineMarkers, type ContextSegment } from "../lib/view-model";
 import styles from "./ReportPage.module.css";
 
 export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:string|null}){
@@ -48,11 +48,12 @@ export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:
  return <><Navbar/><div className={styles.page}><main className={styles.main}>
   <header className={styles.header}>
    <Link className={styles.back} href="/">← New analysis</Link>
-   <div className={styles.heading}><div><p className={styles.eyebrow}>ZoomOut / Analysis</p><h1>{analysisName(report)}</h1></div>
+   <div className={styles.heading}><h1 className="zo-h1">Analysis results</h1>
     <div className={styles.actions}><button className={styles.copyButton} onClick={copyLink}>{copyStatus.startsWith("Link copied")?"Copied":copyStatus.startsWith("Couldn’t")?"Copy failed":"Copy link"}<span aria-hidden="true">↗</span></button><span role="status" className="sr-only">{copyStatus}</span></div>
    </div>
   </header>
-  {error?<><div className={styles.error} role="alert"><h2>We couldn’t load this report.</h2><p>{error.error.message}</p><p className={styles.note}>{error.error.code} · {error.error.stage}</p>{error.error.retryable&&<button className={styles.copyButton} onClick={retry}>Retry</button>}</div>{(jobId||reportId)&&<DiagnosticPanel key={jobId||reportId} jobId={jobId??reportId!.replace(/^report_/,"")}/>}</>:report&&display?<ReportContent key={report.job_id} report={report} display={display} onRecheckCompleted={id=>router.push(`/results?id=${encodeURIComponent(id)}`)}/>:null}
+  {error?<><div className={`zo-card ${styles.error}`} role="alert"><h2 className="zo-h2">We couldn’t load this report.</h2><p className="zo-body">{error.error.message}</p>{error.error.retryable&&<button className={styles.copyButton} onClick={retry}>Retry</button>}
+   <details className={styles.errorDetails}><summary>Technical details</summary><p className="zo-meta">{error.error.code} · {error.error.stage}</p>{(jobId||reportId)&&<DiagnosticPanel key={jobId||reportId} jobId={jobId??reportId!.replace(/^report_/,"")}/>}</details></div></>:report&&display?<ReportContent key={report.job_id} report={report} display={display} onRecheckCompleted={id=>router.push(`/results?id=${encodeURIComponent(id)}`)}/>:null}
  </main><footer className={styles.footer}><Link href="/" aria-label="ZoomOut home"><Image src="/logo-light.png" alt="ZoomOut" width={129} height={25} unoptimized /></Link><p>The full record, in context.</p><span>Built at HackNC · © 2026 ZoomOut</span></footer></div>{!loadingDismissed&&<AnalysisLoadingScreen key={`${jobId}:${reportId}:${attempt}`} complete={ready} onDone={finishLoading}/>}</>;
 }
 export function ReportLoading(){return <AnalysisLoadingScreen/>}
@@ -100,38 +101,40 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
  const primaryLead = verifiedSource ? undefined : leads[0];
  const candidateMedia = !verifiedSource && !primaryLead ? source : null;
  const additionalLeadCount = leads.length - (primaryLead ? 1 : 0);
+ const name = analysisName(report);
+ const submittedTitle = name === "Video analysis" ? "Untitled video" : name;
+ const submittedMeta = [platformName(submitted.post.platform), submitted.post.media.duration_seconds == null ? "" : time(submitted.post.media.duration_seconds)].filter(Boolean).join(" · ");
+ const timeline = verifiedSource ? contextTimeline(report) : [];
  return <article className={styles.report}>
-  {checkedReportId&&<Link href={`/results?id=${encodeURIComponent(checkedReportId)}`}>Open rechecked report ↗</Link>}
-  {<div className={styles.videoGrid}>
-  <section className={styles.primarySource} aria-label="Submitted video">
-   <div className={styles.primaryHead}><h2>Submitted video</h2></div>
-   <div className={styles.primaryVideo}><ReportPlayer media={submitted} label="Submitted excerpt"/></div>
-  </section>
-  <section className={styles.primarySource} aria-label="Source video result">
-   <div className={styles.primaryHead}>
-    <div><p className={styles.eyebrow}>{verifiedSource ? "Matched source recording" : primaryLead || candidateMedia ? "Most likely source candidate" : "Source recording"}</p>
-     <h2>{summaryText(verifiedSource?.post.title || primaryLead?.title || candidateMedia?.post.title || (verifiedSource ? "Matched recording" : "No source candidate found"))}</h2>
-    </div>
-    {(verifiedSource || primaryLead || candidateMedia) && <span className={`${styles.sourceStatus} ${verifiedSource ? styles.verifiedSource : styles.unverifiedSource}`}>
-     {verifiedSource ? "Verified speech match" : "Unverified lead"}
-    </span>}
-   </div>
-   {verifiedSource ? <div className={styles.primaryVideo}><ReportPlayer key={verifiedSource.post.media.media_id} media={verifiedSource} label="Matched source recording"/></div>
-    : <div className={styles.sourceEmpty}><p>No verified source video is available.</p></div>}
-
-  </section>
-  <section className={styles.primarySource} aria-label="Spliced context video">
-   <div className={styles.primaryHead}><h2>Clip in context</h2></div>
+  {checkedReportId&&<Link className={styles.recheckLink} href={`/results?id=${encodeURIComponent(checkedReportId)}`}>Open rechecked report ↗</Link>}
+  <div className={styles.videoGrid}>
+  <MediaCard ariaLabel="Submitted video" label="Submitted video" title={submittedTitle}
+   status={submittedMeta && <span className="zo-pill">{submittedMeta}</span>}>
+   <ReportPlayer media={submitted} label="Submitted excerpt" variant="card"/>
+  </MediaCard>
+  <MediaCard ariaLabel="Source video result" label={verifiedSource ? "Matched source recording" : primaryLead || candidateMedia ? "Most likely source candidate" : "Source recording"}
+   title={summaryText(verifiedSource?.post.title || primaryLead?.title || candidateMedia?.post.title || (verifiedSource ? "Matched recording" : "No source candidate found"))}
+   status={(verifiedSource || primaryLead || candidateMedia) && <span className={`zo-pill ${verifiedSource ? "zo-pill--ok" : ""}`}>
+    {verifiedSource && <span aria-hidden="true">✓</span>}{verifiedSource ? "Verified speech match" : "Unverified lead"}
+   </span>}>
+   {verifiedSource ? <ReportPlayer key={verifiedSource.post.media.media_id} media={verifiedSource} label="Matched source recording" variant="card"/>
+    : <EmptyMedia title="No verified source video is available.">{leads.length > 0 && "Possible recordings are listed below for rechecking."}</EmptyMedia>}
+  </MediaCard>
+  <MediaCard ariaLabel="Spliced context video" label="Generated context video" title="Clip in context" className={styles.contextCard}
+   status={verifiedSource && report.context_video && <span className="zo-pill">Generated from matched recording</span>}>
    {verifiedSource && report.context_video
-    ? <div className={styles.primaryVideo}><ReportPlayer key={report.context_video.media_id}
+    ? <div className={styles.contextBody}><ReportPlayer key={report.context_video.media_id}
       media={{...verifiedSource, post: {...verifiedSource.post, media: report.context_video}}}
-      label="Spliced context video" generated onPlaybackReady={ready=>setPlayableContextId(ready?report.context_video?.media_id??null:null)}/></div>
-    : <div className={styles.sourceEmpty} role="status"><p>{verifiedSource
+      label="Spliced context video" generated variant="card" onPlaybackReady={ready=>setPlayableContextId(ready?report.context_video?.media_id??null:null)}/>
+      <div className={styles.contextDetails}>
+       {timeline.length>0&&<ContextTimeline segments={timeline}/>}
+       <p className="zo-meta">Generated from the matched recording, with timed labels for the excerpt and surrounding context.</p>
+      </div></div>
+    : <EmptyMedia title="No context video available">{verifiedSource
       ? "No generated context video is available for this report."
-      : "A sufficiently confident source match is needed before generating a context video."}</p></div>}
-   {verifiedSource && report.context_video && <p className={styles.note}>Generated from the matched recording, with timed labels for the excerpt and surrounding context.</p>}
-  </section>
-  </div>}
+      : "A context video is generated once a source recording is confirmed."}</EmptyMedia>}
+  </MediaCard>
+  </div>
   <ReportAnalytics data={analytics} interpretation={interpretation ? {...interpretation,summary:clipDisplayText(interpretation.summary,submitted.post.media.media_id,source?.post.media.media_id),context_gap:clipDisplayText(interpretation.context_gap,submitted.post.media.media_id,source?.post.media.media_id),source_review:interpretation.source_review?{...interpretation.source_review,fact_check:clipDisplayText(interpretation.source_review.fact_check,submitted.post.media.media_id,source?.post.media.media_id)}:interpretation.source_review}:null} interpretationState={interpretationState}
    sourceEvidence={verifiedSource&&report.context?.source_media_id===verifiedSource.post.media.media_id
     ?report.context.windows.filter(window=>window.coverage!=="unavailable").flatMap(window=>window.sentences.filter(sentence=>sentence.start_seconds<window.requested_end_seconds&&sentence.end_seconds>window.requested_start_seconds&&verifiedSource.transcript.sentences.some(recorded=>recorded.sentence_id===sentence.sentence_id&&recorded.text===sentence.text&&recorded.start_seconds===sentence.start_seconds&&recorded.end_seconds===sentence.end_seconds))).map(sentence=>({...sentence,media_id:verifiedSource.post.media.media_id})):[]}
@@ -262,6 +265,39 @@ export function DiagnosticPanel({ report=null, display=null, initialDiagnostics,
   <pre className={styles.diagnosticOutput} tabIndex={0} aria-label="Complete recorded analysis output">{output}</pre>
  </section>;
 }
+
+function MediaCard({ ariaLabel, label, title, status, className = "", children }: { ariaLabel: string; label: string; title: string; status?: ReactNode; className?: string; children: ReactNode }) {
+ return <section className={`zo-card ${styles.mediaCard} ${className}`} aria-label={ariaLabel}>
+  <p className="zo-label">{label}</p>
+  <h2 className={`zo-h2 ${styles.cardTitle}`}>{title}</h2>
+  <div className={styles.cardStatus}>{status}</div>
+  <div className={styles.cardBody}>{children}</div>
+ </section>;
+}
+
+function EmptyMedia({ title, children }: { title: string; children?: ReactNode }) {
+ return <div className={styles.emptyMedia} role="status">
+  <svg className={styles.emptyIcon} viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m10 9.5 4.5 2.5-4.5 2.5z"/></svg>
+  <p className={styles.emptyTitle}>{title}</p>
+  {children&&<p className="zo-meta">{children}</p>}
+ </div>;
+}
+
+const SEGMENT_LABELS: Record<ContextSegment["kind"], string> = { before: "Before clip", match: "Matched excerpt", after: "After clip" };
+
+function ContextTimeline({ segments }: { segments: ContextSegment[] }) {
+ return <figure className={styles.timeline} aria-label="Where the excerpt sits in the source recording">
+  <div className={styles.timelineBar} aria-hidden="true">{segments.map(segment=><span key={segment.kind} data-kind={segment.kind}
+   style={{flexGrow:segment.endSeconds-segment.startSeconds}}/>)}</div>
+  <ol className={styles.timelineLabels}>{segments.map(segment=><li key={segment.kind} data-kind={segment.kind}>
+   <strong>{SEGMENT_LABELS[segment.kind]}</strong><span>{time(segment.startSeconds)}–{time(segment.endSeconds)}</span>
+  </li>)}</ol>
+  <figcaption className="zo-meta">Times in the source recording; boundaries are approximate.</figcaption>
+ </figure>;
+}
+
+const PLATFORM_NAMES: Record<string, string> = { youtube: "YouTube", tiktok: "TikTok", instagram: "Instagram", x: "X", twitter: "X", facebook: "Facebook" };
+function platformName(platform: string) { return PLATFORM_NAMES[platform.toLowerCase()] ?? ""; }
 
 function Transcript({ media, label }: { media: Report["submitted"]; label: string }) {
  return <section className={styles.transcript} aria-label={`${label} transcript`}><h3>{label}<span>{media.transcript.status.replaceAll("_"," ")}</span></h3>

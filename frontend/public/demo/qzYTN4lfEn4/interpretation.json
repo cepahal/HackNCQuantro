@@ -1,12 +1,21 @@
 {
  "report_id": "report_job_demo_qzYTN4lfEn4_5",
- "status": "unavailable",
- "context_gap": null,
- "summary": null,
+ "status": "ready",
+ "context_gap": "Bernie Sanders says \"the political system in this country is largely corrupt\" because \"billionaires in both political parties\" decide legislation and candidates, citing Elon Musk and AIPAC primary threats. In the source, he is answering a question about why both parties are viewed so poorly (\"I will tell you why\"), and the interviewer then moves on to Gaza.",
+ "summary": "Bernie Sanders argues that billionaires in both parties control legislation and primary challenges, calling the campaign finance system corrupt.",
  "reliability": "This reading compares recorded words. It does not verify factual accuracy, identity or video authenticity.",
- "references": [],
+ "references": [
+  {
+   "media_id": "media_df681e20ed5ea718c655a415",
+   "sentence_id": "s1"
+  },
+  {
+   "media_id": "media_181770437a0a243a26a0b41d",
+   "sentence_id": "s98"
+  }
+ ],
  "source_review": null,
  "provider": "gemini",
  "model": null,
- "generated_at": "2026-10-11T12:16:07.111483Z"
+ "generated_at": "2026-10-11T13:02:49.902774Z"
 }

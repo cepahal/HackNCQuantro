@@ -96,3 +96,24 @@
 @media(min-width:1100px){#how>.section-intro{max-width:none;white-space:nowrap}}
 
 .analysis-loading *,.navbar *,.mobile-drawer *{font-size:14px!important}.analysis-loading h2{font-size:22px!important}
+
+/* Results page design tokens and shared type/card styles. */
+:root{
+  --zo-red:var(--red);--zo-red-text:#c4213b;--zo-red-soft:#fdeef0;
+  --zo-text:#202b38;--zo-text-2:#5f6d7e;--zo-muted:#748397;
+  --zo-bg:#f5f7fa;--zo-card:#fff;--zo-line:#dce3ec;--zo-line-soft:#e9eef4;--zo-dark:#0b0b0d;
+  --zo-green:#1d7446;--zo-green-soft:#ebf7f0;--zo-green-line:#cde8d8;
+  --zo-radius:12px;--zo-radius-sm:8px;--zo-pad:24px;--zo-gap:20px;
+  --zo-shadow:0 1px 2px #1018280a,0 6px 18px #10182808;
+  --zo-h1:30px;--zo-h2:22px;--zo-h3:17px;--zo-body:16px;--zo-small:14px;--zo-label:13px;
+}
+.zo-card{min-width:0;padding:var(--zo-pad);background:var(--zo-card);border:1px solid var(--zo-line);border-radius:var(--zo-radius);box-shadow:var(--zo-shadow);color:var(--zo-text)}
+.zo-h1{margin:0;color:var(--zo-text);font-size:var(--zo-h1);font-weight:700;line-height:1.2;letter-spacing:-.02em}
+.zo-h2{margin:0;color:var(--zo-text);font-size:var(--zo-h2);font-weight:700;line-height:1.3;letter-spacing:-.015em;overflow-wrap:anywhere}
+.zo-h3{margin:0;color:var(--zo-text);font-size:var(--zo-h3);font-weight:700;line-height:1.4}
+.zo-body{margin:0;color:var(--zo-text);font-size:var(--zo-body);font-weight:400;line-height:1.6}
+.zo-meta{margin:0;color:var(--zo-text-2);font-size:var(--zo-small);line-height:1.55}
+.zo-label{margin:0;color:var(--zo-text-2);font-size:var(--zo-label);font-weight:600;line-height:1.4;letter-spacing:.08em;text-transform:uppercase}
+.zo-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--zo-line);border-radius:999px;background:var(--zo-bg);color:var(--zo-text-2);font-size:var(--zo-label);font-weight:600;line-height:1.4}
+.zo-pill--ok{color:var(--zo-green);background:var(--zo-green-soft);border-color:var(--zo-green-line)}
+@media(max-width:600px){:root{--zo-h1:28px;--zo-pad:20px;--zo-gap:16px}}

@@ -1,12 +1,21 @@
 {
  "report_id": "report_job_demo_3XPuGqqWLtk_5",
- "status": "unavailable",
- "context_gap": null,
- "summary": null,
+ "status": "ready",
+ "context_gap": "Barack Obama tells graduates \"nobody is going to give you anything that you have not earned\" and that \"nobody cares\" about past hardship. In the source, these lines follow his acknowledgment that \"racism and discrimination\" still exist in a \"hypercompetitive world,\" and lead into a tribute to figures such as Frederick Douglass and Dr. Martin Luther King, Jr.",
+ "summary": "Barack Obama tells graduates that success must be earned and that earlier generations overcame far greater hardships.",
  "reliability": "This reading compares recorded words. It does not verify factual accuracy, identity or video authenticity.",
- "references": [],
+ "references": [
+  {
+   "media_id": "media_2a5f2f764c267776fd661b63",
+   "sentence_id": "s1"
+  },
+  {
+   "media_id": "media_e72908cf35603fc75e4ea353",
+   "sentence_id": "s277"
+  }
+ ],
  "source_review": null,
  "provider": "gemini",
  "model": null,
- "generated_at": "2026-10-11T12:16:38.823693Z"
+ "generated_at": "2026-10-11T13:02:49.909059Z"
 }
