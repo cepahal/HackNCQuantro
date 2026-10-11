@@ -48,8 +48,7 @@ def test_errors_are_redacted_and_not_no_match(status, retryable):
         search_candidates(['q1','q2'], 5, provider=p)
     assert caught.value.retryable is retryable
     assert 'private-test-key' not in str(caught.value)
-    if status != 503:
-        assert len(calls)==1
+    assert len(calls)==3
     p.close()
 
 
@@ -60,9 +59,9 @@ def test_partial_failure_warning_and_bounded_queries():
         if len(calls)==2: return httpx.Response(503)
         return httpx.Response(200,json={'results': []})
     p=ExaSearch('test',client=client(handler))
-    assert p.find_posts(['a','b','c','d','e'],5)==[]
+    with pytest.raises(QuantroError):
+        p.find_posts(['a','b','c','d','e'],5)
     assert len(calls)==4
-    assert any('failed' in w for w in p.warnings)
     assert any('first three' in w for w in p.warnings)
     p.close()
 
@@ -146,8 +145,96 @@ def test_video_host_search_adds_recordings_within_four_call_budget():
     provider = ExaSearch("test", client=client(handler))
     result = search_candidates(["spoken phrase", "visible title", "post title", "extra speech"], 5, provider=provider)
     assert len(requests) == 4
-    assert requests[1]["includeDomains"] == ["youtube.com", "vimeo.com", "archive.org"]
+    assert [body["includeDomains"] for body in requests if "includeDomains" in body] == [["youtube.com", "vimeo.com", "archive.org"]]
     assert {body["query"] for body in requests} == {"spoken phrase", "visible title", "post title"}
     assert result["candidates"][0]["url"] == "https://www.youtube.com/watch?v=full"
     assert result["candidates"][0]["discovered_by_queries"] == ["spoken phrase"]
     provider.close()
+
+
+@pytest.mark.parametrize("status,retryable", [(402, False), (429, True), (503, True), (403, False)])
+def test_empty_success_plus_failure_is_not_no_match(status, retryable):
+    import json
+    def handler(request):
+        body = json.loads(request.content)
+        return httpx.Response(status if body.get("includeDomains") else 200, json={"results": []})
+    provider = ExaSearch("test", client=client(handler))
+    with pytest.raises(QuantroError) as error:
+        provider.find_posts(["clue"], 5)
+    assert error.value.code.value == "SEARCH_FAILED"
+    assert error.value.retryable is retryable
+    provider.close()
+
+
+def test_successful_empty_is_valid_and_partial_hits_keep_warning():
+    import json
+    def handler(request):
+        body = json.loads(request.content)
+        if body.get("includeDomains"):
+            return httpx.Response(503)
+        return httpx.Response(200, json={"results": [{"url": "https://example.org/source"}]})
+    provider = ExaSearch("test", client=client(handler))
+    assert len(provider.find_posts(["clue"], 5)) == 1
+    assert any("failed" in warning for warning in provider.warnings)
+    provider.close()
+    provider = ExaSearch("test", client=client(lambda request: httpx.Response(200, json={"results": []})))
+    assert provider.find_posts(["clue"], 5) == []
+    provider.close()
+
+
+def test_canonical_exclusion_and_dedup_precede_final_limit():
+    from backend.services.shared.post_identity import post_identity
+    rows = [{"url": "https://www.youtube.com/watch?v=self"},
+            {"url": "https://youtu.be/self"},
+            {"url": "https://youtu.be/source"},
+            {"url": "https://www.youtube.com/watch?v=source"},
+            {"url": "https://example.org/other.mp4"}]
+    provider = ExaSearch("test", excluded_identities={post_identity(rows[0]["url"])},
+                         client=client(lambda request: httpx.Response(200, json={"results": rows})))
+    found = provider.find_posts(["clue"], 2)
+    assert len(found) == 2
+    assert {post_identity(post["post_url"]) for post, queries in found} == {
+        post_identity("https://youtu.be/source"), post_identity("https://example.org/other.mp4")}
+    provider.close()
+
+
+def test_concurrent_requests_merge_deterministically_and_close():
+    import json
+    import threading
+    barrier = threading.Barrier(3)
+    active = 0
+    peak = 0
+    lock = threading.Lock()
+    def handler(request):
+        nonlocal active, peak
+        body = json.loads(request.content)
+        with lock:
+            active += 1
+            peak = max(peak, active)
+        barrier.wait(timeout=3)
+        with lock:
+            active -= 1
+        return httpx.Response(200, json={"results": [{"url": "https://example.org/" + body["query"]}]})
+    transport_client = client(handler)
+    provider = ExaSearch("test", client=transport_client)
+    for _ in range(2):
+        assert [post["post_url"] for post, queries in provider.find_posts(["first", "second"], 5)] == [
+            "https://example.org/first", "https://example.org/second"]
+    assert peak == 3
+    provider.close()
+    assert transport_client.is_closed
+
+
+def test_transport_failure_is_retryable_and_client_cleanup_is_explicit():
+    def handler(request):
+        raise httpx.ReadTimeout("private-provider-detail", request=request)
+    transport_client = client(handler)
+    provider = ExaSearch("test", client=transport_client)
+    try:
+        with pytest.raises(QuantroError) as error:
+            provider.find_posts(["clue"], 5)
+        assert error.value.retryable is True
+        assert "private-provider-detail" not in str(error.value)
+    finally:
+        provider.close()
+    assert transport_client.is_closed

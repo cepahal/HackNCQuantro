@@ -12,20 +12,34 @@ and a messaging failure becomes a delivery warning rather than undoing the save.
 """
 
 import logging
+import os
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal, TypeVar
 
 from ..external_apis.build_search_queries import build_search_queries
 from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
 from ..external_apis.retrieve_post import _validate_url
-from ..external_apis.search_candidates import check_search_settings, search_candidates
+from ..external_apis.search_candidates import (
+    check_search_settings,
+    search_candidates,
+    search_scope,
+)
+from ..external_apis.search_expansion import widen_queries
 from ..pipeline.artifacts import artifact_scope
+from ..pipeline.feature_cache import extraction_signature, media_sha256
 from ..pipeline.run_ingest import EXTRACTION_OPTIONS, run_ingest
 from ..processing.preprocessing import extract_media_features
 from ..shared.contracts import validate_contract_result
-from ..shared.errors import ErrorCode, JobConflictError, QuantroError, Stage, normalize_exception
+from ..shared.errors import (
+    ErrorCode,
+    JobConflictError,
+    QuantroError,
+    Stage,
+    normalize_exception,
+)
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
 from ..shared.post_identity import ensure_distinct_source
@@ -145,22 +159,54 @@ def _candidate_label(candidate: dict[str, Any], index: int) -> str:
     return candidate_id if isinstance(candidate_id, str) and candidate_id else f"#{index}"
 
 
-def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures, submitted_identities: set[str]) -> _AssessedSource:
-    raw_post = _call(Stage.RETRIEVE_CANDIDATE_MEDIA, retrieve_candidate_media, candidate)
-    post = parse_stage_output(Post, raw_post, Stage.RETRIEVE_CANDIDATE_MEDIA)
+def _assess_candidate(candidate: dict[str, Any], clip_features: MediaFeatures, submitted_identities: set[str], *, store: TigerStore | None = None) -> _AssessedSource:
+    options = {**EXTRACTION_OPTIONS, "extract_frames": False, "extract_visual_text": False, "max_frames": 0}
+    signature = extraction_signature(options)
+    cached = None
+    cached_post = None
+    cached_features = None
+    cache_warning = None
+    if store is not None:
+        try:
+            cached = store.get_cached_source(candidate["url"], signature)
+            if cached:
+                cached_post = parse_stage_output(Post, cached["post_json"], Stage.RETRIEVE_CANDIDATE_MEDIA)
+                cached_features = parse_stage_output(MediaFeatures, cached["features_json"], Stage.EXTRACT_MEDIA_FEATURES)
+                if cached_post.media.media_id != cached_features.media_id:
+                    raise ValueError("Snapshot media identities do not agree.")
+        except Exception as exc:  # noqa: BLE001 - cache is an optional optimization
+            cached = None
+            logger.warning("Candidate snapshot lookup failed (%s)", type(exc).__name__)
+            cache_warning = "Source snapshot reuse was unavailable; fresh retrieval was attempted."
+    if cached and cached_post is not None:
+        post = cached_post.model_copy(update={"candidate_id": candidate["candidate_id"]}, deep=True)
+    else:
+        raw_post = _call(Stage.RETRIEVE_CANDIDATE_MEDIA, retrieve_candidate_media, candidate)
+        post = parse_stage_output(Post, raw_post, Stage.RETRIEVE_CANDIDATE_MEDIA)
     if _post_identities(post) & submitted_identities:
         raise QuantroError(
             ErrorCode.PROCESSING_FAILED, Stage.RETRIEVE_CANDIDATE_MEDIA,
             "The submitted post cannot be its own source.",
         )
-    raw_features = _call(
-        Stage.EXTRACT_MEDIA_FEATURES,
-        extract_media_features,
-        post.media,
-        {**EXTRACTION_OPTIONS, "extract_frames": False, "extract_visual_text": False, "max_frames": 0},
-    )
-    features = parse_stage_output(MediaFeatures, raw_features, Stage.EXTRACT_MEDIA_FEATURES)
+    if cached and cached_features is not None:
+        features = cached_features
+    else:
+        raw_features = _call(Stage.EXTRACT_MEDIA_FEATURES, extract_media_features, post.media, options)
+        features = parse_stage_output(MediaFeatures, raw_features, Stage.EXTRACT_MEDIA_FEATURES)
     features = features.model_copy(deep=True)
+    if cached:
+        features.warnings.append(
+            f"Reused a prior recording transcript snapshot retrieved at {cached['retrieved_at']}; current URL bytes were not re-downloaded."
+        )
+    elif store is not None and Path(post.media.local_path).is_file():
+        try:
+            store.cache_source_features(post.model_dump(mode="json"), features.model_dump(mode="json"),
+                                        signature, media_sha256(post.media.local_path))
+        except Exception as exc:  # noqa: BLE001 - preserve valid fresh evidence on optional cache failure
+            logger.warning("Candidate snapshot save failed (%s)", type(exc).__name__)
+            cache_warning = "Source features could not be cached for reuse."
+    if cache_warning:
+        features.warnings.append(cache_warning)
     features.warnings.append("Candidate visual extraction was skipped; source verification uses transcript alignment only.")
     raw_alignment = _call(
         Stage.VERIFY_AND_ALIGN,
@@ -247,8 +293,30 @@ def run_analysis(
             raise
     except QuantroError:
         raise
-    except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
+    except Exception as exc:
         raise _normalize_contract_exception(_ContractStage.RUN_ANALYSIS, exc) from exc
+
+
+def _discover_sources(queries: _SearchQueries, store: TigerStore, excluded: set[str],
+                      warnings: list[str], limit: int,
+                      exclusion_warning: str = "The submitted post was excluded from its own source candidates.") -> list[dict[str, Any]]:
+    started = time.monotonic()
+    try:
+        with search_scope(store, excluded):
+            raw_search = search_candidates(queries, limit=limit)
+    except Exception as exc:
+        raise QuantroError(
+            code=ErrorCode.SEARCH_FAILED, stage=Stage.SEARCH_CANDIDATES, retryable=True
+        ) from exc
+    finally:
+        logger.info("analysis_stage stage=%s seconds=%.3f", Stage.SEARCH_CANDIDATES.value, time.monotonic() - started)
+    search = parse_stage_output(_CandidateSearch, raw_search, Stage.SEARCH_CANDIDATES)
+    warnings.extend(warning for warning in search.warnings if warning not in warnings)
+    rows = [candidate.model_dump(mode="json") for candidate in search.candidates]
+    eligible = [row for row in rows if _post_identity(row["url"]) not in excluded]
+    if len(eligible) < len(rows):
+        warnings.append(exclusion_warning)
+    return eligible[:limit]
 
 
 def _analyze(
@@ -272,40 +340,42 @@ def _analyze(
     queries = parse_stage_output(_SearchQueries, raw_queries, Stage.BUILD_SEARCH_QUERIES)
     warnings.extend(queries.warnings)
 
-    search_started = time.monotonic()
-    try:
-        raw_search = search_candidates(queries, limit=SEARCH_LIMIT)
-    except Exception as exc:
-        raise QuantroError(
-            code=ErrorCode.SEARCH_FAILED, stage=Stage.SEARCH_CANDIDATES, retryable=True
-        ) from exc
-    finally:
-        logger.info("analysis_stage stage=%s seconds=%.3f", Stage.SEARCH_CANDIDATES.value, time.monotonic() - search_started)
-    search = parse_stage_output(_CandidateSearch, raw_search, Stage.SEARCH_CANDIDATES)
-    warnings.extend(warning for warning in search.warnings if warning not in warnings)
     submitted_identities = _post_identities(submitted_post)
-    candidate_rows = [candidate.model_dump(mode="json") for candidate in search.candidates]
-    eligible_candidates = [
-        candidate for candidate in candidate_rows
-        if _post_identity(candidate.get("url", "")) not in submitted_identities
-    ]
-    candidates = eligible_candidates[:SEARCH_LIMIT]
-    if len(eligible_candidates) < len(candidate_rows):
-        warnings.append("The submitted post was excluded from its own source candidates.")
+    candidates = _discover_sources(queries, store, submitted_identities, warnings, SEARCH_LIMIT)
 
     viable: list[_AssessedSource] = []
     skipped = 0
-    for index, candidate in enumerate(candidates, start=1):
-        _heartbeat(store, job_id)
-        try:
-            assessed = _assess_candidate(candidate, submitted_features, submitted_identities)
-        except QuantroError as error:
-            skipped += 1
-            warnings.append(f"Candidate {_candidate_label(candidate, index)} was skipped: {error.message}")
-            continue
-        confidence = assessed.alignment.match_quality.confidence
-        if assessed.alignment.status == "verified" and confidence.level in _VIABLE_LEVELS:
-            viable.append(assessed)
+    attempted_identities = set(submitted_identities)
+
+    def assess_batch(batch: list[dict[str, Any]]) -> None:
+        nonlocal skipped
+        for index, candidate in enumerate(batch, start=1):
+            identity = _post_identity(candidate["url"])
+            if identity in attempted_identities:
+                warnings.append("An alias of a previously assessed recording was skipped.")
+                continue
+            attempted_identities.add(identity)
+            _heartbeat(store, job_id)
+            try:
+                assessed = _assess_candidate(candidate, submitted_features, submitted_identities, store=store)
+            except QuantroError as error:
+                skipped += 1
+                warnings.append(f"Candidate {_candidate_label(candidate, index)} was skipped: {error.message}")
+                continue
+            attempted_identities.update(_post_identities(assessed.post))
+            confidence = assessed.alignment.match_quality.confidence
+            if assessed.alignment.status == "verified" and confidence.level in _VIABLE_LEVELS:
+                viable.append(assessed)
+
+    assess_batch(candidates)
+    if not viable and os.getenv("SEARCH_PROVIDER", "").strip().lower() == "hybrid":
+        expanded = widen_queries(queries)
+        if expanded.queries:
+            warnings.extend(warning for warning in expanded.warnings if warning not in warnings)
+            more = _discover_sources(expanded, store, attempted_identities, warnings, 2,
+                                     "Previously assessed source candidates were excluded from the expanded search.")
+            candidates.extend(more)
+            assess_batch(more)
 
     extra_limitations = list(warnings)
     if skipped:

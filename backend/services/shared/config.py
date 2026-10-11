@@ -32,13 +32,14 @@ def validate_search_settings(settings: dict[str, str]) -> None:
     provider = settings.get("SEARCH_PROVIDER", "").strip().lower()
     required = {
         "exa": ("EXA_API_KEY",),
+        "hybrid": ("EXA_API_KEY",),
         "serpapi": ("SEARCH_PROVIDER_API_KEY",),
         "brave": ("SEARCH_PROVIDER_API_KEY",),
         "google_cse": ("SEARCH_PROVIDER_API_KEY",),
         "tiger": (), "tigerdata": (),
     }
     if provider not in required:
-        raise RuntimeError("Configure a supported SEARCH_PROVIDER before API startup: exa, serpapi, brave, google_cse, or tiger.")
+        raise RuntimeError("Configure a supported SEARCH_PROVIDER before API startup: exa, hybrid, serpapi, brave, google_cse, or tiger.")
     if any(not settings.get(name, "").strip() for name in required[provider]):
         raise RuntimeError("The selected search provider is missing its API credential. Configure it before API startup.")
     if provider == "google_cse" and not (settings.get("SEARCH_GOOGLE_CSE_ID", "") or settings.get("GOOGLE_CSE_ID", "")).strip():

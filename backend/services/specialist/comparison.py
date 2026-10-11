@@ -7,6 +7,7 @@ assessments. Both interpretations remain model-based, not semantic guarantees.
 """
 
 import json
+import os
 from enum import Enum
 from typing import Literal
 
@@ -25,8 +26,16 @@ from ..shared.types import Comparison as _ReturnModel
 from ..shared.types import (
     ConfidenceObject as Confidence,
 )
-from .gemini import client_and_model, generate_json
+from .gemini import client_and_model as _gemini_client_and_model
+from .gemini import generate_json
 from .validation import number, validate_features
+
+
+def client_and_model(stage):
+    """Optionally select a comparison-only model without changing media models."""
+    client, model = _gemini_client_and_model(stage)
+    override = os.getenv('GEMINI_COMPARISON_MODEL', '').strip()
+    return client, override or model
 
 
 class _CaptionEvidenceBasis(str, Enum):
@@ -318,7 +327,9 @@ def compare_context_and_caption(clip_features, context, caption):
         try:
             request_prompt = prompt
             for attempt in range(2):
-                data = generate_json(client, model, request_prompt, response_schema, stage)
+                # The outer loop owns the single evidence repair; do not multiply
+                # it by the provider helper's transport/JSON retry budget.
+                data = generate_json(client, model, request_prompt, response_schema, stage, max_attempts=1)
                 try:
                     if not isinstance(data, dict):
                         raise TypeError('Invalid comparison object')

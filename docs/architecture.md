@@ -20,8 +20,8 @@ The four empty merge scaffolds formerly under `services/_archive/` were deleted
    Data, and returns the internal Post with local media path.
 3. Extraction produces contract MediaFeatures. Requested transcription/OCR
    provider failures are errors; missing speech is explicitly unavailable.
-4. Query generation feeds the configured search provider: Exa public-web search
-   or the legacy Tiger Post metadata corpus. Query ordering mixes spoken, OCR, and title evidence. Exa uses the first three
+4. Query generation feeds the configured search provider: Exa public-web search,
+   indexed transcript passages plus Exa (`hybrid`), or the legacy Tiger Post metadata corpus. Query ordering mixes spoken, OCR, and title evidence. Exa uses the first three
    clues plus a video-host search, with at most four requests. Exa prioritizes recording-shaped URLs within fetched results
    before applying the candidate limit; this is not verification. Candidate webpages are attempted
    through the guarded downloader; unsupported media is skipped with warnings. The submitted URL is excluded from source selection.
@@ -42,6 +42,14 @@ No-match is a normal corpus-search outcome, not a provider-error substitute.
 Confidence, coverage and context assessment remain separate; there is no overall
 credibility score.
 
+Hybrid mode reserves web discovery capacity even when the local archive has hits.
+After no viable alignment it tries one bounded wider search with unchanged words
+and at most two new candidates. Fresh candidate feature snapshots avoid repeat
+download/Whisper work while retaining original retrieval times and rerunning
+alignment. Gemini comparison has a maximum of three provider requests and an
+optional comparison-only budget model. See [HYBRID_SEARCH.md](HYBRID_SEARCH.md)
+for the flow, migration, call budgets, verification and limitations.
+
 ## Tiger Data storage
 
 `external_apis/tigerdata_storage.py` stores original media bytes in BYTEA and the
@@ -56,6 +64,12 @@ state through SQLAlchemy in the same Tiger service. Its tables use the configura
 for retrieval and either the same DSN or `TIGER_DATABASE_URL` for job/report state.
 Private values belong in ignored root `.env.local` or the process environment;
 see the audit for the existing loader precedence differences.
+
+The same store initializes additive `source_passages` (PostgreSQL GIN search) and
+`source_features` (immutable, TTL-bounded recording feature snapshots). The
+streaming [archive importer](ARCHIVE_IMPORT.md) preserves provenance and null
+timestamps for untimed published transcripts; it does not invent media assets or
+recording times. The curated seed is not a comprehensive political-speech archive.
 
 `GET /media/{media_id}` reads real stored JPEG/MP4 bytes for browser playback,
 including HTTP byte ranges, when the Post has no public playback_url. IDs are

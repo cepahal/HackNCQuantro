@@ -1,11 +1,15 @@
-"""Search the configured Exa web provider or explicit Tiger Data corpus."""
+"""Search web, stored metadata, or transcript passages with Exa fallback."""
 
+import copy
 import hashlib
 import ipaddress
 import logging
 import math
 import ssl
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
@@ -13,15 +17,17 @@ from uuid import uuid4
 
 import httpx
 
-from ..shared.contracts import contract_input, validate_contract_result
 from ..shared.config import validate_search_settings
+from ..shared.contracts import contract_input, validate_contract_result
 from ..shared.errors import QuantroError, Stage
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
+from ..shared.post_identity import post_identity
 from ..shared.types import CandidateList as _ReturnModel
 from ..shared.types import (
     Queries,
 )
+from ..storage.tiger import TigerStore
 from .exa_search import ExaSearch
 from .retrieve_post import _validate_url
 from .tigerdata_storage import TigerDataPostStore, _environment
@@ -219,6 +225,102 @@ class CandidateSearch(Protocol):
     ) -> list[tuple[object, object]]: ...
 
 
+_search_context: ContextVar[tuple[TigerStore | None, frozenset[str]]] = ContextVar(
+    "quantro_search_context", default=(None, frozenset())
+)
+
+
+@contextmanager
+def search_scope(store: TigerStore, excluded_identities: set[str]) -> Iterator[None]:
+    """Carry job-owned storage and exclusions without changing the v2 callable."""
+    token = _search_context.set((store, frozenset(excluded_identities)))
+    try:
+        yield
+    finally:
+        _search_context.reset(token)
+
+
+class _TranscriptSearch:
+    def __init__(self, store: TigerStore, excluded: frozenset[str]) -> None:
+        self.store = store
+        self.excluded = excluded
+
+    def find_posts(self, queries: list[str], limit: int) -> list[tuple[object, object]]:
+        return list(self.store.find_transcript_posts(
+            queries, limit, excluded_identities=tuple(sorted(self.excluded))
+        ))
+
+
+class HybridSearch:
+    """Bounded discovery only; retrieved text never establishes source truth."""
+
+    def __init__(
+        self, local: CandidateSearch, web_factory: Callable[[], CandidateSearch],
+        *, excluded_identities: frozenset[str] = frozenset(),
+    ) -> None:
+        self.local = local
+        self.web_factory = web_factory
+        self.excluded = excluded_identities
+        self.warnings: list[str] = []
+        self.web: CandidateSearch | None = None
+
+    def find_posts(self, queries: list[str], limit: int) -> list[tuple[object, object]]:
+        fetch_limit = min(50, limit * 4)
+        found: dict[str, tuple[dict[str, Any], list[str]]] = {}
+        self.warnings = [
+            "Transcript and web hits are unverified discovery candidates; downstream alignment is required."
+        ]
+
+        def merge(rows: list[tuple[object, object]]) -> list[str]:
+            if not isinstance(rows, list) or len(rows) > fetch_limit:
+                raise ValueError("Invalid provider result count")
+            keys = []
+            for metadata, matched in rows:
+                if not isinstance(metadata, dict) or not isinstance(matched, list):
+                    raise TypeError("Invalid candidate metadata")
+                # Validate before canonicalization. Identity helpers are not URL validators.
+                try:
+                    url = _candidate_url(metadata.get("post_url"))
+                except ValueError:
+                    self.warnings.append("An invalid or non-public discovery URL was discarded.")
+                    continue
+                identity = post_identity(url)
+                if identity in self.excluded:
+                    continue
+                if not matched or any(q not in queries for q in matched):
+                    raise ValueError("Invalid query provenance")
+                if identity not in found:
+                    found[identity] = (copy.deepcopy(metadata), [])
+                for query in queries:
+                    if query in matched and query not in found[identity][1]:
+                        found[identity][1].append(query)
+                if identity not in keys:
+                    keys.append(identity)
+            return keys
+
+        local_keys = merge(self.local.find_posts(queries, fetch_limit))
+        # Local retrieval is not verification: preserve one web discovery slot
+        # for limit>1 so repeated political wording cannot crowd out all web hits.
+        local_budget = max(1, limit - 1)
+        selected = local_keys[:local_budget]
+        if len(selected) < limit:
+            self.web = self.web_factory()
+            web_keys = merge(self.web.find_posts(queries, fetch_limit))
+            selected.extend(key for key in web_keys if key not in selected)
+            self.warnings.extend(getattr(self.web, "warnings", []))
+        else:
+            self.warnings.append("The candidate limit left no web discovery slot.")
+        selected.extend(key for key in local_keys if key not in selected)
+        return [found[key] for key in selected[:limit]]
+
+    def close(self) -> None:
+        # Only the lazily constructed web client is owned; job storage is borrowed.
+        if self.web is not None:
+            close = getattr(self.web, "close", None)
+            if callable(close):
+                close()
+
+
 def _nullable_text(value: object) -> str | None:
     if value is None:
         return None
@@ -242,8 +344,8 @@ def search_candidates(
 ) -> dict[str, Any]:
     """Accept function 3's object or its queries array; return the exact v2 envelope.
 
-    SEARCH_PROVIDER=exa selects public web discovery. SEARCH_PROVIDER=tiger
-    (legacy default) searches stored Post metadata. No silent fallback occurs.
+    SEARCH_PROVIDER=hybrid searches transcript passages and fills a bounded
+    candidate budget from Exa. Explicit exa/tiger modes retain their behavior.
     Candidate pages are attempted by the guarded retrieval worker downstream.
     """
     # aligned with shared/types.py on 2026-10-10
@@ -281,7 +383,8 @@ def search_candidates(
                 "candidates": [],
                 "warnings": warnings + ["No search queries were available."],
             }, _ContractStage.SEARCH_CANDIDATES, json_native=True)
-        owned: TigerDataPostStore | ExaSearch | None = None
+        owned: TigerDataPostStore | ExaSearch | HybridSearch | None = None
+        owned_store: TigerStore | None = None
         try:
             if provider is None:
                 settings = _environment()
@@ -293,6 +396,17 @@ def search_candidates(
                     ))
                 if name == "exa":
                     owned = ExaSearch(settings.get("EXA_API_KEY", ""))
+                elif name == "hybrid":
+                    validate_search_settings(settings)
+                    store, excluded = _search_context.get()
+                    if store is None:
+                        owned_store = TigerStore.from_env()
+                        store = owned_store
+                    owned = HybridSearch(
+                        _TranscriptSearch(store, excluded),
+                        lambda: ExaSearch(settings.get("EXA_API_KEY", ""), excluded_identities=excluded),
+                        excluded_identities=excluded,
+                    )
                 elif name in {"tiger", "tigerdata"}:
                     owned = TigerDataPostStore.from_env()
                 else:
@@ -340,7 +454,7 @@ def search_candidates(
                         ],
                     }
                 )
-            if isinstance(provider, ExaSearch):
+            if isinstance(provider, (ExaSearch, HybridSearch)):
                 warnings.extend(provider.warnings)
             elif owned is not None:
                 warnings.append(
@@ -364,6 +478,11 @@ def search_candidates(
                     logger.warning(
                         "Candidate search cleanup failed (%s)", type(error).__name__
                     )
+            if owned_store is not None:
+                try:
+                    owned_store.close()
+                except Exception as error:  # noqa: BLE001 - do not expose connection details
+                    logger.warning("Transcript search cleanup failed (%s)", type(error).__name__)
     except Exception as exc:  # noqa: BLE001 - Public contract boundary redacts and normalizes failures.
         raise _normalize_contract_exception(
             _ContractStage.SEARCH_CANDIDATES, exc
