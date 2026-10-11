@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.routes.common import get_tiger_store, not_found, quantro_error_response
 from backend.services.reporting.build_report import sanitize_report
 from backend.services.reporting.display_report import display_report
-from backend.services.reporting.run_analysis import run_analysis
+from backend.services.resolution.run import run_analysis
 from backend.services.reporting.save_report import report_id_for_job
 from backend.services.shared.errors import RETRYABLE_CODES, ErrorCode, QuantroError, Stage
 from backend.services.shared.post_identity import ensure_distinct_source

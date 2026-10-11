@@ -19,7 +19,7 @@ from backend.services.messaging.inbound import (
     message_timestamp,
 )
 from backend.services.messaging.photon import PhotonProvider
-from backend.services.reporting.run_analysis import run_analysis
+from backend.services.resolution.run import run_analysis
 from backend.services.reporting.send_summary import DeliveryTracker
 from backend.services.shared.errors import QuantroError, Stage
 from backend.services.storage.tiger import TigerStore

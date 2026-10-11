@@ -161,7 +161,7 @@ for (const receiptState of ["accepted", "uncertain"] as const) {
     assert.equal(await readFile(join(state.directory, ledgerName()), "utf8"), receipt);
     const retry = await createEnrollmentHandler(state.options)(input, key);
     assert.equal(retry.already_enrolled, true);
-    assert.equal(retry.welcome_status, receiptState);
+    assert.equal(retry.welcome_status, "uncertain");
     assert.equal(state.sends.length, 0);
     assert.equal(await readFile(join(state.directory, ledgerName()), "utf8"), receipt);
   });
@@ -188,7 +188,40 @@ test("current assigned number overrides a stale accepted receipt without another
   const result = await createEnrollmentHandler(state.options)(input, key);
   assert.equal(result.assigned_phone_number, newAssigned);
   assert.equal(result.open_messages_url, `sms:${newAssigned}&body=Hi%20Quantro`);
-  assert.equal(result.welcome_status, "accepted");
+  assert.equal(result.welcome_status, "uncertain");
+  assert.equal(state.sends.length, 1);
+  const retry = await createEnrollmentHandler(state.options)(input, key);
+  assert.equal(retry.welcome_status, "uncertain");
+  // Returning to the original line must not resurrect the historical receipt.
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  assert.equal((await createEnrollmentHandler(state.options)(input, key)).welcome_status, "uncertain");
+  assert.equal(state.sends.length, 1);
+});
+
+test("same-ID restoration on the same line remains uncertain across retries and restarts", async (t) => {
+  const state = await fixture(t);
+  await createEnrollmentHandler(state.options)(input, key);
+  const receipt = await readFile(join(state.directory, ledgerName()), "utf8");
+  state.setListed({ succeed: true, data: { users: [], total: 0 } });
+  const restored = await createEnrollmentHandler(state.options)(input, key);
+  assert.equal(restored.already_enrolled, false);
+  assert.equal(restored.welcome_status, "uncertain");
+  for (let index = 0; index < 3; index++) {
+    const retry = await createEnrollmentHandler(state.options)(input, key);
+    assert.equal(retry.already_enrolled, true);
+    assert.equal(retry.welcome_status, "uncertain");
+  }
+  assert.equal(state.sends.length, 1);
+  assert.equal(await readFile(join(state.directory, ledgerName()), "utf8"), receipt);
+  const marker = JSON.parse(await readFile(join(state.directory, `${ledgerName()}.reconciled.json`), "utf8"));
+  assert.deepEqual(marker, { version: 1, state: "uncertain", assigned_phone_number: assigned });
+});
+
+test("corrupt reconciliation state fails closed without another welcome", async (t) => {
+  const state = await fixture(t);
+  await createEnrollmentHandler(state.options)(input, key);
+  await writeFile(join(state.directory, `${ledgerName()}.reconciled.json`), "invalid-private-state");
+  await assert.rejects(createEnrollmentHandler(state.options)(input, key), hasError(503, "ENROLLMENT_STORAGE_UNAVAILABLE"));
   assert.equal(state.sends.length, 1);
 });
 

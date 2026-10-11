@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 import backend.services.pipeline.run_ingest as ingest_module
 from backend.main import app
+from backend.routes import ingest as ingest_route
 from backend.routes.common import get_tiger_store
 from backend.services.external_apis import retrieve_post as retrieval
 from backend.services.shared.errors import ErrorCode, Stage
@@ -105,6 +106,8 @@ def test_real_retrieval_failure_persists_safe_reason_and_never_extracts(
 
     monkeypatch.setattr(ingest_module, "retrieve_post", retrieve_from_worker)
     monkeypatch.setattr(ingest_module, "extract_media_features", unexpected_extract)
+    # Exercise the preserved legacy worker boundary; caption-first resolution has its own tests.
+    monkeypatch.setattr(ingest_route, "run_ingest", ingest_module.run_ingest)
     prior_overrides = dict(app.dependency_overrides)
     app.dependency_overrides[get_tiger_store] = lambda: store
     try:
