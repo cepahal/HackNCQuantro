@@ -185,6 +185,8 @@ def test_cors_allows_the_loopback_twin_and_exposes_range_headers():
     assert allowed_origins("http://localhost:3000") == ["http://localhost:3000", "http://127.0.0.1:3000"]
     assert allowed_origins("http://127.0.0.1:3000") == ["http://127.0.0.1:3000", "http://localhost:3000"]
     assert allowed_origins("https://quantro.vercel.app") == ["https://quantro.vercel.app"]
+    assert allowed_origins("https://www.zoomout.tech, https://quantro-ten.vercel.app/") == [
+        "https://www.zoomout.tech", "https://quantro-ten.vercel.app"]
     cors = next(middleware for middleware in app.user_middleware if middleware.cls is CORSMiddleware)
     assert cors.kwargs["allow_origins"] == allowed_origins(FRONTEND_ORIGIN)
     assert "*" not in cors.kwargs["allow_origins"]

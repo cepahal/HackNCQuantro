@@ -101,12 +101,17 @@ FRONTEND_ORIGIN = (
 
 
 def allowed_origins(frontend_origin: str) -> list[str]:
-    origins = [frontend_origin]
-    parts = urlsplit(frontend_origin)
-    twin = {"localhost": "127.0.0.1", "127.0.0.1": "localhost"}.get(parts.hostname or "")
-    if twin is not None:
-        netloc = f"{twin}:{parts.port}" if parts.port else twin
-        origins.append(urlunsplit((parts.scheme, netloc, parts.path, "", "")))
+    """Accepts one origin or a comma-separated list, e.g. a custom domain plus the Vercel URL."""
+    origins: list[str] = []
+    for origin in (item.strip().rstrip("/") for item in frontend_origin.split(",")):
+        if not origin:
+            continue
+        origins.append(origin)
+        parts = urlsplit(origin)
+        twin = {"localhost": "127.0.0.1", "127.0.0.1": "localhost"}.get(parts.hostname or "")
+        if twin is not None:
+            netloc = f"{twin}:{parts.port}" if parts.port else twin
+            origins.append(urlunsplit((parts.scheme, netloc, parts.path, "", "")))
     return origins
 
 

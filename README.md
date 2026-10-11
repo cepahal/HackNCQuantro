@@ -1,519 +1,159 @@
-# HackNCQuantro
+# ZoomOut
+### Team Quantro @ HackNC
+### Members: Abdullah Siddique, Bhrigu Uppal, Grant Andrews, Jason Kasnicki 
 
-Photon setup and the Python `send_summary` adapter are documented in
-[backend/services/photon/README.md](backend/services/photon/README.md).
-Copy the blank `.env.example` only for a fresh checkout; keep real credentials in ignored `.env`.
-
-Task 1 — Build the iMessage verification agent
-Photon
-track
- 
-Person
-A
 
-Goal: Get a real message into your backend and return a reply through Photon Spectrum.
 
-Build:
+### Problem
 
-Sign up for Photon and activate the hackathon subscription.
+ZoomOut helps people investigate viral political speech clips by finding potential longer recordings, locating matching passages, and showing what was said before and after the clip.
 
-Set up Spectrum according to the 
-official Spectrum documentation .
+Submit a clip through the web app or send it through iMessage. ZoomOut searches for potential sources, aligns transcript passages, evaluates surrounding context, and generates an evidence-backed report that distinguishes verified findings from unverified leads.
 
-Configure the agent and its messaging number using the supported onboarding flow.
+**Our principle:** Show the evidence. Communicate uncertainty. Never claim more than the evidence supports.
 
-Implement a message handler that recognizes a URL or supported attachment.
+**Live demo:** https://quantro-ten.vercel.app
 
-Send a confirmation and handle invalid inputs.
 
-Input from Photon: The actual incoming message object provided by Spectrum. Adapt this example to the documented payload rather than assuming these exact fields exist.
 
-json
-{
-  "messageText": "Check this image: https://example.com/post",
-  "senderId": "user-id",
-  "attachments": []
-}
-Output from your handler: A normalized internal request.
+---
 
-json
-{
-  "requestId": "req_001",
-  "inputType": "url",
-  "inputUrl": "https://example.com/post",
-  "attachmentUrl": null,
-  "status": "received"
-}
-Acceptance test: Text the agent from a real supported iMessage client. It receives the message and replies successfully.
+## Table of Contents
 
-Depends on: Photon account and access to Spectrum.
+- [Why ZoomOut?](#why-zoomout)
+- [What It Does](#what-it-does)
+- [How It Works](#how-it-works)
+- [Technical Architecture](#technical-architecture)
+- [Tech Stack](#tech-stack)
+- [Key Design Decisions](#key-design-decisions)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [API Reference](#api-reference)
+- [Project Structure](#project-structure)
+- [Limitations](#limitations)
+- [Future Work](#future-work)
+- [Team and Acknowledgments](#team-and-acknowledgments)
 
-Parallel work: Person B can begin the Gemini extraction module with test images while Person A configures messaging.
+---
 
-Task 2 — Build media and text extraction
-Gemini
-track
- 
-Person
-B
 
-Goal: Convert the submitted image or page into useful, structured clues.
 
-Build:
+## Why ZoomOut?
 
-Handle a supported image directly or retrieve an accessible image from a submitted URL.
+Short political clips can spread rapidly without the context needed to interpret them accurately. A few seconds of speech may omit the preceding question, a qualification, or the statement that explains what a speaker meant.
 
-Extract visible text, captions, dates, locations, watermarks, and visual descriptions where detectable.
+Finding the original recording and manually comparing transcripts is time-consuming. ZoomOut makes that investigation easier by turning a submitted clip into a structured report with potential source recordings, matched passages, surrounding context, and explicit limitations.
 
-Produce search queries that can help locate earlier appearances.
+ZoomOut is an investigative aid, not an automated truth detector.
 
-Validate Gemini's response against a schema.
 
-Gemini supports schema-constrained structured output, which is useful for making the result predictable for your next pipeline stages. See the 
-Gemini structured output documentation . 
 
-ai.google.dev
+## What It Does
 
-Input:
+- **Submit a clip:** Paste a link into the website or send it through the Photon-powered iMessage agent.
+- **Discover potential sources:** Search for longer recordings using transcript-derived queries and post metadata.
+- **Locate matching passages:** Compare transcript text to identify a matching segment and approximate its timestamp.
+- **Recover context:** Examine approximately 30 seconds before and after the matched passage when sufficient source material is available.
+- **Generate an evidence report:** Present source links, matched passages, timestamps, contextual analysis, and a rule-based confidence rating.
+- **Access results easily:** View the full report on the web or receive its link through iMessage.
 
-json
-{
-  "requestId": "req_001",
-  "inputType": "url",
-  "mediaUrl": "https://example.com/post",
-  "mediaType": "image"
-}
-Output:
 
-json
-{
-  "requestId": "req_001",
-  "extractedText": "A caption visible in the image",
-  "visualDescription": "A crowd outside a building",
-  "clues": {
-    "dates": [],
-    "locations": [],
-    "watermarks": [],
-    "namedEvents": []
-  },
-  "searchQueries": [
-    "\"A caption visible in the image\"",
-    "crowd outside building earlier report"
-  ],
-  "limitations": []
-}
-Acceptance test: Run five test images and confirm that the extraction output is valid JSON and the text/clues are useful. Empty fields are acceptable when the image does not contain that information.
 
-Depends on: Gemini credentials and a test media set.
+## How It Works
 
-Parallel work: Person C can build the report page using mocked extraction and source data.
+### End-to-End Pipeline
 
-Task 3 — Build source candidate search
-Snowflake
-track
- 
-Person
-C
+1. **Submission and ingestion**
 
-Goal: Find candidate sources and use Snowflake for a real retrieval feature.
+   A user submits a clip URL through the website or iMessage. The backend creates or processes an analysis job.
 
-I'd make Snowflake Cortex Search your searchable source corpus, not a second copy of your operational database.
+2. **Media retrieval**
 
-Build:
-
-Collect a small, curated corpus of public articles, media references, captions, and source URLs.
-
-Create a Snowflake database, schema, and table containing those records.
-
-Create a Cortex Search Service over a text column containing captions, extracted text, titles, and relevant descriptions.
-
-Query that service through the Snowflake REST API using your search queries.
-
-Normalize the results into your application's candidate-source format.
-
-Snowflake Cortex Search supports hybrid keyword and semantic retrieval over indexed text and exposes a query API. See the 
-Cortex Search overview  and 
-REST API documentation . 
-
-Snowflake Documentation
-+1
-
-Input:
-
-json
-{
-  "requestId": "req_001",
-  "searchQueries": [
-    "\"A caption visible in the image\"",
-    "crowd outside building earlier report"
-  ],
-  "limit": 5
-}
-Output:
-
-json
-{
-  "requestId": "req_001",
-  "candidates": [
-    {
-      "candidateId": "src_001",
-      "url": "https://example.com/earlier-article",
-      "title": "Earlier report about an event",
-      "publishedAt": "2023-08-14",
-      "matchedText": "Matching text from the indexed record",
-      "retrievalMethod": "snowflake_cortex_search"
-    }
-  ]
-}
-The example result is illustrative. Your application must return actual retrieved records, and publishedAt should be null when the date is unknown.
-
-Acceptance test: Search for a distinctive phrase in your curated corpus and retrieve the correct record and URL.
-
-Important limitation: Snowflake Cortex Search searches the corpus you index; it does not automatically search every social network or discover every original image on the web. Add a separate public-web search adapter if you have access to one. Keep the curated corpus as a dependable demo fallback.
-
-Parallel work: Person D can set up Tiger Data and the operational database schema.
-
-Task 4 — Compare the submitted media with candidate sources
-Core
-product
- 
-Person
-D
-
-Goal: Establish what evidence supports a source match and identify meaningful differences.
-
-Build:
-
-Compare OCR text and captions.
-
-Compare dates and source context when available.
-
-Use a perceptual image hash or image embeddings for visual similarity if time allows.
-
-Ask Gemini to help interpret the comparison results, but do not use its opinion as the only match signal.
-
-Record each match and difference with its evidence.
-
-Input:
-
-json
-{
-  "requestId": "req_001",
-  "submittedMedia": {
-    "extractedText": "A caption visible in the image",
-    "visualDescription": "A crowd outside a building"
-  },
-  "candidates": [
-    {
-      "candidateId": "src_001",
-      "url": "https://example.com/earlier-article",
-      "title": "Earlier report about an event",
-      "publishedAt": "2023-08-14",
-      "matchedText": "Matching text from the indexed record"
-    }
-  ]
-}
-Output:
-
-json
-{
-  "requestId": "req_001",
-  "comparisons": [
-    {
-      "candidateId": "src_001",
-      "signals": [
-        {
-          "type": "text_match",
-          "result": "partial",
-          "evidence": "A distinctive phrase appears in both records."
-        },
-        {
-          "type": "date",
-          "result": "source_predates_submission",
-          "evidence": "The recorded source date is earlier."
-        }
-      ],
-      "differences": [],
-      "assessment": "possible_match"
-    }
-  ]
-}
-Acceptance test: Give the system a known source and a misleadingly captioned repost. It should identify the actual similarities and only report differences that it can support.
-
-Important: A source predating a repost does not prove that it is the original. A similar image does not prove that the caption is false. Preserve that distinction in your data model.
-
-Parallel work: Person A can continue refining Photon follow-ups and the message lifecycle.
-
-Task 5 — Generate the evidence-backed verdict
-Gemini
-+
-Community
- 
-Person
-B
-
-Goal: Turn the extraction and comparison data into a clear, trustworthy explanation.
-
-Build:
-
-Send Gemini the submitted-media clues, candidate sources, and observed comparison signals.
-
-Require a structured report.
-
-Require source references for factual claims.
-
-Explicitly distinguish evidence from interpretation.
-
-Provide a useful “not enough evidence” response when necessary.
-
-Input:
-
-json
-{
-  "requestId": "req_001",
-  "comparisons": [
-    {
-      "candidateId": "src_001",
-      "assessment": "possible_match",
-      "signals": [
-        {
-          "type": "date",
-          "result": "source_predates_submission"
-        }
-      ]
-    }
-  ],
-  "sources": [
-    {
-      "candidateId": "src_001",
-      "url": "https://example.com/earlier-article",
-      "title": "Earlier report about an event",
-      "publishedAt": "2023-08-14"
-    }
-  ]
-}
-Output:
-
-json
-{
-  "requestId": "req_001",
-  "conclusion": "uncertain",
-  "summary": "A potentially earlier source was found.",
-  "findings": [
-    {
-      "claim": "The candidate source predates the submitted post.",
-      "evidenceSourceIds": ["src_001"],
-      "status": "supported"
-    }
-  ],
-  "limitations": [
-    "The original source has not been conclusively established."
-  ]
-}
-Acceptance test: For every factual finding, the report contains a traceable evidence source or a documented comparison. If no reliable candidate exists, the system says so instead of making one up.
-
-Community value: This is where you make the tool useful to real people: help them understand context without shaming them for sharing a post.
-
-Task 6 — Build the report website and .tech domain
-.Tech
-track
- 
-Person
-C
-
-Goal: Turn every investigation into a polished, shareable report.
-
-Build:
-
-A home page with a URL submission box and a sample report.
-
-A report page at /report/[id].
-
-Submitted media and source previews.
-
-Side-by-side comparison.
-
-Source timeline and citations.
-
-Findings, limitations, and a clear explanation of uncertainty.
-
-Deploy to a public host and connect your .tech domain.
-
-Input:
-
-json
-{
-  "reportId": "req_001",
-  "summary": "A potentially earlier source was found.",
-  "conclusion": "uncertain",
-  "sourceIds": ["src_001"],
-  "findings": [
-    {
-      "claim": "The candidate source predates the submitted post.",
-      "evidenceSourceIds": ["src_001"],
-      "status": "supported"
-    }
-  ],
-  "limitations": [
-    "The original source has not been conclusively established."
-  ]
-}
-Output: A publicly accessible report URL, such as:
-
-https://yourproject.tech/report/req_001
-
-The example domain is a placeholder; check availability before choosing the final name.
-
-Acceptance test: Open the report from a separate browser or device. It displays the correct evidence and source links, and it does not expose API keys or private submissions.
-
-Parallel work: Person D should ensure the database returns everything the report page needs.
-
-Task 7 — Integrate Tiger Data, persistence, and investigation history
-Tiger
-Data
-track
- 
-Person
-D
-
-Goal: Make the entire pipeline persistent and give the agent memory across investigations.
-
-Tiger Data provides a PostgreSQL-compatible cloud database, making it suitable for related investigation, source, and comparison records. See the 
-Tiger Data getting-started guide  and 
-service quickstart . 
+   `yt-dlp` attempts to retrieve media, while FFmpeg handles media processing. If the hosted environment cannot download a video, the pipeline can fall back to transcript-based analysis.
 
-Tiger Data Docs
-+1
+3. **Transcription**
 
-Build:
+   Gemini (`gemini-flash-latest`) transcribes requested media windows of up to 60 seconds and produces word-level timestamps.
 
-Create the Tiger Data service and connect using a PostgreSQL driver.
+4. **Source discovery**
 
-Create the investigations, source_candidates, and observed_differences tables.
+   ZoomOut builds search queries from transcript content and available post metadata. Exa semantic search and keyword-based YouTube search identify potential source recordings.
 
-Save the request before processing begins.
+5. **Transcript alignment**
 
-Update the status and persist results when processing finishes.
+   The `transcript_alignment` component searches candidate transcripts for distinctive word sequences matching the submitted clip, ignoring capitalization and punctuation.
 
-Allow the agent to retrieve an earlier investigation when a user asks about it.
+6. **Context assessment**
 
-Save basic processing timestamps and error messages for debugging.
+   When a passage is matched, Gemini analyzes approximately 30 seconds of surrounding source context on either side.
 
-Input:
+7. **Evidence scoring**
 
-json
-{
-  "requestId": "req_001",
-  "status": "complete",
-  "summary": "A potentially earlier source was found.",
-  "sourceIds": ["src_001"],
-  "conclusion": "uncertain"
-}
-Output:
+   `evidence_rules_v1` evaluates the available evidence and assigns a **low**, **moderate**, or **high** confidence rating. These categories are rule-based assessments, not statistical probabilities.
 
-json
-{
-  "reportId": "req_001",
-  "persisted": true,
-  "status": "complete",
-  "reportPath": "/report/req_001"
-}
-Acceptance test: Complete an investigation, restart the backend, and retrieve the same report. Then send a follow-up request that refers to the earlier report and retrieve the correct stored findings.
+8. **Report generation and storage**
 
-How Tiger Data and Snowflake work together:
+   The finished report is stored in Tiger Data PostgreSQL and made available through the report endpoint.
 
-Tiger Data is the operational source of truth for live investigations, users or conversation identifiers, results, and report IDs.
 
-Snowflake stores the searchable reference corpus and powers source-candidate retrieval.
 
-The backend connects the two by storing Snowflake candidate IDs and source URLs alongside each investigation in Tiger Data.
+### Architecture Diagram
 
-This makes both sponsor integrations meaningful without unnecessarily duplicating the same workload.
-
-Task 8 — Connect everything, test failures, and prepare the demo
-Beginner
-+
-all
-tracks
- 
-All
-four
-teammates
-
-Goal: Make the complete user journey work reliably and demonstrate it in under two minutes.
-
-Build:
-
-Connect the Photon message handler to the backend orchestrator.
-
-Connect Gemini extraction, Snowflake retrieval, candidate comparison, and the evidence report.
-
-Persist results in Tiger Data.
-
-Send the final report URL back through Photon.
-
-Test invalid URLs, missing source matches, API errors, duplicate submissions, and inaccessible media.
-
-Prepare three known test examples: a matching image, a caption-altered image, and an example with no reliable source.
-
-Input:
-
-json
-{
-  "message": "Check this post: https://example.com/test",
-  "conversationId": "conversation_001"
-}
-Output:
-
-json
-{
-  "status": "complete",
-  "reply": "I found a possible earlier source. View the evidence: https://yourproject.tech/report/req_001",
-  "reportId": "req_001"
-}
-Acceptance test: A judge can send a supported input to your agent, receive an evidence-backed answer, and open the full report without manual intervention from your team.
-
-Final demo sequence:
-
-Send a suspicious post to your agent.
-
-Show the investigation starting.
-
-Show the retrieved source and comparison.
-
-Open the report on your .tech domain.
-
-Ask the agent a follow-up question.
-
-Demonstrate how the result remains available in investigation history.
-
-10. How all eight tasks connect
-This is the architecture I would actually implement. Each box is a component your teammates can build and test independently.
-
-## System dependencies
-
-Python 3.11+ and FFmpeg/ffprobe are required. Local transcription downloads the
-faster-whisper base model on first use; subsequent calls reuse the cached model.
-Local OCR requires Tesseract and its language data.
-
-- macOS: `brew install ffmpeg tesseract yt-dlp`
-- Debian/Ubuntu: `sudo apt-get install -y ffmpeg tesseract-ocr yt-dlp`
-- Windows: `winget install --id Gyan.FFmpeg.Essentials --exact` and
-  `winget install --id UB-Mannheim.TesseractOCR --exact`; reopen the terminal.
-- Verify: `ffmpeg -version`, `ffprobe -version`, `tesseract --version`,
-  `python -m yt_dlp --version`.
-
-Install Python dependencies with `python -m pip install -r backend/requirements.txt`.
-Gemini uses the supported google-genai SDK; google-generativeai is not used.
-Gemini comparison still requires a funded private key.
-
-Public-web search requires SEARCH_PROVIDER=brave, serpapi, or google_cse and
-SEARCH_PROVIDER_API_KEY in ignored .env.local. Google CSE also requires
-SEARCH_GOOGLE_CSE_ID. SEARCH_PROVIDER=tigerdata explicitly selects the existing
-stored corpus, which does not search the public web. Missing config raises
-SEARCH_FAILED. Bing Search API was retired; use a supported provider.
-
-Live video checks: set NETWORK=1 and run
-`python -m pytest tests/test_real_pipeline.py -v -s`. Accessible YouTube media,
-Whisper model download, Tesseract, Tiger Data, and search credentials are required.
-A blocked download/provider is a failed gate.
+```mermaid
+flowchart TD
+    U[User] --> W[Next.js Web App]
+    U --> I[Photon Spectrum iMessage]
+    I --> B[TypeScript Photon Bridge]
+    B --> H[FastAPI Webhook]
+    W --> A[FastAPI Backend]
+    H --> A
+
+    A --> R[Media Retrieval]
+    R --> T[Gemini Transcription]
+    T --> S[Exa + YouTube Search]
+    S --> M[Transcript Alignment]
+    M --> C[Gemini Context Assessment]
+    C --> E[Evidence Rules]
+    E --> D[(Tiger Data PostgreSQL)]
+
+    W --> P[Poll Job Status]
+    P --> A
+    W --> Q[Display Report]
+    Q --> A
+    B --> L[Reply with Report Link]
+```
+
+
+
+## Technical Architecture
+
+ZoomOut separates the user-facing interfaces, analysis pipeline, messaging integration, and persistent storage.
+
+| Component | Responsibility |
+|---|---|
+| Next.js frontend | Accept submissions, display analysis progress, and render reports |
+| FastAPI backend | Coordinate ingestion, analysis jobs, status updates, and report retrieval |
+| Photon Spectrum bridge | Relay iMessage submissions to the backend and return report links |
+| Gemini | Transcribe media and analyze matched passages in context |
+| Exa and YouTube search | Discover candidate source recordings |
+| `transcript_alignment` | Locate matching transcript passages |
+| `evidence_rules_v1` | Assign rule-based evidence confidence |
+| Tiger Data PostgreSQL | Persist reports and media-analysis features |
+
+The frontend polls the backend while an analysis is running and displays a progress state such as **“Finding the source…”** until the result is ready.
+
+
+
+## Tech Stack
+
+| Layer | Technologies | Purpose |
+|---|---|---|
+| Frontend | Next.js 16, React 19, TypeScript | Web application and report interface |
+| Styling and animation | Tailwind CSS 4, Framer Motion | Styling, transitions, and UI interactions |
+| Frontend hosting | Vercel | Deployment of the web application |
+| Backend | Python, FastAPI | API endpoints and analysis orchestration |
+| Backend hosting | Render | Hosted API and processing service |
+| AI analysis | Gemini (`gemini-flash-latest`) | Timestamped transcription and contextual analysis |
+| Source discovery | Exa, YouTube keyword search | Semantic and keyword-based retrieval |
+| Media processing | `yt-dlp`, FFmpeg | Media retrieval and processing |
+| Messaging | Photon Spectrum, TypeScript | iMessage interaction and report delivery
