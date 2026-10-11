@@ -64,17 +64,21 @@ class IngestOutput:
 
 
 @artifact_scope()
-def run_ingest(job_id: str, url: str, *, store: TigerStore | None = None) -> IngestResult:
+def run_ingest(job_id: str, url: str, *, store: TigerStore | None = None,
+               _defer_platform_challenge: bool = False) -> IngestResult:
     if store is None:
         owned_store = TigerStore.from_env()
         try:
-            return ingest_post_and_features(job_id, url, store=owned_store).result
+            return ingest_post_and_features(job_id, url, store=owned_store,
+                                            _defer_platform_challenge=_defer_platform_challenge).result
         finally:
             owned_store.close()
-    return ingest_post_and_features(job_id, url, store=store).result
+    return ingest_post_and_features(job_id, url, store=store,
+                                   _defer_platform_challenge=_defer_platform_challenge).result
 
 
-def ingest_post_and_features(job_id: str, url: str, *, store: TigerStore) -> IngestOutput:
+def ingest_post_and_features(job_id: str, url: str, *, store: TigerStore,
+                             _defer_platform_challenge: bool = False) -> IngestOutput:
     """run_ingest, also returning the validated models for the rest of run_analysis."""
     # Reject invalid, private and unsupported URLs before any database write.
     _validate_url(url)
@@ -89,6 +93,11 @@ def ingest_post_and_features(job_id: str, url: str, *, store: TigerStore) -> Ing
     except Exception as exc:
         error = _retrieval_error(exc)
         logger.warning("Pipeline failure code=%s stage=%s type=%s", error.code.value, error.stage.value, type(exc).__name__)
+        if (_defer_platform_challenge and isinstance(error, RetrievalError)
+                and error.code == ErrorCode.MEDIA_UNAVAILABLE
+                and error.reason == "platform_challenge" and _validate_url(url)[1] == "youtube"):
+            # The analysis owner is still working; polling must not see a terminal failure.
+            raise error from exc
         try:
             store.set_job_status(job_id, "failed", error.code.value, error.stage.value, str(error.public_dict()["message"]), error.retryable)
         except Exception as storage_exc:

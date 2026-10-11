@@ -52,12 +52,15 @@ class RetrievalError(QuantroError):
         *,
         retryable: bool = False,
         status_code: int = 502,
+        reason: str | None = None,
     ) -> None:
         normalized_code = (
             code if code in ErrorCode._value2member_map_ else "MEDIA_UNAVAILABLE"
         )
         super().__init__(normalized_code, Stage.RETRIEVE_POST, message, retryable)
         self.status_code = status_code
+        # Internal classification only; never added to the shared error envelope.
+        self.reason = reason
 
     def as_dict(self) -> dict[str, dict[str, str | bool]]:
         return {
@@ -68,6 +71,57 @@ class RetrievalError(QuantroError):
                 "retryable": self.retryable,
             }
         }
+
+
+def _download_failure(stderr: str) -> RetrievalError:
+    """Classify diagnostics into fixed messages; never disclose provider output."""
+    diagnostic = stderr.casefold().replace("\u2019", "'")
+    retryable = False
+    if any(marker in diagnostic for marker in (
+        "not a bot", "confirm you're human", "captcha", "automated requests",
+    )):
+        reason = "platform_challenge"
+        message = (
+            "The platform blocked automated video retrieval from this server. "
+            "Use a direct public MP4 link or another accessible recording."
+        )
+    elif any(marker in diagnostic for marker in (
+        "private video", "video is private", "sign in", "log in", "login required", "age-restricted",
+        "age restricted", "confirm your age", "members-only", "members only",
+    )):
+        reason = "restricted_video"
+        message = (
+            "This video is private, restricted, or requires login. "
+            "Use a public recording that is accessible without signing in."
+        )
+    elif any(marker in diagnostic for marker in (
+        "has been removed", "video unavailable", "video is unavailable",
+        "does not exist", "not found", "http error 404",
+    )):
+        reason = "unavailable_video"
+        message = "This video is unavailable or has been removed. Check the link or use another recording."
+    elif any(marker in diagnostic for marker in ("http error 429", "http 429", "too many requests", "rate limit")):
+        reason = "provider_rate_limit"
+        retryable = True
+        message = "The platform rate-limited video retrieval. Wait briefly and try again."
+    elif any(marker in diagnostic for marker in ("http error 403", "http 403", "403 forbidden", "access denied")):
+        reason = "access_blocked"
+        message = "The platform blocked access to this video from the server. Use an accessible recording or direct public MP4 link."
+    elif any(marker in diagnostic for marker in (
+        "timed out", "connection reset", "temporary failure", "network is unreachable",
+        "connection refused", "remote end closed connection",
+    )):
+        reason = "transient_network"
+        retryable = True
+        message = "Video retrieval failed because of a temporary network problem. Try again shortly."
+    elif "requested format is not available" in diagnostic:
+        reason = "unsupported_format"
+        message = "No supported downloadable MP4 format is available for this recording."
+    else:
+        reason = "download_failed"
+        message = "The submitted video could not be retrieved."
+    logger.warning("Media retrieval failed reason=%s", reason)
+    return RetrievalError("MEDIA_UNAVAILABLE", message, retryable=retryable, reason=reason)
 
 
 def _validate_url(url: str, *, allow_webpage: bool = False) -> tuple[str, str]:
@@ -464,7 +518,7 @@ def _retrieve_split_media(url: str, workspace: Path, max_bytes: int, deadline: f
     if result.returncode == 4:
         raise RetrievalError("MEDIA_TOO_LARGE", "No available video and audio combination fits the download limit.", status_code=413)
     if result.returncode:
-        raise RetrievalError("MEDIA_UNAVAILABLE", "The separate video and audio streams could not be retrieved.")
+        raise _download_failure(result.stderr)
     streams = [workspace / "video.mp4", workspace / "audio.m4a"]
     total = 0
     for path in streams:
@@ -607,19 +661,7 @@ def _download_and_probe(
                 stdout = _retrieve_split_media(url, workspace, max_bytes, deadline)
             elif completed.returncode != 0:
                 # Never expose downloader stderr: it can contain signed URLs and provider responses.
-                raise RetrievalError(
-                    "MEDIA_UNAVAILABLE",
-                    "The submitted video could not be retrieved.",
-                    retryable=any(
-                        marker in completed.stderr.lower()
-                        for marker in (
-                            "timed out",
-                            "connection reset",
-                            "temporary failure",
-                            "network is unreachable",
-                        )
-                    ),
-                )
+                raise _download_failure(completed.stderr)
             post = _result(url, platform, workspace, stdout, max_bytes)
             post["post_id"] = post_id or post["post_id"]
             post["candidate_id"] = candidate_id

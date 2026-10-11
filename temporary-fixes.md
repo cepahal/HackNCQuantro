@@ -291,3 +291,48 @@ code from the tested caption release is unchanged by this UI reconciliation.
 
 Reconciled frontend verification: 51 tests passed; lint, typecheck and webpack
 production build passed. The backend tree matches the 945-test caption release.
+
+### Bounded YouTube transcript fallback (2026-10-10)
+
+Render's downloader rejected the public recording `TCm9788Tb5g` with YouTube's
+bot-verification challenge. This occurred before transcription or source search.
+Download failures now retain a private classification and expose fixed, safe
+messages instead of discarding the cause or returning raw provider diagnostics.
+
+After a specifically classified YouTube bot challenge, `run_analysis` uses
+Gemini's native public YouTube input for a requested 0–60 second window. One
+token preflight caps input at 12,000 tokens; one generation caps output at 4,096
+tokens, with thinking disabled and no application retries. Returned speech,
+numeric bounds, completion and audio/video usage are validated before saving.
+Provider schema restrictions are handled separately from stricter local
+validation. Unsupported, deleted, private, invalid and storage failures retain
+their structured errors and do not trigger this path.
+
+This is a **limited transcript-only report**, not a completed source/context
+verification. It preserves report schema 2.1 and labels text/timestamps as
+provider estimates. Source, alignment, context and comparison remain null;
+duration, playback and unknown metadata remain null. No fake downloaded file,
+media bytes, audio fingerprint or ASR cache row is created. The public outcome
+is `no_verified_match`, with explicit limitations that source search and
+alignment were not performed. The normal downloaded-media pipeline is intact.
+
+`/ingest` keeps its actual-download contract. During the analysis fallback the
+job stays running so polling cannot observe a premature terminal failure.
+Reports persist through the existing Tiger report boundary, remain idempotent
+for the same job ID, and retain the existing post-save messaging behavior.
+There are no frontend or shared-schema changes and no new keys or dependencies.
+
+Verification before publication: 364 focused retrieval/ingest/orchestration/API
+and contract tests passed; the final fallback matrix separately passed 55 tests.
+Ruff F/E9, diff checks and read-only frontend wire-type export checks passed.
+The exact blocked public recording returned four validated speech segments via
+the live helper in 2.97 seconds. This checks access and schema enforcement,
+not independent transcript or timing accuracy. Hosted verification follows the
+manual Render deployment of this backend revision.
+
+Remaining: independently validate transcript fidelity/timestamps; extend remote
+evidence into verified source search/alignment without inventing recording
+duration; validate capacity and other platform restrictions. Gemini access,
+quota and intelligible speech are still required: upstream unavailability can
+still produce a structured failure. This change does not guarantee every URL
+can be processed and does not provide a deepfake/authenticity determination.

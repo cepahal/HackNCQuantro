@@ -21,7 +21,7 @@ from typing import Any, Literal, TypeVar
 
 from ..external_apis.build_search_queries import build_search_queries
 from ..external_apis.retrieve_candidate_media import retrieve_candidate_media
-from ..external_apis.retrieve_post import _validate_url
+from ..external_apis.retrieve_post import RetrievalError, _validate_url
 from ..external_apis.search_candidates import (
     check_search_settings,
     search_candidates,
@@ -67,6 +67,7 @@ from ..specialist.comparison import compare_context_and_caption
 from ..specialist.context import select_surrounding_context
 from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from .build_report import build_report
+from .remote_youtube import build_remote_youtube_report
 from .save_report import report_id_for_job, save_report_and_complete_job
 from .send_summary import DeliveryTracker, MessagingProvider, send_summary
 
@@ -277,7 +278,28 @@ def run_analysis(
             return validate_contract_result(_ReturnModel, _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, []), _ContractStage.RUN_ANALYSIS, json_native=False)
 
         check_search_settings()
-        _call(Stage.RETRIEVE_POST, run_ingest, job_id, url, store=store)
+        try:
+            _call(Stage.RETRIEVE_POST, run_ingest, job_id, url, store=store, _defer_platform_challenge=True)
+        except QuantroError as error:
+            # Native provider access is separate evidence, never a fake media download.
+            if not (
+                isinstance(error, RetrievalError)
+                and error.code == ErrorCode.MEDIA_UNAVAILABLE
+                and error.reason == "platform_challenge"
+                and _validate_url(url)[1] == "youtube"
+            ):
+                raise
+            try:
+                _call(Stage.RUN_ANALYSIS, store.set_job_status, job_id, "running")
+                report = _call(Stage.EXTRACT_MEDIA_FEATURES, build_remote_youtube_report, job_id, url)
+                return validate_contract_result(
+                    _ReturnModel,
+                    _complete_and_deliver(job_id, report, conversation_id, store, provider, tracker, list(report.limitations)),
+                    _ContractStage.RUN_ANALYSIS, json_native=False,
+                )
+            except QuantroError as fallback_error:
+                _mark_failed(store, job_id, fallback_error)
+                raise
         try:
             ingested = store.get_job(job_id)
             if ingested is None:
