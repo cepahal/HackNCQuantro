@@ -126,13 +126,25 @@ to the provider user ID. A newly assigned provider ID permits one fresh welcome;
 Photon can also restore the same ID after removal. In that case a durable
 reconciliation marker keeps welcome status uncertain across retries and restarts.
 An assigned-line change also invalidates the old welcome status. Original receipts
-remain intact, and neither case automatically resends a message. Repeating an
-active enrollment does not resend an accepted or uncertain welcome. An existing
-Photon user without receipt history is registered, but welcome delivery remains
-uncertain and is not automatically retried.
+remain intact, and neither case automatically resends a message. The signup page
+includes a UUIDv4 `welcome_request_id` for the user's explicit request to register
+and receive a welcome. The ID is normalized to lowercase. The private bridge key
+is `enroll_` plus the SHA256 of `phone_number + ':' + welcome_request_id`; its
+receipt identity is the project, phone and request ID, independent of provider user ID.
+That request can send one welcome to an already registered user. Retrying it,
+including after a timeout or process restart, never resends an accepted or uncertain
+attempt. A new explicit request has a separate receipt and preserves older attempts.
+Legacy clients that omit the request ID retain their previous behavior: an existing
+Photon user without receipt history is registered without another welcome.
 Without a persistent mount, these markers and throttle counters reset on a
 deploy. Entering a number is consent to contact, not proof of phone ownership
 or authentication to private reports. An accepted send is not a delivery receipt.
+
+Enrollment logs identify the provider `lookup` or `create` phase, elapsed milliseconds,
+numeric HTTP status when available, and a fixed response/error category. They omit
+phone numbers, account IDs, credentials, URLs, response bodies and provider exceptions.
+A `response_ok` log confirms a valid API envelope, not registration or message delivery.
+Failures are never automatically retried.
 
 Official enrollment contract:
 [Create user](https://photon.codes/docs/api-reference/users/create-user).
@@ -239,11 +251,13 @@ Content-Type: application/json
 {"conversation_id":"original chat GUID","summary":"Evidence-backed summary","report_url":"https://your-host/reports/report_001"}
 ```
 
-Reports arrive as three texts in order: a reliability TL;DR, a short explanation,
-then the report link. The formatter reads the report's exact `Takeaways`,
-`What this means`, and `Reliability` sections. Older free-form summaries receive
-a neutral reliability TL;DR. Text uses plain wording without em dashes; the first
-message is at most 247 characters and the explanation at most 650.
+New analysis replies arrive as three texts: `Context before: ...`,
+`Context after: ...`, then the report link. The backend selects the nearest whole
+source sentence before and after the verified matched passage, using the saved
+source transcript and its linked context windows. Each side is bounded to 650
+characters and explicitly says when source context is unavailable. The saved
+report and bridge payload schema stay unchanged. Legacy summary payloads retain
+their reliability TL;DR and short explanation formatting.
 
 Response after the SDK accepts all three texts and supplies their message IDs:
 

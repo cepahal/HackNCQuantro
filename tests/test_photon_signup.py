@@ -18,6 +18,7 @@ from backend.routes import photon_signup as signup
 PHONE = "+19195550123"
 ASSIGNED = "+17735550199"
 TOKEN = "test-bridge-token-" + "a" * 32
+WELCOME_REQUEST_ID = "12345678-1234-4123-8123-123456789abc"
 RESULT = {"assigned_phone_number": ASSIGNED, "open_messages_url": f"sms:{ASSIGNED}&body=Hi%20Quantro",
           "welcome_status": "accepted", "already_enrolled": False}
 
@@ -99,15 +100,17 @@ async def test_signup_uses_zoomout_branding_and_clear_mobile_steps_without_exter
 async def test_signup_explains_qr_registration_assigned_number_and_unconfirmed_delivery(client):
     html = (await client.get("/imessage")).text
     assert "Scanning only opens this form" in html
-    assert "tap Register for iMessage to finish registration" in html
+    assert "tap Register and send welcome to finish registration" in html
+    assert '<a href="/imessage">Open the registration form</a>' in html
     assert 'id="result" hidden aria-labelledby="result-heading"' in html
-    assert 'id="result-heading">Next: open Messages.</h2>' in html
-    assert "You can start without waiting for a welcome message" in html
+    assert 'id="result-heading">Check Messages for your welcome.</h2>' in html
+    assert "You do not need to start the conversation" in html
+    assert '<a href="/imessage"><img src="/imessage/qr.svg"' in html
     assert "not a number copied from a friend" in html
     assert 'id="messages" class="messages" aria-describedby="assigned"' in html
     assert "body.assigned_phone_number" in html and "body.open_messages_url" in html
     assert "receipt is not confirmed" in html
-    assert "Welcome delivery is unconfirmed" in html
+    assert "A welcome was requested, but its delivery is unconfirmed" in html
     assert "Settings &gt; Apps &gt; Messages &gt; Send &amp; Receive" in html
     assert "Start New Conversations From" in html
     assert "rather than an Apple Account email address, then start a new conversation" in html
@@ -121,10 +124,12 @@ def test_actual_signup_script_normalizes_formatted_numbers_before_sending_strict
         {"input": "+1 (919) 555-0123", "expected": "+19195550123"},
         {"input": "919-555-0123", "expected": "+19195550123"},
         {"input": "9195550123", "expected": "+19195550123"},
+        {"input": "1 (919) 555-0123", "expected": "+19195550123"},
+        {"input": "19195550123", "expected": "+19195550123"},
         {"input": "  +44 (20) 7946 0958  ", "expected": "+442079460958"},
         {"input": "+683 1234", "expected": "+6831234"},
         *({"input": value, "expected": None} for value in (
-            "", "19195550123", "00442079460958", "++19195550123", "+01995550123",
+            "", "29195550123", "00442079460958", "++19195550123", "+01995550123",
             "+123", "+19195550123 ext 5", "９１９５５５０１２３", "919<script>5550123",
         )),
     ]
@@ -137,7 +142,7 @@ for(const item of cases){
   const handlers={},requests=[];
   const elements=Object.fromEntries(['signup','submit','status','result','phone','consent','assigned','messages'].map(id=>[id,{textContent:'',hidden:true,disabled:false,attributes:{},addEventListener(name,handler){handlers[name]=handler;},setAttribute(name,value){this.attributes[name]=value;},removeAttribute(name){delete this.attributes[name];},focus(){this.focused=true;}}]));
   elements.phone.value=item.input;elements.consent.checked=true;
-  vm.runInNewContext(script,{window:{addEventListener(){}},document:{getElementById:id=>elements[id]},fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>response};}},{timeout:1000});
+  vm.runInNewContext(script,{crypto:{randomUUID:()=> '12345678-1234-4123-8123-123456789abc'},AbortController,setTimeout,clearTimeout,window:{addEventListener(){}},document:{getElementById:id=>elements[id]},fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>response};}},{timeout:1000});
   await handlers.submit({preventDefault(){}});
   results.push({requests,status:elements.status.textContent,invalid:elements.phone.attributes['aria-invalid'],hidden:elements.result.hidden,disabled:elements.submit.disabled,phone:elements.phone.value});
 }
@@ -159,7 +164,7 @@ process.stdout.write(JSON.stringify(results));
             assert "include + and the country code" in actual["status"]
             assert actual["hidden"] is True
         else:
-            assert actual["requests"] == [{"url": "/imessage/signup", "body": {"phone_number": case["expected"], "consent": True}}], case
+            assert actual["requests"] == [{"url": "/imessage/signup", "body": {"phone_number": case["expected"], "consent": True, "welcome_request_id": WELCOME_REQUEST_ID}}], case
             assert actual["phone"] == case["expected"]
             assert actual["hidden"] is False
     assert 'pattern=' not in signup._HTML.split('<input id="phone"', 1)[1].split('>', 1)[0]
@@ -179,7 +184,8 @@ for(const reset of ['pageshow','input']){
   elements.phone.value='9195550123';elements.consent.checked=true;
   let release,entered;
   let bodyReady=new Promise(resolve=>{entered=resolve;});
-  vm.runInNewContext(script,{window:{addEventListener(name,handler){windowHandlers[name]=handler;}},document:{getElementById:id=>elements[id]},fetch:async(url,options)=>{requests.push({url,cache:options.cache});return {ok:true,json:async()=>new Promise(resolve=>{release=()=>resolve(response);entered();})};}},{timeout:1000});
+  let generated=0;
+  vm.runInNewContext(script,{crypto:{randomUUID(){generated++;return '12345678-1234-4123-8123-123456789abc';}},AbortController,setTimeout,clearTimeout,window:{addEventListener(name,handler){windowHandlers[name]=handler;}},document:{getElementById:id=>elements[id]},fetch:async(url,options)=>{requests.push({url,cache:options.cache,signal:options.signal,body:JSON.parse(options.body)});return {ok:true,json:async()=>new Promise(resolve=>{release=()=>resolve(response);entered();})};}},{timeout:1000});
   assert.equal(requests.length,0);
   const first=handlers['signup:submit']({preventDefault(){}});
   await bodyReady;
@@ -194,9 +200,11 @@ for(const reset of ['pageshow','input']){
   const second=handlers['signup:submit']({preventDefault(){}});
   await bodyReady;
   trigger();release();await second;
+  assert.equal(requests[1].signal.aborted,true);
   assert.equal(elements.result.hidden,true);assert.equal(elements.status.textContent,'');
   assert.equal(elements.submit.disabled,false);
   assert.equal(requests.length,2);assert.ok(requests.every(request=>request.cache==='no-store'));
+  assert.equal(generated,1);assert.equal(requests[0].body.welcome_request_id,requests[1].body.welcome_request_id);
 }
 process.stdout.write('restored and late signup results cleared');
 """
@@ -206,6 +214,58 @@ process.stdout.write('restored and late signup results cleared');
         text=True, encoding="utf-8", capture_output=True, check=True, timeout=10,
     )
     assert executed.stdout == "restored and late signup results cleared"
+
+
+def test_actual_signup_script_bounds_hung_requests_and_safely_handles_transport_failures():
+    script = signup._HTML.split("<script>", 1)[1].split("</script>", 1)[0]
+    harness = """
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const {script,response}=JSON.parse(readFileSync(0,'utf8'));
+for(const mode of ['fetch-timeout','body-timeout','reset-hung','non-json','network']){
+  const handlers={},timers=new Map();
+  const elements=Object.fromEntries(['signup','submit','status','result','phone','consent','assigned','messages'].map(id=>[id,{textContent:'',hidden:true,disabled:false,attributes:{},addEventListener(name,handler){handlers[id+':'+name]=handler;},setAttribute(name,value){this.attributes[name]=value;},removeAttribute(name){delete this.attributes[name];delete this[name];},focus(){}}]));
+  elements.phone.value='9195550123';elements.consent.checked=true;
+  let signal,release;
+  const stalled=new Promise(resolve=>{release=resolve;});
+  vm.runInNewContext(script,{crypto:{randomUUID:()=> '12345678-1234-4123-8123-123456789abc'},AbortController,
+    setTimeout(callback,delay){assert.equal(delay,35000);timers.set(1,callback);return 1;},
+    clearTimeout(id){timers.delete(id);},
+    window:{addEventListener(){}},document:{getElementById:id=>elements[id]},
+    fetch:async(_url,options)=>{signal=options.signal;
+      if(mode==='fetch-timeout'||mode==='reset-hung')return stalled;
+      if(mode==='network')throw new TypeError('PRIVATE_NETWORK_DETAIL');
+      return {ok:false,json:async()=>{if(mode==='body-timeout')return stalled;throw new SyntaxError('PRIVATE_PROXY_HTML');}};
+    }},{timeout:1000});
+  const submitted=handlers['signup:submit']({preventDefault(){}});
+  assert.equal(elements.submit.disabled,true);
+  if(mode==='reset-hung')handlers['phone:input']();
+  else if(mode.endsWith('timeout'))timers.get(1)();
+  await submitted;
+  assert.equal(elements.submit.disabled,false);assert.equal(elements.result.hidden,true);
+  assert.equal(timers.size,0);
+  if(mode==='reset-hung'){assert.equal(signal.aborted,true);assert.equal(elements.status.textContent,'');}
+  else if(mode.endsWith('timeout')){
+    assert.equal(signal.aborted,true);
+    assert.match(elements.status.textContent,/taking too long/);
+    assert.match(elements.status.textContent,/may already be registered/);
+    assert.match(elements.status.textContent,/delivery is unconfirmed/);
+  }else assert.match(elements.status.textContent,/may already be registered/);
+  assert.doesNotMatch(elements.status.textContent,/PRIVATE_/);
+  const status=elements.status.textContent;
+  release({ok:true,json:async()=>response});
+  await Promise.resolve();await Promise.resolve();
+  assert.equal(elements.status.textContent,status);assert.equal(elements.result.hidden,true);
+}
+process.stdout.write('signup deadlines, cancellation and safe errors passed');
+"""
+    executed = subprocess.run(
+        [shutil.which("node"), "--input-type=module", "-e", harness],
+        input=json.dumps({"script": script, "response": RESULT}),
+        text=True, encoding="utf-8", capture_output=True, check=True, timeout=10,
+    )
+    assert executed.stdout == "signup deadlines, cancellation and safe errors passed"
 
 
 @pytest.mark.asyncio
@@ -223,6 +283,25 @@ async def test_success_proxies_only_phone_and_consent_to_authenticated_loopback(
     assert handlers[0].proxies == {}
     assert isinstance(handlers[1], signup._NoRedirect)
     assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("nonce", [WELCOME_REQUEST_ID, WELCOME_REQUEST_ID.upper()])
+async def test_explicit_welcome_nonce_is_canonicalized_in_authenticated_bridge_request(nonce, client, environment):
+    payload = {"phone_number": PHONE, "consent": True, "welcome_request_id": nonce}
+    response = await client.post("/imessage/signup", json=payload)
+    assert response.status_code == 200
+    request = environment.open.call_args.args[0]
+    assert json.loads(request.data) == {**payload, "welcome_request_id": nonce.lower()}
+    assert request.get_header("Idempotency-key") == "enroll_" + hashlib.sha256((PHONE + ":" + nonce.lower()).encode()).hexdigest()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("nonce", [None, False, 12, "", "not-a-uuid", WELCOME_REQUEST_ID.replace("-4", "-1"), WELCOME_REQUEST_ID + "\n"])
+async def test_invalid_welcome_nonce_never_reaches_bridge(nonce, client, environment):
+    response = await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": True, "welcome_request_id": nonce})
+    assert response.status_code == 400
+    environment.open.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -287,16 +366,45 @@ async def test_invalid_json_is_safe(client, environment):
 
 
 @pytest.mark.asyncio
-async def test_failed_bridge_attempts_still_throttle_each_phone(client, environment):
+async def test_unavailable_bridge_attempts_do_not_lock_out_phone_and_recovery_can_succeed(client, environment):
     environment.open.side_effect = URLError("PRIVATE_PROVIDER_DIAGNOSTIC")
-    for _ in range(signup._PHONE_LIMIT):
+    for _ in range(signup._PHONE_LIMIT + 1):
         response = await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": True})
         assert response.status_code == 503
         assert "PRIVATE_PROVIDER_DIAGNOSTIC" not in response.text
+    environment.open.side_effect = None
     response = await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": True})
-    assert response.status_code == 429
-    assert environment.open.call_count == signup._PHONE_LIMIT
+    assert response.status_code == 200
+    assert environment.open.call_count == signup._PHONE_LIMIT + 2
     assert all(PHONE not in key for key in signup._attempts)
+
+
+@pytest.mark.asyncio
+async def test_missing_consent_does_not_consume_phone_attempts(client, environment):
+    for _ in range(signup._PHONE_LIMIT + 1):
+        response = await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": False})
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "CONSENT_REQUIRED"
+    environment.open.assert_not_called()
+    assert (await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": True})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_successful_phone_attempts_remain_limited(client, environment):
+    for _ in range(signup._PHONE_LIMIT):
+        assert (await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": True})).status_code == 200
+    assert (await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": True})).status_code == 429
+    assert environment.open.call_count == signup._PHONE_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_unavailable_bridge_retries_still_hit_ip_limit(client, environment, monkeypatch):
+    monkeypatch.setattr(signup, "_IP_LIMIT", 2)
+    environment.open.side_effect = URLError("PRIVATE_PROVIDER_DIAGNOSTIC")
+    for _ in range(2):
+        assert (await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": True})).status_code == 503
+    assert (await client.post("/imessage/signup", json={"phone_number": PHONE, "consent": True})).status_code == 429
+    assert environment.open.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -321,6 +429,15 @@ def test_throttle_state_is_bounded_and_expires(monkeypatch):
     clock.return_value = 3601.0
     assert signup._allow_attempt("three", 1, 600)
     assert len(signup._attempts) == 1
+
+
+def test_releasing_failed_attempt_preserves_concurrent_phone_reservations():
+    assert signup._allow_attempt("phone:test", 2, 3_600, timestamp=100.0)
+    assert signup._allow_attempt("phone:test", 2, 3_600, timestamp=101.0)
+    signup._release_attempt("phone:test", 100.0)
+    assert list(signup._attempts["phone:test"]) == [101.0]
+    assert signup._allow_attempt("phone:test", 2, 3_600, timestamp=102.0)
+    assert not signup._allow_attempt("phone:test", 2, 3_600, timestamp=103.0)
 
 
 @pytest.mark.asyncio

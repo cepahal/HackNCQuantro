@@ -50,12 +50,15 @@ exclude that already selected workspace fee.
    full-pipeline guarantee. Admit only one demo analysis at a time until a tested
    global concurrency gate exists.
 
-The Python Docker service does **not** start the Node Photon Spectrum bridge.
-Its dispatcher currently connects to a loopback backend, so moving only Python
-to Render does not move the local iMessage workflow. Keep the verified local
-bridge/backend pair running for that workflow until a supported deployment of
-both has been configured and tested; do not point its loopback setting at an
-invented public-host environment variable.
+The Docker image includes Node 24 and supervises the existing Photon Spectrum
+bridge beside Python when `PHOTON_ENABLED=true`. Configure the existing private
+`SPECTRUM_PROJECT_ID`, `SPECTRUM_PROJECT_SECRET`, and `PHOTON_BRIDGE_TOKEN` in
+Render. The bridge stays on loopback; `/imessage` exposes the consent-based
+registration page and `/imessage/qr.svg` links to that page. A QR scan opens
+registration; submitting the form requests the welcome message. Keep one
+listener instance and persist `PHOTON_DATA_DIR` to retain intake and delivery
+receipts across deployments. A provider-accepted send still requires a handset
+check to confirm receipt.
 
 [Render documents long HTTP responses up to 100 minutes](https://render.com/docs/heroku),
 whereas [Railway closes a request after five minutes without transferred data](https://docs.railway.com/networking/public-networking/specs-and-limits)

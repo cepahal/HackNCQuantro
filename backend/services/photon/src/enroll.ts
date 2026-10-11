@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 const E164 = /^\+[1-9]\d{6,14}$/;
 const PROJECT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const WELCOME_REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_RESPONSE_BYTES = 32_768;
 export const WELCOME_MESSAGE = "Quantro is ready. Reply with a public video link to analyze its source and context.";
 
@@ -18,6 +19,13 @@ export interface WelcomeDiagnostic {
   category: "sdk_exception" | "send_deadline" | "invalid_message_id" | "receipt_storage_failed";
   elapsed_ms: number;
   grpcCode?: number;
+}
+
+export interface EnrollmentDiagnostic {
+  phase: "lookup" | "create";
+  category: "response_ok" | "http_error" | "invalid_response" | "timeout" | "network_error";
+  elapsed_ms: number;
+  http_status?: number;
 }
 
 class WelcomeDeadlineError extends Error {}
@@ -44,6 +52,7 @@ interface EnrollmentOptions {
   requestTimeoutMs?: number;
   sendTimeoutMs?: number;
   diagnostic?: (event: WelcomeDiagnostic) => void;
+  enrollmentDiagnostic?: (event: EnrollmentDiagnostic) => void;
 }
 
 interface WelcomeRecord {
@@ -61,20 +70,23 @@ const storageError = (): EnrollmentError => new EnrollmentError(
   503, "ENROLLMENT_STORAGE_UNAVAILABLE", "Welcome delivery state could not be safely stored. No automatic resend is permitted.",
 );
 
-function validateInput(input: unknown, key: string): string {
+function validateInput(input: unknown, key: string): { phone: string; welcomeRequestId?: string } {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new EnrollmentError(400, "INVALID_ENROLLMENT_INPUT", "Provide an international phone number and explicit messaging consent.");
   }
   const record = input as Record<string, unknown>;
   const phone = record.phone_number;
+  const requestId = record.welcome_request_id;
   if (typeof phone !== "string" || !E164.test(phone) || record.consent !== true
-      || Object.keys(record).some((field) => field !== "phone_number" && field !== "consent")) {
+      || (requestId !== undefined && (typeof requestId !== "string" || !WELCOME_REQUEST_ID.test(requestId)))
+      || Object.keys(record).some((field) => !["phone_number", "consent", "welcome_request_id"].includes(field))) {
     throw new EnrollmentError(400, "INVALID_ENROLLMENT_INPUT", "Provide an international phone number and explicit messaging consent.");
   }
-  if (key !== `enroll_${digest(phone)}`) {
+  const welcomeRequestId = typeof requestId === "string" ? requestId.toLowerCase() : undefined;
+  if (key !== `enroll_${digest(welcomeRequestId === undefined ? phone : `${phone}:${welcomeRequestId}`)}`) {
     throw new EnrollmentError(400, "INVALID_IDEMPOTENCY_KEY", "The enrollment idempotency key must match the submitted phone number.");
   }
-  return phone;
+  return { phone, ...(typeof welcomeRequestId === "string" ? { welcomeRequestId } : {}) };
 }
 
 function validMessageId(id: unknown): id is string {
@@ -206,10 +218,17 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
   }
 
   async function request(url: string, method: "GET" | "POST", phone: string): Promise<Record<string, unknown>> {
+    const started = performance.now();
+    const signal = AbortSignal.timeout(requestTimeoutMs);
+    const event: EnrollmentDiagnostic = {
+      phase: method === "GET" ? "lookup" : "create", category: "network_error", elapsed_ms: 0,
+    };
     try {
       const response = await fetcher(url, { method, redirect: "error", cache: "no-store",
-        signal: AbortSignal.timeout(requestTimeoutMs), headers: { authorization, "Content-Type": "application/json" },
+        signal, headers: { authorization, "Content-Type": "application/json" },
         ...(method === "POST" ? { body: JSON.stringify({ type: "shared", phoneNumber: phone }) } : {}) });
+      event.http_status = response.status;
+      event.category = "http_error";
       if (response.status === 409) {
         await response.body?.cancel();
         throw new EnrollmentError(409, "ENROLLMENT_CAPACITY_OR_CONFLICT", "Photon cannot add this user on the current plan. No upgrade was attempted.");
@@ -218,21 +237,35 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
         await response.body?.cancel();
         throw unavailable();
       }
+      event.category = "invalid_response";
       const payload = await boundedJson(response);
       if (typeof payload !== "object" || payload === null || Array.isArray(payload)) throw unavailable();
       const envelope = payload as Record<string, unknown>;
       if (envelope.succeed !== true || typeof envelope.data !== "object" || envelope.data === null || Array.isArray(envelope.data)) throw unavailable();
+      event.category = "response_ok";
       return envelope.data as Record<string, unknown>;
     } catch (error) {
+      if (signal.aborted) event.category = "timeout";
       if (error instanceof EnrollmentError) throw error;
       throw unavailable();
+    } finally {
+      // Fixed phase/status fields explain signup failures without logging URLs,
+      // bodies, account IDs, phone numbers, credentials or provider exceptions.
+      event.elapsed_ms = Math.max(0, Math.round(performance.now() - started));
+      try {
+        if (options.enrollmentDiagnostic) {
+          void Promise.resolve(options.enrollmentDiagnostic(event)).catch(() => undefined);
+        } else {
+          console.info("Photon enrollment diagnostic:", JSON.stringify(event));
+        }
+      } catch { /* Diagnostics cannot change registration or permit another send. */ }
     }
   }
 
-  async function enroll(phone: string): Promise<EnrollmentResult> {
+  async function enroll(phone: string, welcomeRequestId?: string): Promise<EnrollmentResult> {
     // Keep legacy receipts intact, but never treat a receipt as current authorization.
     const legacyPath = resolve(directory, `${digest(`${options.projectId}:${phone}`)}.json`);
-    await existingRecord(legacyPath);
+    if (welcomeRequestId === undefined) await existingRecord(legacyPath);
     const listed = await request(`${endpoint}?type=shared&search=${encodeURIComponent(phone)}&limit=100`, "GET", phone);
     if (!Array.isArray(listed.users) || listed.users.length > 100) throw unavailable();
     const matching = listed.users.filter((value: unknown) => typeof value === "object" && value !== null
@@ -242,7 +275,9 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
     const user = providerUser(alreadyEnrolled ? matching[0] : await request(endpoint, "POST", phone), phone);
     // Photon may restore an earlier user ID after deletion. Keep its welcome
     // history, but use this lookup to describe the current registration.
-    const path = resolve(directory, `${digest(`${options.projectId}:${phone}:${user.id}`)}.json`);
+    const receiptIdentity = welcomeRequestId === undefined
+      ? `${options.projectId}:${phone}:${user.id}` : `${options.projectId}:${phone}:${welcomeRequestId}`;
+    const path = resolve(directory, `${digest(receiptIdentity)}.json`);
     const reconciledResult = (record: WelcomeRecord): EnrollmentResult => result({
       ...record, assigned_phone_number: user.assignedPhoneNumber,
       state: alreadyEnrolled && record.assigned_phone_number === user.assignedPhoneNumber
@@ -265,7 +300,7 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
       }
       return reconciledResult(existing);
     }
-    const pending: WelcomeRecord = { version: 1, state: alreadyEnrolled ? "uncertain" : "pending",
+    const pending: WelcomeRecord = { version: 1, state: alreadyEnrolled && welcomeRequestId === undefined ? "uncertain" : "pending",
       assigned_phone_number: user.assignedPhoneNumber };
     try {
       await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -278,9 +313,9 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
       }
       throw storageError();
     }
-    // A provider user without local history may already have received a welcome
-    // before a redeploy. Do not turn lost receipt history into another message.
-    if (alreadyEnrolled) return result(pending, true);
+    // Legacy signup never infers permission to repeat a missing welcome. A new
+    // explicit request has its own durable receipt and does not reuse old attempts.
+    if (alreadyEnrolled && welcomeRequestId === undefined) return result(pending, true);
     let sent: { id: string } | undefined;
     const started = performance.now();
     try {
@@ -305,15 +340,15 @@ export function createEnrollmentHandler(options: EnrollmentOptions) {
   }
 
   return async function handleEnrollment(input: unknown, key: string): Promise<EnrollmentResult> {
-    const phone = validateInput(input, key);
-    const active = inFlight.get(phone);
+    const { phone, welcomeRequestId } = validateInput(input, key);
+    const active = inFlight.get(key);
     if (active) return active;
-    const promise = enroll(phone);
-    inFlight.set(phone, promise);
+    const promise = enroll(phone, welcomeRequestId);
+    inFlight.set(key, promise);
     try {
       return await promise;
     } finally {
-      inFlight.delete(phone);
+      inFlight.delete(key);
     }
   };
 }

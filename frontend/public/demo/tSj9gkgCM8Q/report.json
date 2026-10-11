@@ -1,0 +1,4057 @@
+{
+ "context_video": {
+  "media_id": "context_c9e6117cc504433ca30945804dfbb761",
+  "mime_type": "video/mp4",
+  "playback_url": null,
+  "duration_seconds": 140.066667,
+  "width": 640,
+  "height": 360,
+  "fps": 30.0,
+  "has_audio": true
+ },
+ "context_selection": {
+  "after": [],
+  "before": [],
+  "strategy": "nearest_two_sentences",
+  "end_seconds": 141.0,
+  "timing_note": "Conservative caption boundaries; not frame-exact. Context sufficiency is an estimate.",
+  "after_method": "five_second_fallback",
+  "before_method": "five_second_fallback",
+  "start_seconds": 0.0
+ },
+ "schema_version": "2.1",
+ "job_id": "job_demo_tSj9gkgCM8Q_5",
+ "outcome": "matched",
+ "submitted": {
+  "post": {
+   "post_id": "post_3bd11d4bca84cf1958566b53",
+   "candidate_id": null,
+   "post_url": "https://www.youtube.com/watch?v=tSj9gkgCM8Q",
+   "platform": "youtube",
+   "title": "VP Joe Biden: We own the finish line",
+   "caption": "Vice President Joe Biden spoke Wednesday at the 2016 Democratic National Convention in Philadelphia.",
+   "author": {
+    "id": "UC6ZFN9Tx6xh-skXCuRHCDpQ",
+    "handle": null,
+    "display_name": "PBS NewsHour",
+    "profile_url": "https://www.youtube.com/channel/UC6ZFN9Tx6xh-skXCuRHCDpQ",
+    "bio": null,
+    "verified": null,
+    "followers_count": null,
+    "following_count": null,
+    "posts_count": null
+   },
+   "engagement": {
+    "views_count": null,
+    "likes_count": null,
+    "comments_count": null,
+    "shares_count": null
+   },
+   "published_at": null,
+   "media": {
+    "media_id": "media_3bd11d4bca84cf1958566b53",
+    "mime_type": "video/mp4",
+    "playback_url": "https://www.youtube.com/watch?v=tSj9gkgCM8Q",
+    "duration_seconds": 115.0,
+    "width": 640,
+    "height": 360,
+    "fps": 30.0,
+    "has_audio": true
+   },
+   "retrieval": {
+    "retrieved_at": "2026-10-11T12:15:29.019427Z",
+    "provider": "yt-dlp+groq_whisper",
+    "metadata_source_urls": [
+     "https://www.youtube.com/watch?v=tSj9gkgCM8Q"
+    ],
+    "unavailable_fields": [
+     "published_at",
+     "author.verified",
+     "author.followers_count",
+     "author.following_count",
+     "author.posts_count",
+     "engagement.views_count",
+     "engagement.likes_count",
+     "engagement.comments_count",
+     "engagement.shares_count"
+    ],
+    "warnings": [
+     "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+     "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording."
+    ]
+   }
+  },
+  "transcript": {
+   "status": "complete",
+   "processed_ranges": [
+    {
+     "start_seconds": 0.6800000000000004,
+     "end_seconds": 114.0
+    }
+   ],
+   "sentences": [
+    {
+     "sentence_id": "s1",
+     "start_seconds": 0.6800000000000004,
+     "end_seconds": 7.04,
+     "text": "Not only do we have the largest economy in the world, we have the strongest economy in",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "Not",
+       "start_seconds": 0.6800000000000004,
+       "end_seconds": 1.32
+      },
+      {
+       "text": "only",
+       "start_seconds": 1.32,
+       "end_seconds": 1.64
+      },
+      {
+       "text": "do",
+       "start_seconds": 1.64,
+       "end_seconds": 1.88
+      },
+      {
+       "text": "we",
+       "start_seconds": 1.88,
+       "end_seconds": 2.02
+      },
+      {
+       "text": "have",
+       "start_seconds": 2.02,
+       "end_seconds": 2.3
+      },
+      {
+       "text": "the",
+       "start_seconds": 2.3,
+       "end_seconds": 2.46
+      },
+      {
+       "text": "largest",
+       "start_seconds": 2.46,
+       "end_seconds": 2.92
+      },
+      {
+       "text": "economy",
+       "start_seconds": 2.92,
+       "end_seconds": 3.48
+      },
+      {
+       "text": "in",
+       "start_seconds": 3.48,
+       "end_seconds": 3.72
+      },
+      {
+       "text": "the",
+       "start_seconds": 3.72,
+       "end_seconds": 3.82
+      },
+      {
+       "text": "world,",
+       "start_seconds": 3.82,
+       "end_seconds": 4.0
+      },
+      {
+       "text": "we",
+       "start_seconds": 4.2,
+       "end_seconds": 4.48
+      },
+      {
+       "text": "have",
+       "start_seconds": 4.48,
+       "end_seconds": 4.8
+      },
+      {
+       "text": "the",
+       "start_seconds": 4.8,
+       "end_seconds": 5.18
+      },
+      {
+       "text": "strongest",
+       "start_seconds": 5.18,
+       "end_seconds": 5.78
+      },
+      {
+       "text": "economy",
+       "start_seconds": 5.78,
+       "end_seconds": 6.74
+      },
+      {
+       "text": "in",
+       "start_seconds": 6.74,
+       "end_seconds": 7.04
+      }
+     ]
+    },
+    {
+     "sentence_id": "s2",
+     "start_seconds": 7.04,
+     "end_seconds": 7.46,
+     "text": "the world.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "the",
+       "start_seconds": 7.04,
+       "end_seconds": 7.14
+      },
+      {
+       "text": "world.",
+       "start_seconds": 7.14,
+       "end_seconds": 7.46
+      }
+     ]
+    },
+    {
+     "sentence_id": "s3",
+     "start_seconds": 8.48,
+     "end_seconds": 11.0,
+     "text": "We have the most productive workers in the world.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s4",
+     "start_seconds": 11.72,
+     "end_seconds": 18.36,
+     "text": "And given a fair shot, given a fair chance, Americans have never, ever, ever, ever let",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "And",
+       "start_seconds": 11.72,
+       "end_seconds": 12.12
+      },
+      {
+       "text": "given",
+       "start_seconds": 12.12,
+       "end_seconds": 12.36
+      },
+      {
+       "text": "a",
+       "start_seconds": 12.36,
+       "end_seconds": 12.64
+      },
+      {
+       "text": "fair",
+       "start_seconds": 12.64,
+       "end_seconds": 12.82
+      },
+      {
+       "text": "shot,",
+       "start_seconds": 12.82,
+       "end_seconds": 13.36
+      },
+      {
+       "text": "given",
+       "start_seconds": 14.0,
+       "end_seconds": 14.12
+      },
+      {
+       "text": "a",
+       "start_seconds": 14.12,
+       "end_seconds": 14.36
+      },
+      {
+       "text": "fair",
+       "start_seconds": 14.36,
+       "end_seconds": 14.5
+      },
+      {
+       "text": "chance,",
+       "start_seconds": 14.5,
+       "end_seconds": 15.1
+      },
+      {
+       "text": "Americans",
+       "start_seconds": 15.48,
+       "end_seconds": 15.88
+      },
+      {
+       "text": "have",
+       "start_seconds": 15.88,
+       "end_seconds": 16.24
+      },
+      {
+       "text": "never,",
+       "start_seconds": 16.24,
+       "end_seconds": 16.66
+      },
+      {
+       "text": "ever,",
+       "start_seconds": 16.94,
+       "end_seconds": 17.2
+      },
+      {
+       "text": "ever,",
+       "start_seconds": 17.4,
+       "end_seconds": 17.7
+      },
+      {
+       "text": "ever",
+       "start_seconds": 17.7,
+       "end_seconds": 18.06
+      },
+      {
+       "text": "let",
+       "start_seconds": 18.06,
+       "end_seconds": 18.36
+      }
+     ]
+    },
+    {
+     "sentence_id": "s5",
+     "start_seconds": 18.36,
+     "end_seconds": 19.44,
+     "text": "their country down.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "their",
+       "start_seconds": 18.36,
+       "end_seconds": 18.6
+      },
+      {
+       "text": "country",
+       "start_seconds": 18.6,
+       "end_seconds": 18.94
+      },
+      {
+       "text": "down.",
+       "start_seconds": 18.94,
+       "end_seconds": 19.44
+      }
+     ]
+    },
+    {
+     "sentence_id": "s6",
+     "start_seconds": 19.9,
+     "end_seconds": 20.46,
+     "text": "Never.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "Never.",
+       "start_seconds": 19.9,
+       "end_seconds": 20.46
+      }
+     ]
+    },
+    {
+     "sentence_id": "s7",
+     "start_seconds": 20.46,
+     "end_seconds": 33.98,
+     "text": "never, never. Ordinary people like us who do extraordinary things. We've had candidates",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "never,",
+       "start_seconds": 20.46,
+       "end_seconds": 20.58
+      },
+      {
+       "text": "never.",
+       "start_seconds": 21.66,
+       "end_seconds": 22.02
+      },
+      {
+       "text": "Ordinary",
+       "start_seconds": 24.32,
+       "end_seconds": 25.08
+      },
+      {
+       "text": "people",
+       "start_seconds": 25.08,
+       "end_seconds": 25.6
+      },
+      {
+       "text": "like",
+       "start_seconds": 25.6,
+       "end_seconds": 25.92
+      },
+      {
+       "text": "us",
+       "start_seconds": 25.92,
+       "end_seconds": 26.3
+      },
+      {
+       "text": "who",
+       "start_seconds": 26.3,
+       "end_seconds": 27.28
+      },
+      {
+       "text": "do",
+       "start_seconds": 27.28,
+       "end_seconds": 27.46
+      },
+      {
+       "text": "extraordinary",
+       "start_seconds": 27.46,
+       "end_seconds": 28.04
+      },
+      {
+       "text": "things.",
+       "start_seconds": 28.04,
+       "end_seconds": 28.7
+      },
+      {
+       "text": "We've",
+       "start_seconds": 32.6,
+       "end_seconds": 33.36
+      },
+      {
+       "text": "had",
+       "start_seconds": 33.36,
+       "end_seconds": 33.48
+      },
+      {
+       "text": "candidates",
+       "start_seconds": 33.48,
+       "end_seconds": 33.98
+      }
+     ]
+    },
+    {
+     "sentence_id": "s8",
+     "start_seconds": 33.98,
+     "end_seconds": 39.54,
+     "text": "before or attempted to get elected by appeal into our fears, but they've never succeeded",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "before",
+       "start_seconds": 33.98,
+       "end_seconds": 34.42
+      },
+      {
+       "text": "or",
+       "start_seconds": 34.42,
+       "end_seconds": 34.68
+      },
+      {
+       "text": "attempted",
+       "start_seconds": 34.68,
+       "end_seconds": 35.06
+      },
+      {
+       "text": "to",
+       "start_seconds": 35.06,
+       "end_seconds": 35.9
+      },
+      {
+       "text": "get",
+       "start_seconds": 35.9,
+       "end_seconds": 36.06
+      },
+      {
+       "text": "elected",
+       "start_seconds": 36.06,
+       "end_seconds": 36.4
+      },
+      {
+       "text": "by",
+       "start_seconds": 36.4,
+       "end_seconds": 36.64
+      },
+      {
+       "text": "appeal",
+       "start_seconds": 36.64,
+       "end_seconds": 36.96
+      },
+      {
+       "text": "into",
+       "start_seconds": 36.96,
+       "end_seconds": 37.2
+      },
+      {
+       "text": "our",
+       "start_seconds": 37.2,
+       "end_seconds": 37.36
+      },
+      {
+       "text": "fears,",
+       "start_seconds": 37.36,
+       "end_seconds": 37.78
+      },
+      {
+       "text": "but",
+       "start_seconds": 38.08,
+       "end_seconds": 38.62
+      },
+      {
+       "text": "they've",
+       "start_seconds": 38.62,
+       "end_seconds": 38.84
+      },
+      {
+       "text": "never",
+       "start_seconds": 38.84,
+       "end_seconds": 39.02
+      },
+      {
+       "text": "succeeded",
+       "start_seconds": 39.02,
+       "end_seconds": 39.54
+      }
+     ]
+    },
+    {
+     "sentence_id": "s9",
+     "start_seconds": 39.54,
+     "end_seconds": 47.32,
+     "text": "because we do not scare easily. We never bow. We never bend. We never break when confronted",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "because",
+       "start_seconds": 39.54,
+       "end_seconds": 40.14
+      },
+      {
+       "text": "we",
+       "start_seconds": 40.14,
+       "end_seconds": 40.56
+      },
+      {
+       "text": "do",
+       "start_seconds": 40.56,
+       "end_seconds": 41.14
+      },
+      {
+       "text": "not",
+       "start_seconds": 41.14,
+       "end_seconds": 41.52
+      },
+      {
+       "text": "scare",
+       "start_seconds": 41.52,
+       "end_seconds": 41.94
+      },
+      {
+       "text": "easily.",
+       "start_seconds": 41.94,
+       "end_seconds": 42.48
+      },
+      {
+       "text": "We",
+       "start_seconds": 42.76,
+       "end_seconds": 43.02
+      },
+      {
+       "text": "never",
+       "start_seconds": 43.02,
+       "end_seconds": 43.48
+      },
+      {
+       "text": "bow.",
+       "start_seconds": 43.48,
+       "end_seconds": 43.86
+      },
+      {
+       "text": "We",
+       "start_seconds": 44.2,
+       "end_seconds": 44.38
+      },
+      {
+       "text": "never",
+       "start_seconds": 44.38,
+       "end_seconds": 44.8
+      },
+      {
+       "text": "bend.",
+       "start_seconds": 44.8,
+       "end_seconds": 45.18
+      },
+      {
+       "text": "We",
+       "start_seconds": 45.48,
+       "end_seconds": 45.68
+      },
+      {
+       "text": "never",
+       "start_seconds": 45.68,
+       "end_seconds": 46.08
+      },
+      {
+       "text": "break",
+       "start_seconds": 46.08,
+       "end_seconds": 46.54
+      },
+      {
+       "text": "when",
+       "start_seconds": 46.54,
+       "end_seconds": 46.94
+      },
+      {
+       "text": "confronted",
+       "start_seconds": 46.94,
+       "end_seconds": 47.32
+      }
+     ]
+    },
+    {
+     "sentence_id": "s10",
+     "start_seconds": 47.32,
+     "end_seconds": 56.54,
+     "text": "with crisis. No, we endure, we overcome, and we always, always, always move forward. That's why,",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "with",
+       "start_seconds": 47.32,
+       "end_seconds": 47.54
+      },
+      {
+       "text": "crisis.",
+       "start_seconds": 47.54,
+       "end_seconds": 47.92
+      },
+      {
+       "text": "No,",
+       "start_seconds": 48.34,
+       "end_seconds": 48.56
+      },
+      {
+       "text": "we",
+       "start_seconds": 48.9,
+       "end_seconds": 49.14
+      },
+      {
+       "text": "endure,",
+       "start_seconds": 49.14,
+       "end_seconds": 49.6
+      },
+      {
+       "text": "we",
+       "start_seconds": 50.06,
+       "end_seconds": 50.18
+      },
+      {
+       "text": "overcome,",
+       "start_seconds": 50.18,
+       "end_seconds": 50.6
+      },
+      {
+       "text": "and",
+       "start_seconds": 51.18,
+       "end_seconds": 51.3
+      },
+      {
+       "text": "we",
+       "start_seconds": 51.3,
+       "end_seconds": 51.44
+      },
+      {
+       "text": "always,",
+       "start_seconds": 51.44,
+       "end_seconds": 52.06
+      },
+      {
+       "text": "always,",
+       "start_seconds": 52.2,
+       "end_seconds": 52.7
+      },
+      {
+       "text": "always",
+       "start_seconds": 52.78,
+       "end_seconds": 53.16
+      },
+      {
+       "text": "move",
+       "start_seconds": 53.16,
+       "end_seconds": 53.42
+      },
+      {
+       "text": "forward.",
+       "start_seconds": 53.42,
+       "end_seconds": 53.86
+      },
+      {
+       "text": "That's",
+       "start_seconds": 55.52,
+       "end_seconds": 56.2
+      },
+      {
+       "text": "why,",
+       "start_seconds": 56.2,
+       "end_seconds": 56.54
+      }
+     ]
+    },
+    {
+     "sentence_id": "s11",
+     "start_seconds": 57.6,
+     "end_seconds": 66.62,
+     "text": "that's why I can say with absolute conviction, I am more optimistic about our chances today",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "that's",
+       "start_seconds": 57.6,
+       "end_seconds": 58.28
+      },
+      {
+       "text": "why",
+       "start_seconds": 58.28,
+       "end_seconds": 58.48
+      },
+      {
+       "text": "I",
+       "start_seconds": 58.48,
+       "end_seconds": 58.66
+      },
+      {
+       "text": "can",
+       "start_seconds": 58.66,
+       "end_seconds": 58.9
+      },
+      {
+       "text": "say",
+       "start_seconds": 58.9,
+       "end_seconds": 59.3
+      },
+      {
+       "text": "with",
+       "start_seconds": 59.3,
+       "end_seconds": 60.46
+      },
+      {
+       "text": "absolute",
+       "start_seconds": 60.46,
+       "end_seconds": 61.24
+      },
+      {
+       "text": "conviction,",
+       "start_seconds": 61.24,
+       "end_seconds": 62.04
+      },
+      {
+       "text": "I",
+       "start_seconds": 62.52,
+       "end_seconds": 63.36
+      },
+      {
+       "text": "am",
+       "start_seconds": 63.36,
+       "end_seconds": 63.62
+      },
+      {
+       "text": "more",
+       "start_seconds": 63.62,
+       "end_seconds": 63.9
+      },
+      {
+       "text": "optimistic",
+       "start_seconds": 63.9,
+       "end_seconds": 64.7
+      },
+      {
+       "text": "about",
+       "start_seconds": 64.7,
+       "end_seconds": 65.1
+      },
+      {
+       "text": "our",
+       "start_seconds": 65.1,
+       "end_seconds": 65.44
+      },
+      {
+       "text": "chances",
+       "start_seconds": 65.44,
+       "end_seconds": 65.96
+      },
+      {
+       "text": "today",
+       "start_seconds": 65.96,
+       "end_seconds": 66.62
+      }
+     ]
+    },
+    {
+     "sentence_id": "s12",
+     "start_seconds": 66.62,
+     "end_seconds": 73.02,
+     "text": "than when I was elected as a 29-year-old kid to the Senate. The 21st century is going to be",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "than",
+       "start_seconds": 66.62,
+       "end_seconds": 67.32
+      },
+      {
+       "text": "when",
+       "start_seconds": 67.32,
+       "end_seconds": 67.5
+      },
+      {
+       "text": "I",
+       "start_seconds": 67.5,
+       "end_seconds": 67.66
+      },
+      {
+       "text": "was",
+       "start_seconds": 67.66,
+       "end_seconds": 67.78
+      },
+      {
+       "text": "elected",
+       "start_seconds": 67.78,
+       "end_seconds": 68.18
+      },
+      {
+       "text": "as",
+       "start_seconds": 68.18,
+       "end_seconds": 68.42
+      },
+      {
+       "text": "a",
+       "start_seconds": 68.42,
+       "end_seconds": 68.52
+      },
+      {
+       "text": "29",
+       "start_seconds": 68.52,
+       "end_seconds": 69.08
+      },
+      {
+       "text": "-year",
+       "start_seconds": 69.08,
+       "end_seconds": 69.26
+      },
+      {
+       "text": "-old",
+       "start_seconds": 69.26,
+       "end_seconds": 69.4
+      },
+      {
+       "text": "kid",
+       "start_seconds": 69.4,
+       "end_seconds": 69.64
+      },
+      {
+       "text": "to",
+       "start_seconds": 69.64,
+       "end_seconds": 69.78
+      },
+      {
+       "text": "the",
+       "start_seconds": 69.78,
+       "end_seconds": 69.92
+      },
+      {
+       "text": "Senate.",
+       "start_seconds": 69.92,
+       "end_seconds": 70.22
+      },
+      {
+       "text": "The",
+       "start_seconds": 70.78,
+       "end_seconds": 70.94
+      },
+      {
+       "text": "21st",
+       "start_seconds": 70.94,
+       "end_seconds": 71.74
+      },
+      {
+       "text": "century",
+       "start_seconds": 71.74,
+       "end_seconds": 72.2
+      },
+      {
+       "text": "is",
+       "start_seconds": 72.2,
+       "end_seconds": 72.42
+      },
+      {
+       "text": "going",
+       "start_seconds": 72.42,
+       "end_seconds": 72.62
+      },
+      {
+       "text": "to",
+       "start_seconds": 72.62,
+       "end_seconds": 72.8
+      },
+      {
+       "text": "be",
+       "start_seconds": 72.8,
+       "end_seconds": 73.02
+      }
+     ]
+    },
+    {
+     "sentence_id": "s13",
+     "start_seconds": 73.02,
+     "end_seconds": 84.08,
+     "text": "the American Century because we lead not only by the example of our power but by the power",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "the",
+       "start_seconds": 73.02,
+       "end_seconds": 73.62
+      },
+      {
+       "text": "American",
+       "start_seconds": 73.62,
+       "end_seconds": 74.64
+      },
+      {
+       "text": "Century",
+       "start_seconds": 74.64,
+       "end_seconds": 75.42
+      },
+      {
+       "text": "because",
+       "start_seconds": 75.42,
+       "end_seconds": 77.5
+      },
+      {
+       "text": "we",
+       "start_seconds": 77.5,
+       "end_seconds": 80.04
+      },
+      {
+       "text": "lead",
+       "start_seconds": 80.04,
+       "end_seconds": 80.36
+      },
+      {
+       "text": "not",
+       "start_seconds": 80.36,
+       "end_seconds": 80.66
+      },
+      {
+       "text": "only",
+       "start_seconds": 80.66,
+       "end_seconds": 80.96
+      },
+      {
+       "text": "by",
+       "start_seconds": 80.96,
+       "end_seconds": 81.22
+      },
+      {
+       "text": "the",
+       "start_seconds": 81.22,
+       "end_seconds": 81.38
+      },
+      {
+       "text": "example",
+       "start_seconds": 81.38,
+       "end_seconds": 81.92
+      },
+      {
+       "text": "of",
+       "start_seconds": 81.92,
+       "end_seconds": 82.12
+      },
+      {
+       "text": "our",
+       "start_seconds": 82.12,
+       "end_seconds": 82.28
+      },
+      {
+       "text": "power",
+       "start_seconds": 82.28,
+       "end_seconds": 82.78
+      },
+      {
+       "text": "but",
+       "start_seconds": 82.78,
+       "end_seconds": 83.22
+      },
+      {
+       "text": "by",
+       "start_seconds": 83.22,
+       "end_seconds": 83.5
+      },
+      {
+       "text": "the",
+       "start_seconds": 83.5,
+       "end_seconds": 83.64
+      },
+      {
+       "text": "power",
+       "start_seconds": 83.64,
+       "end_seconds": 84.08
+      }
+     ]
+    },
+    {
+     "sentence_id": "s14",
+     "start_seconds": 84.08,
+     "end_seconds": 92.82,
+     "text": "of our example. That is the history of the journey of America. And God willing, God willing,",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "of",
+       "start_seconds": 84.08,
+       "end_seconds": 84.38
+      },
+      {
+       "text": "our",
+       "start_seconds": 84.38,
+       "end_seconds": 84.6
+      },
+      {
+       "text": "example.",
+       "start_seconds": 84.6,
+       "end_seconds": 85.14
+      },
+      {
+       "text": "That",
+       "start_seconds": 85.5,
+       "end_seconds": 86.08
+      },
+      {
+       "text": "is",
+       "start_seconds": 86.08,
+       "end_seconds": 86.48
+      },
+      {
+       "text": "the",
+       "start_seconds": 86.48,
+       "end_seconds": 86.68
+      },
+      {
+       "text": "history",
+       "start_seconds": 86.68,
+       "end_seconds": 87.18
+      },
+      {
+       "text": "of",
+       "start_seconds": 87.18,
+       "end_seconds": 87.82
+      },
+      {
+       "text": "the",
+       "start_seconds": 87.82,
+       "end_seconds": 87.92
+      },
+      {
+       "text": "journey",
+       "start_seconds": 87.92,
+       "end_seconds": 88.26
+      },
+      {
+       "text": "of",
+       "start_seconds": 88.26,
+       "end_seconds": 88.48
+      },
+      {
+       "text": "America.",
+       "start_seconds": 88.48,
+       "end_seconds": 88.84
+      },
+      {
+       "text": "And",
+       "start_seconds": 89.66,
+       "end_seconds": 90.1
+      },
+      {
+       "text": "God",
+       "start_seconds": 90.1,
+       "end_seconds": 90.5
+      },
+      {
+       "text": "willing,",
+       "start_seconds": 90.5,
+       "end_seconds": 90.98
+      },
+      {
+       "text": "God",
+       "start_seconds": 91.34,
+       "end_seconds": 92.36
+      },
+      {
+       "text": "willing,",
+       "start_seconds": 92.36,
+       "end_seconds": 92.82
+      }
+     ]
+    },
+    {
+     "sentence_id": "s15",
+     "start_seconds": 92.94,
+     "end_seconds": 98.7,
+     "text": "Hillary Clinton will write the next chapter in that journey. We are America, second",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "Hillary",
+       "start_seconds": 92.94,
+       "end_seconds": 93.22
+      },
+      {
+       "text": "Clinton",
+       "start_seconds": 93.22,
+       "end_seconds": 93.7
+      },
+      {
+       "text": "will",
+       "start_seconds": 93.7,
+       "end_seconds": 93.94
+      },
+      {
+       "text": "write",
+       "start_seconds": 93.94,
+       "end_seconds": 94.22
+      },
+      {
+       "text": "the",
+       "start_seconds": 94.22,
+       "end_seconds": 94.6
+      },
+      {
+       "text": "next",
+       "start_seconds": 94.6,
+       "end_seconds": 94.92
+      },
+      {
+       "text": "chapter",
+       "start_seconds": 94.92,
+       "end_seconds": 95.38
+      },
+      {
+       "text": "in",
+       "start_seconds": 95.38,
+       "end_seconds": 95.62
+      },
+      {
+       "text": "that",
+       "start_seconds": 95.62,
+       "end_seconds": 95.76
+      },
+      {
+       "text": "journey.",
+       "start_seconds": 95.76,
+       "end_seconds": 96.18
+      },
+      {
+       "text": "We",
+       "start_seconds": 96.78,
+       "end_seconds": 97.04
+      },
+      {
+       "text": "are",
+       "start_seconds": 97.04,
+       "end_seconds": 97.28
+      },
+      {
+       "text": "America,",
+       "start_seconds": 97.28,
+       "end_seconds": 97.92
+      },
+      {
+       "text": "second",
+       "start_seconds": 98.26,
+       "end_seconds": 98.7
+      }
+     ]
+    },
+    {
+     "sentence_id": "s16",
+     "start_seconds": 98.7,
+     "end_seconds": 101.9,
+     "text": "into none, and we own the finish line.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "into",
+       "start_seconds": 98.7,
+       "end_seconds": 98.94
+      },
+      {
+       "text": "none,",
+       "start_seconds": 98.94,
+       "end_seconds": 99.3
+      },
+      {
+       "text": "and",
+       "start_seconds": 99.74,
+       "end_seconds": 99.88
+      },
+      {
+       "text": "we",
+       "start_seconds": 99.88,
+       "end_seconds": 100.24
+      },
+      {
+       "text": "own",
+       "start_seconds": 100.24,
+       "end_seconds": 100.88
+      },
+      {
+       "text": "the",
+       "start_seconds": 100.88,
+       "end_seconds": 101.12
+      },
+      {
+       "text": "finish",
+       "start_seconds": 101.12,
+       "end_seconds": 101.48
+      },
+      {
+       "text": "line.",
+       "start_seconds": 101.48,
+       "end_seconds": 101.9
+      }
+     ]
+    },
+    {
+     "sentence_id": "s17",
+     "start_seconds": 102.72,
+     "end_seconds": 103.68,
+     "text": "Don't forget it.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "Don't",
+       "start_seconds": 102.72,
+       "end_seconds": 103.02
+      },
+      {
+       "text": "forget",
+       "start_seconds": 103.02,
+       "end_seconds": 103.42
+      },
+      {
+       "text": "it.",
+       "start_seconds": 103.42,
+       "end_seconds": 103.68
+      }
+     ]
+    },
+    {
+     "sentence_id": "s18",
+     "start_seconds": 104.88,
+     "end_seconds": 108.46,
+     "text": "God bless you all, and may God protect our troops.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "God",
+       "start_seconds": 104.88,
+       "end_seconds": 105.3
+      },
+      {
+       "text": "bless",
+       "start_seconds": 105.3,
+       "end_seconds": 105.56
+      },
+      {
+       "text": "you",
+       "start_seconds": 105.56,
+       "end_seconds": 105.88
+      },
+      {
+       "text": "all,",
+       "start_seconds": 105.88,
+       "end_seconds": 106.26
+      },
+      {
+       "text": "and",
+       "start_seconds": 106.66,
+       "end_seconds": 106.88
+      },
+      {
+       "text": "may",
+       "start_seconds": 106.88,
+       "end_seconds": 107.04
+      },
+      {
+       "text": "God",
+       "start_seconds": 107.04,
+       "end_seconds": 107.36
+      },
+      {
+       "text": "protect",
+       "start_seconds": 107.36,
+       "end_seconds": 107.76
+      },
+      {
+       "text": "our",
+       "start_seconds": 107.76,
+       "end_seconds": 108.1
+      },
+      {
+       "text": "troops.",
+       "start_seconds": 108.1,
+       "end_seconds": 108.46
+      }
+     ]
+    },
+    {
+     "sentence_id": "s19",
+     "start_seconds": 109.34,
+     "end_seconds": 111.78,
+     "text": "Con, we're America.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "Con,",
+       "start_seconds": 109.34,
+       "end_seconds": 109.72
+      },
+      {
+       "text": "we're",
+       "start_seconds": 110.4,
+       "end_seconds": 111.22
+      },
+      {
+       "text": "America.",
+       "start_seconds": 111.22,
+       "end_seconds": 111.78
+      }
+     ]
+    },
+    {
+     "sentence_id": "s20",
+     "start_seconds": 113.04,
+     "end_seconds": 114.0,
+     "text": "Thank you.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "Thank",
+       "start_seconds": 113.04,
+       "end_seconds": 113.8
+      },
+      {
+       "text": "you.",
+       "start_seconds": 113.8,
+       "end_seconds": 114.0
+      }
+     ]
+    }
+   ]
+  },
+  "frames": [],
+  "visual_text": []
+ },
+ "source": {
+  "post": {
+   "post_id": "post_fc803652038d7713262a24c9",
+   "candidate_id": "candidate_1",
+   "post_url": "https://www.youtube.com/watch?v=lUkR5URgv0o",
+   "platform": "youtube",
+   "title": "Joe Biden: We are America, second to none",
+   "caption": null,
+   "author": {
+    "id": null,
+    "handle": null,
+    "display_name": null,
+    "profile_url": null,
+    "bio": null,
+    "verified": null,
+    "followers_count": null,
+    "following_count": null,
+    "posts_count": null
+   },
+   "engagement": {
+    "views_count": null,
+    "likes_count": null,
+    "comments_count": null,
+    "shares_count": null
+   },
+   "published_at": null,
+   "media": {
+    "media_id": "media_fc803652038d7713262a24c9",
+    "mime_type": "video/mp4",
+    "playback_url": "https://www.youtube.com/watch?v=lUkR5URgv0o",
+    "duration_seconds": 141.0,
+    "width": null,
+    "height": null,
+    "fps": null,
+    "has_audio": true
+   },
+   "retrieval": {
+    "retrieved_at": "2026-10-11T12:19:00.194860Z",
+    "provider": "yt-dlp+groq_whisper",
+    "metadata_source_urls": [
+     "https://www.youtube.com/watch?v=lUkR5URgv0o"
+    ],
+    "unavailable_fields": [
+     "published_at",
+     "author.verified",
+     "author.followers_count",
+     "author.following_count",
+     "author.posts_count",
+     "engagement.views_count",
+     "engagement.likes_count",
+     "engagement.comments_count",
+     "engagement.shares_count",
+     "media.width",
+     "media.height",
+     "media.fps"
+    ],
+    "warnings": [
+     "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+     "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+     "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording."
+    ]
+   }
+  },
+  "transcript": {
+   "status": "complete",
+   "processed_ranges": [
+    {
+     "start_seconds": 0.0,
+     "end_seconds": 139.56
+    }
+   ],
+   "sentences": [
+    {
+     "sentence_id": "s1",
+     "start_seconds": 0.0,
+     "end_seconds": 5.98,
+     "text": "But folks, let me tell you what I literally tell every world leader I met with and I've met them all",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "But",
+       "start_seconds": 0.0,
+       "end_seconds": 0.52
+      },
+      {
+       "text": "folks,",
+       "start_seconds": 0.52,
+       "end_seconds": 0.8
+      },
+      {
+       "text": "let",
+       "start_seconds": 0.88,
+       "end_seconds": 1.04
+      },
+      {
+       "text": "me",
+       "start_seconds": 1.04,
+       "end_seconds": 1.14
+      },
+      {
+       "text": "tell",
+       "start_seconds": 1.14,
+       "end_seconds": 1.38
+      },
+      {
+       "text": "you",
+       "start_seconds": 1.38,
+       "end_seconds": 1.5
+      },
+      {
+       "text": "what",
+       "start_seconds": 1.5,
+       "end_seconds": 1.68
+      },
+      {
+       "text": "I",
+       "start_seconds": 1.68,
+       "end_seconds": 1.84
+      },
+      {
+       "text": "literally",
+       "start_seconds": 1.84,
+       "end_seconds": 2.32
+      },
+      {
+       "text": "tell",
+       "start_seconds": 2.32,
+       "end_seconds": 2.84
+      },
+      {
+       "text": "every",
+       "start_seconds": 2.84,
+       "end_seconds": 3.72
+      },
+      {
+       "text": "world",
+       "start_seconds": 3.72,
+       "end_seconds": 4.12
+      },
+      {
+       "text": "leader",
+       "start_seconds": 4.12,
+       "end_seconds": 4.38
+      },
+      {
+       "text": "I",
+       "start_seconds": 4.38,
+       "end_seconds": 4.6
+      },
+      {
+       "text": "met",
+       "start_seconds": 4.6,
+       "end_seconds": 4.78
+      },
+      {
+       "text": "with",
+       "start_seconds": 4.78,
+       "end_seconds": 4.98
+      },
+      {
+       "text": "and",
+       "start_seconds": 4.98,
+       "end_seconds": 5.14
+      },
+      {
+       "text": "I've",
+       "start_seconds": 5.14,
+       "end_seconds": 5.34
+      },
+      {
+       "text": "met",
+       "start_seconds": 5.34,
+       "end_seconds": 5.48
+      },
+      {
+       "text": "them",
+       "start_seconds": 5.48,
+       "end_seconds": 5.7
+      },
+      {
+       "text": "all",
+       "start_seconds": 5.7,
+       "end_seconds": 5.98
+      }
+     ]
+    },
+    {
+     "sentence_id": "s2",
+     "start_seconds": 6.800000000000001,
+     "end_seconds": 13.6,
+     "text": "It's never never never been a good bet to bet against America",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "It's",
+       "start_seconds": 6.800000000000001,
+       "end_seconds": 7.5
+      },
+      {
+       "text": "never",
+       "start_seconds": 7.5,
+       "end_seconds": 7.96
+      },
+      {
+       "text": "never",
+       "start_seconds": 7.96,
+       "end_seconds": 9.2
+      },
+      {
+       "text": "never",
+       "start_seconds": 9.2,
+       "end_seconds": 10.2
+      },
+      {
+       "text": "been",
+       "start_seconds": 10.2,
+       "end_seconds": 10.6
+      },
+      {
+       "text": "a",
+       "start_seconds": 10.6,
+       "end_seconds": 10.74
+      },
+      {
+       "text": "good",
+       "start_seconds": 10.74,
+       "end_seconds": 10.96
+      },
+      {
+       "text": "bet",
+       "start_seconds": 10.96,
+       "end_seconds": 11.3
+      },
+      {
+       "text": "to",
+       "start_seconds": 11.3,
+       "end_seconds": 11.76
+      },
+      {
+       "text": "bet",
+       "start_seconds": 11.76,
+       "end_seconds": 12.12
+      },
+      {
+       "text": "against",
+       "start_seconds": 12.12,
+       "end_seconds": 13.04
+      },
+      {
+       "text": "America",
+       "start_seconds": 13.04,
+       "end_seconds": 13.6
+      }
+     ]
+    },
+    {
+     "sentence_id": "s3",
+     "start_seconds": 15.100000000000001,
+     "end_seconds": 18.7,
+     "text": "We have the finest fighting force in the world",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "We",
+       "start_seconds": 15.100000000000001,
+       "end_seconds": 15.8
+      },
+      {
+       "text": "have",
+       "start_seconds": 15.8,
+       "end_seconds": 16.06
+      },
+      {
+       "text": "the",
+       "start_seconds": 16.06,
+       "end_seconds": 16.22
+      },
+      {
+       "text": "finest",
+       "start_seconds": 16.22,
+       "end_seconds": 16.72
+      },
+      {
+       "text": "fighting",
+       "start_seconds": 16.72,
+       "end_seconds": 17.28
+      },
+      {
+       "text": "force",
+       "start_seconds": 17.28,
+       "end_seconds": 17.72
+      },
+      {
+       "text": "in",
+       "start_seconds": 17.72,
+       "end_seconds": 18.08
+      },
+      {
+       "text": "the",
+       "start_seconds": 18.08,
+       "end_seconds": 18.22
+      },
+      {
+       "text": "world",
+       "start_seconds": 18.22,
+       "end_seconds": 18.7
+      }
+     ]
+    },
+    {
+     "sentence_id": "s4",
+     "start_seconds": 20.76,
+     "end_seconds": 21.88,
+     "text": "Not only",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "Not",
+       "start_seconds": 20.76,
+       "end_seconds": 21.46
+      },
+      {
+       "text": "only",
+       "start_seconds": 21.46,
+       "end_seconds": 21.88
+      }
+     ]
+    },
+    {
+     "sentence_id": "s5",
+     "start_seconds": 26.88,
+     "end_seconds": 27.58,
+     "text": "Not",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "Not",
+       "start_seconds": 26.88,
+       "end_seconds": 27.58
+      }
+     ]
+    },
+    {
+     "sentence_id": "s6",
+     "start_seconds": 34.4,
+     "end_seconds": 42.9,
+     "text": "Not only do we have the largest economy in the world, we have the strongest economy in",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "Not",
+       "start_seconds": 34.4,
+       "end_seconds": 35.04
+      },
+      {
+       "text": "only",
+       "start_seconds": 35.04,
+       "end_seconds": 35.42
+      },
+      {
+       "text": "do",
+       "start_seconds": 35.42,
+       "end_seconds": 37.72
+      },
+      {
+       "text": "we",
+       "start_seconds": 37.72,
+       "end_seconds": 37.9
+      },
+      {
+       "text": "have",
+       "start_seconds": 37.9,
+       "end_seconds": 38.16
+      },
+      {
+       "text": "the",
+       "start_seconds": 38.16,
+       "end_seconds": 38.34
+      },
+      {
+       "text": "largest",
+       "start_seconds": 38.34,
+       "end_seconds": 38.78
+      },
+      {
+       "text": "economy",
+       "start_seconds": 38.78,
+       "end_seconds": 39.38
+      },
+      {
+       "text": "in",
+       "start_seconds": 39.38,
+       "end_seconds": 39.58
+      },
+      {
+       "text": "the",
+       "start_seconds": 39.58,
+       "end_seconds": 39.68
+      },
+      {
+       "text": "world,",
+       "start_seconds": 39.68,
+       "end_seconds": 39.88
+      },
+      {
+       "text": "we",
+       "start_seconds": 40.08,
+       "end_seconds": 40.36
+      },
+      {
+       "text": "have",
+       "start_seconds": 40.36,
+       "end_seconds": 40.68
+      },
+      {
+       "text": "the",
+       "start_seconds": 40.68,
+       "end_seconds": 41.04
+      },
+      {
+       "text": "strongest",
+       "start_seconds": 41.04,
+       "end_seconds": 41.66
+      },
+      {
+       "text": "economy",
+       "start_seconds": 41.66,
+       "end_seconds": 42.64
+      },
+      {
+       "text": "in",
+       "start_seconds": 42.64,
+       "end_seconds": 42.9
+      }
+     ]
+    },
+    {
+     "sentence_id": "s7",
+     "start_seconds": 42.9,
+     "end_seconds": 43.32,
+     "text": "the world.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "the",
+       "start_seconds": 42.9,
+       "end_seconds": 43.02
+      },
+      {
+       "text": "world.",
+       "start_seconds": 43.02,
+       "end_seconds": 43.32
+      }
+     ]
+    },
+    {
+     "sentence_id": "s8",
+     "start_seconds": 44.36,
+     "end_seconds": 46.88,
+     "text": "We have the most productive workers in the world.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s9",
+     "start_seconds": 47.36,
+     "end_seconds": 54.24,
+     "text": "And given a fair shot, given a fair chance, Americans have never, ever, ever, ever let",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "And",
+       "start_seconds": 47.36,
+       "end_seconds": 48.0
+      },
+      {
+       "text": "given",
+       "start_seconds": 48.0,
+       "end_seconds": 48.24
+      },
+      {
+       "text": "a",
+       "start_seconds": 48.24,
+       "end_seconds": 48.5
+      },
+      {
+       "text": "fair",
+       "start_seconds": 48.5,
+       "end_seconds": 48.7
+      },
+      {
+       "text": "shot,",
+       "start_seconds": 48.7,
+       "end_seconds": 49.22
+      },
+      {
+       "text": "given",
+       "start_seconds": 49.84,
+       "end_seconds": 50.0
+      },
+      {
+       "text": "a",
+       "start_seconds": 50.0,
+       "end_seconds": 50.2
+      },
+      {
+       "text": "fair",
+       "start_seconds": 50.2,
+       "end_seconds": 50.38
+      },
+      {
+       "text": "chance,",
+       "start_seconds": 50.38,
+       "end_seconds": 50.96
+      },
+      {
+       "text": "Americans",
+       "start_seconds": 51.34,
+       "end_seconds": 51.78
+      },
+      {
+       "text": "have",
+       "start_seconds": 51.78,
+       "end_seconds": 52.12
+      },
+      {
+       "text": "never,",
+       "start_seconds": 52.12,
+       "end_seconds": 52.54
+      },
+      {
+       "text": "ever,",
+       "start_seconds": 52.82,
+       "end_seconds": 53.12
+      },
+      {
+       "text": "ever,",
+       "start_seconds": 53.24,
+       "end_seconds": 53.62
+      },
+      {
+       "text": "ever",
+       "start_seconds": 53.62,
+       "end_seconds": 53.96
+      },
+      {
+       "text": "let",
+       "start_seconds": 53.96,
+       "end_seconds": 54.24
+      }
+     ]
+    },
+    {
+     "sentence_id": "s10",
+     "start_seconds": 54.24,
+     "end_seconds": 64.54,
+     "text": "their country down. Never. Never. Ordinary people like us who do extraordinary things.",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "their",
+       "start_seconds": 54.24,
+       "end_seconds": 54.46
+      },
+      {
+       "text": "country",
+       "start_seconds": 54.46,
+       "end_seconds": 54.82
+      },
+      {
+       "text": "down.",
+       "start_seconds": 54.82,
+       "end_seconds": 55.28
+      },
+      {
+       "text": "Never.",
+       "start_seconds": 55.8,
+       "end_seconds": 56.32
+      },
+      {
+       "text": "Never.",
+       "start_seconds": 57.6,
+       "end_seconds": 57.88
+      },
+      {
+       "text": "Ordinary",
+       "start_seconds": 60.14,
+       "end_seconds": 60.96
+      },
+      {
+       "text": "people",
+       "start_seconds": 60.96,
+       "end_seconds": 61.46
+      },
+      {
+       "text": "like",
+       "start_seconds": 61.46,
+       "end_seconds": 61.78
+      },
+      {
+       "text": "us",
+       "start_seconds": 61.78,
+       "end_seconds": 62.2
+      },
+      {
+       "text": "who",
+       "start_seconds": 62.2,
+       "end_seconds": 63.16
+      },
+      {
+       "text": "do",
+       "start_seconds": 63.16,
+       "end_seconds": 63.34
+      },
+      {
+       "text": "extraordinary",
+       "start_seconds": 63.34,
+       "end_seconds": 63.92
+      },
+      {
+       "text": "things.",
+       "start_seconds": 63.92,
+       "end_seconds": 64.54
+      }
+     ]
+    },
+    {
+     "sentence_id": "s11",
+     "start_seconds": 69.06,
+     "end_seconds": 74.5,
+     "text": "We've had candidates before who are attempted to get elected by appeal into our fears, but",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s12",
+     "start_seconds": 74.5,
+     "end_seconds": 81.56,
+     "text": "they've never succeeded because we do not scare easily. We never bow. We never bend. We",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "they've",
+       "start_seconds": 74.5,
+       "end_seconds": 74.72
+      },
+      {
+       "text": "never",
+       "start_seconds": 74.72,
+       "end_seconds": 74.9
+      },
+      {
+       "text": "succeeded",
+       "start_seconds": 74.9,
+       "end_seconds": 75.4
+      },
+      {
+       "text": "because",
+       "start_seconds": 75.4,
+       "end_seconds": 76.0
+      },
+      {
+       "text": "we",
+       "start_seconds": 76.0,
+       "end_seconds": 76.46
+      },
+      {
+       "text": "do",
+       "start_seconds": 76.46,
+       "end_seconds": 77.02
+      },
+      {
+       "text": "not",
+       "start_seconds": 77.02,
+       "end_seconds": 77.38
+      },
+      {
+       "text": "scare",
+       "start_seconds": 77.38,
+       "end_seconds": 77.8
+      },
+      {
+       "text": "easily.",
+       "start_seconds": 77.8,
+       "end_seconds": 78.32
+      },
+      {
+       "text": "We",
+       "start_seconds": 78.66,
+       "end_seconds": 78.9
+      },
+      {
+       "text": "never",
+       "start_seconds": 78.9,
+       "end_seconds": 79.36
+      },
+      {
+       "text": "bow.",
+       "start_seconds": 79.36,
+       "end_seconds": 79.74
+      },
+      {
+       "text": "We",
+       "start_seconds": 80.02,
+       "end_seconds": 80.26
+      },
+      {
+       "text": "never",
+       "start_seconds": 80.26,
+       "end_seconds": 80.68
+      },
+      {
+       "text": "bend.",
+       "start_seconds": 80.68,
+       "end_seconds": 81.08
+      },
+      {
+       "text": "We",
+       "start_seconds": 81.38,
+       "end_seconds": 81.56
+      }
+     ]
+    },
+    {
+     "sentence_id": "s13",
+     "start_seconds": 81.56,
+     "end_seconds": 88.56,
+     "text": "never break when confronted with crisis. No, we endure, we overcome, and we always, always,",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "never",
+       "start_seconds": 81.56,
+       "end_seconds": 81.98
+      },
+      {
+       "text": "break",
+       "start_seconds": 81.98,
+       "end_seconds": 82.44
+      },
+      {
+       "text": "when",
+       "start_seconds": 82.44,
+       "end_seconds": 82.82
+      },
+      {
+       "text": "confronted",
+       "start_seconds": 82.82,
+       "end_seconds": 83.12
+      },
+      {
+       "text": "with",
+       "start_seconds": 83.12,
+       "end_seconds": 83.44
+      },
+      {
+       "text": "crisis.",
+       "start_seconds": 83.44,
+       "end_seconds": 83.82
+      },
+      {
+       "text": "No,",
+       "start_seconds": 84.22,
+       "end_seconds": 84.44
+      },
+      {
+       "text": "we",
+       "start_seconds": 84.78,
+       "end_seconds": 85.02
+      },
+      {
+       "text": "endure,",
+       "start_seconds": 85.02,
+       "end_seconds": 85.48
+      },
+      {
+       "text": "we",
+       "start_seconds": 85.96,
+       "end_seconds": 86.06
+      },
+      {
+       "text": "overcome,",
+       "start_seconds": 86.06,
+       "end_seconds": 86.48
+      },
+      {
+       "text": "and",
+       "start_seconds": 87.02,
+       "end_seconds": 87.18
+      },
+      {
+       "text": "we",
+       "start_seconds": 87.18,
+       "end_seconds": 87.32
+      },
+      {
+       "text": "always,",
+       "start_seconds": 87.32,
+       "end_seconds": 87.94
+      },
+      {
+       "text": "always,",
+       "start_seconds": 88.08,
+       "end_seconds": 88.56
+      }
+     ]
+    },
+    {
+     "sentence_id": "s14",
+     "start_seconds": 88.64,
+     "end_seconds": 99.5,
+     "text": "always move forward. That's why, that's why I can say, with absolute conviction, I am",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "always",
+       "start_seconds": 88.64,
+       "end_seconds": 89.0
+      },
+      {
+       "text": "move",
+       "start_seconds": 89.0,
+       "end_seconds": 89.3
+      },
+      {
+       "text": "forward.",
+       "start_seconds": 89.3,
+       "end_seconds": 89.74
+      },
+      {
+       "text": "That's",
+       "start_seconds": 91.42,
+       "end_seconds": 92.14
+      },
+      {
+       "text": "why,",
+       "start_seconds": 92.14,
+       "end_seconds": 92.44
+      },
+      {
+       "text": "that's",
+       "start_seconds": 92.64,
+       "end_seconds": 94.18
+      },
+      {
+       "text": "why",
+       "start_seconds": 94.18,
+       "end_seconds": 94.36
+      },
+      {
+       "text": "I",
+       "start_seconds": 94.36,
+       "end_seconds": 94.54
+      },
+      {
+       "text": "can",
+       "start_seconds": 94.54,
+       "end_seconds": 94.78
+      },
+      {
+       "text": "say,",
+       "start_seconds": 94.78,
+       "end_seconds": 95.18
+      },
+      {
+       "text": "with",
+       "start_seconds": 96.14,
+       "end_seconds": 96.38
+      },
+      {
+       "text": "absolute",
+       "start_seconds": 96.38,
+       "end_seconds": 97.12
+      },
+      {
+       "text": "conviction,",
+       "start_seconds": 97.12,
+       "end_seconds": 97.92
+      },
+      {
+       "text": "I",
+       "start_seconds": 98.46,
+       "end_seconds": 99.24
+      },
+      {
+       "text": "am",
+       "start_seconds": 99.24,
+       "end_seconds": 99.5
+      }
+     ]
+    },
+    {
+     "sentence_id": "s15",
+     "start_seconds": 99.5,
+     "end_seconds": 105.5,
+     "text": "more optimistic about our chances today than when I was elected as a 29-year-old kid",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "more",
+       "start_seconds": 99.5,
+       "end_seconds": 99.78
+      },
+      {
+       "text": "optimistic",
+       "start_seconds": 99.78,
+       "end_seconds": 100.58
+      },
+      {
+       "text": "about",
+       "start_seconds": 100.58,
+       "end_seconds": 100.98
+      },
+      {
+       "text": "our",
+       "start_seconds": 100.98,
+       "end_seconds": 101.32
+      },
+      {
+       "text": "chances",
+       "start_seconds": 101.32,
+       "end_seconds": 101.82
+      },
+      {
+       "text": "today",
+       "start_seconds": 101.82,
+       "end_seconds": 102.46
+      },
+      {
+       "text": "than",
+       "start_seconds": 102.46,
+       "end_seconds": 103.18
+      },
+      {
+       "text": "when",
+       "start_seconds": 103.18,
+       "end_seconds": 103.4
+      },
+      {
+       "text": "I",
+       "start_seconds": 103.4,
+       "end_seconds": 103.54
+      },
+      {
+       "text": "was",
+       "start_seconds": 103.54,
+       "end_seconds": 103.66
+      },
+      {
+       "text": "elected",
+       "start_seconds": 103.66,
+       "end_seconds": 104.06
+      },
+      {
+       "text": "as",
+       "start_seconds": 104.06,
+       "end_seconds": 104.28
+      },
+      {
+       "text": "a",
+       "start_seconds": 104.28,
+       "end_seconds": 104.4
+      },
+      {
+       "text": "29",
+       "start_seconds": 104.4,
+       "end_seconds": 104.96
+      },
+      {
+       "text": "-year",
+       "start_seconds": 104.96,
+       "end_seconds": 105.14
+      },
+      {
+       "text": "-old",
+       "start_seconds": 105.14,
+       "end_seconds": 105.3
+      },
+      {
+       "text": "kid",
+       "start_seconds": 105.3,
+       "end_seconds": 105.5
+      }
+     ]
+    },
+    {
+     "sentence_id": "s16",
+     "start_seconds": 105.5,
+     "end_seconds": 116.24,
+     "text": "to the Senate. The 21st century is going to be the American century. Because we lead",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "to",
+       "start_seconds": 105.5,
+       "end_seconds": 105.66
+      },
+      {
+       "text": "the",
+       "start_seconds": 105.66,
+       "end_seconds": 105.78
+      },
+      {
+       "text": "Senate.",
+       "start_seconds": 105.78,
+       "end_seconds": 106.08
+      },
+      {
+       "text": "The",
+       "start_seconds": 106.62,
+       "end_seconds": 106.8
+      },
+      {
+       "text": "21st",
+       "start_seconds": 106.8,
+       "end_seconds": 107.62
+      },
+      {
+       "text": "century",
+       "start_seconds": 107.62,
+       "end_seconds": 108.08
+      },
+      {
+       "text": "is",
+       "start_seconds": 108.08,
+       "end_seconds": 108.3
+      },
+      {
+       "text": "going",
+       "start_seconds": 108.3,
+       "end_seconds": 108.5
+      },
+      {
+       "text": "to",
+       "start_seconds": 108.5,
+       "end_seconds": 108.68
+      },
+      {
+       "text": "be",
+       "start_seconds": 108.68,
+       "end_seconds": 108.88
+      },
+      {
+       "text": "the",
+       "start_seconds": 108.88,
+       "end_seconds": 109.58
+      },
+      {
+       "text": "American",
+       "start_seconds": 109.58,
+       "end_seconds": 110.54
+      },
+      {
+       "text": "century.",
+       "start_seconds": 110.54,
+       "end_seconds": 111.3
+      },
+      {
+       "text": "Because",
+       "start_seconds": 112.76,
+       "end_seconds": 113.4
+      },
+      {
+       "text": "we",
+       "start_seconds": 113.4,
+       "end_seconds": 115.92
+      },
+      {
+       "text": "lead",
+       "start_seconds": 115.92,
+       "end_seconds": 116.24
+      }
+     ]
+    },
+    {
+     "sentence_id": "s17",
+     "start_seconds": 116.24,
+     "end_seconds": 123.04,
+     "text": "not only by the example of our power, but by the power of our example. That is the history",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "not",
+       "start_seconds": 116.24,
+       "end_seconds": 116.52
+      },
+      {
+       "text": "only",
+       "start_seconds": 116.52,
+       "end_seconds": 116.84
+      },
+      {
+       "text": "by",
+       "start_seconds": 116.84,
+       "end_seconds": 117.1
+      },
+      {
+       "text": "the",
+       "start_seconds": 117.1,
+       "end_seconds": 117.26
+      },
+      {
+       "text": "example",
+       "start_seconds": 117.26,
+       "end_seconds": 117.78
+      },
+      {
+       "text": "of",
+       "start_seconds": 117.78,
+       "end_seconds": 118.0
+      },
+      {
+       "text": "our",
+       "start_seconds": 118.0,
+       "end_seconds": 118.16
+      },
+      {
+       "text": "power,",
+       "start_seconds": 118.16,
+       "end_seconds": 118.66
+      },
+      {
+       "text": "but",
+       "start_seconds": 118.86,
+       "end_seconds": 119.1
+      },
+      {
+       "text": "by",
+       "start_seconds": 119.1,
+       "end_seconds": 119.36
+      },
+      {
+       "text": "the",
+       "start_seconds": 119.36,
+       "end_seconds": 119.5
+      },
+      {
+       "text": "power",
+       "start_seconds": 119.5,
+       "end_seconds": 119.94
+      },
+      {
+       "text": "of",
+       "start_seconds": 119.94,
+       "end_seconds": 120.26
+      },
+      {
+       "text": "our",
+       "start_seconds": 120.26,
+       "end_seconds": 120.46
+      },
+      {
+       "text": "example.",
+       "start_seconds": 120.46,
+       "end_seconds": 121.0
+      },
+      {
+       "text": "That",
+       "start_seconds": 121.56,
+       "end_seconds": 121.96
+      },
+      {
+       "text": "is",
+       "start_seconds": 121.96,
+       "end_seconds": 122.36
+      },
+      {
+       "text": "the",
+       "start_seconds": 122.36,
+       "end_seconds": 122.56
+      },
+      {
+       "text": "history",
+       "start_seconds": 122.56,
+       "end_seconds": 123.04
+      }
+     ]
+    },
+    {
+     "sentence_id": "s18",
+     "start_seconds": 123.58,
+     "end_seconds": 130.46,
+     "text": "of the journey of America. And God willing, God willing, Hillary Clinton will write the",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s19",
+     "start_seconds": 130.46,
+     "end_seconds": 139.56,
+     "text": "next chapter in that journey we are America second to none and we own the finish line don't forget it",
+     "speaker_id": null,
+     "words": [
+      {
+       "text": "next",
+       "start_seconds": 130.46,
+       "end_seconds": 130.8
+      },
+      {
+       "text": "chapter",
+       "start_seconds": 130.8,
+       "end_seconds": 131.32
+      },
+      {
+       "text": "in",
+       "start_seconds": 131.32,
+       "end_seconds": 131.5
+      },
+      {
+       "text": "that",
+       "start_seconds": 131.5,
+       "end_seconds": 131.64
+      },
+      {
+       "text": "journey",
+       "start_seconds": 131.64,
+       "end_seconds": 132.06
+      },
+      {
+       "text": "we",
+       "start_seconds": 132.06,
+       "end_seconds": 132.9
+      },
+      {
+       "text": "are",
+       "start_seconds": 132.9,
+       "end_seconds": 133.14
+      },
+      {
+       "text": "America",
+       "start_seconds": 133.14,
+       "end_seconds": 133.8
+      },
+      {
+       "text": "second",
+       "start_seconds": 133.8,
+       "end_seconds": 134.56
+      },
+      {
+       "text": "to",
+       "start_seconds": 134.56,
+       "end_seconds": 134.84
+      },
+      {
+       "text": "none",
+       "start_seconds": 134.84,
+       "end_seconds": 135.2
+      },
+      {
+       "text": "and",
+       "start_seconds": 135.2,
+       "end_seconds": 135.74
+      },
+      {
+       "text": "we",
+       "start_seconds": 135.74,
+       "end_seconds": 136.1
+      },
+      {
+       "text": "own",
+       "start_seconds": 136.1,
+       "end_seconds": 136.76
+      },
+      {
+       "text": "the",
+       "start_seconds": 136.76,
+       "end_seconds": 137.0
+      },
+      {
+       "text": "finish",
+       "start_seconds": 137.0,
+       "end_seconds": 137.3
+      },
+      {
+       "text": "line",
+       "start_seconds": 137.3,
+       "end_seconds": 137.78
+      },
+      {
+       "text": "don't",
+       "start_seconds": 137.78,
+       "end_seconds": 138.92
+      },
+      {
+       "text": "forget",
+       "start_seconds": 138.92,
+       "end_seconds": 139.28
+      },
+      {
+       "text": "it",
+       "start_seconds": 139.28,
+       "end_seconds": 139.56
+      }
+     ]
+    }
+   ]
+  },
+  "frames": [],
+  "visual_text": []
+ },
+ "alignment": {
+  "status": "verified",
+  "clip_media_id": "media_3bd11d4bca84cf1958566b53",
+  "source_media_id": "media_fc803652038d7713262a24c9",
+  "matches": [
+   {
+    "match_id": "match_001",
+    "clip_start_seconds": 0.6800000000000004,
+    "clip_end_seconds": 114.0,
+    "source_start_seconds": 34.4,
+    "source_end_seconds": 139.56,
+    "evidence": [
+     {
+      "method": "transcript_partial_ratio",
+      "clip_refs": [
+       "s1",
+       "s2",
+       "s3",
+       "s4",
+       "s5",
+       "s6",
+       "s7",
+       "s8",
+       "s9",
+       "s10",
+       "s11",
+       "s12",
+       "s13",
+       "s14",
+       "s15",
+       "s16",
+       "s17",
+       "s18",
+       "s19",
+       "s20"
+      ],
+      "source_refs": [
+       "s6",
+       "s7",
+       "s8",
+       "s9",
+       "s10",
+       "s11",
+       "s12",
+       "s13",
+       "s14",
+       "s15",
+       "s16",
+       "s17",
+       "s18",
+       "s19"
+      ],
+      "description": "A distinctive fuzzy transcript passage was localized to supplied provider timestamps; time bounds were not interpolated from text."
+     }
+    ]
+   }
+  ],
+  "match_quality": {
+   "confidence": {
+    "level": "high",
+    "method": "transcript_partial_ratio_v1",
+    "basis": [
+     "Distinctive transcript similarity scored 96.1/100 using a lexical matching heuristic."
+    ],
+    "limitations": [
+     "The transcript similarity score is a heuristic, not a calibrated accuracy or authenticity probability.",
+     "Audio, visual and deepfake verification were not performed.",
+     "Time bounds use provider word timestamps when available, otherwise enclosing caption or ASR segments; segment boundaries may include surrounding speech.",
+     "The earliest original upload was not established.",
+     "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+     "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+     "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+     "Only one transcript passage was localized; edit and deletion counts were not assessed."
+    ]
+   },
+   "matched_clip_seconds": 113.32,
+   "clip_coverage_ratio": 0.9811590619364363,
+   "metrics": [
+    {
+     "name": "transcript_partial_ratio",
+     "unit": "score_0_100",
+     "value": 96.05671245015508
+    }
+   ],
+   "methods_used": [
+    "transcript_partial_ratio"
+   ]
+  },
+  "edit_analysis": {
+   "status": "not_assessed",
+   "scope": "single_passage",
+   "minimum_gap_seconds": 1.0,
+   "source_gaps": [],
+   "unmatched_clip_ranges": [],
+   "counts": {
+    "matched_passages": 1,
+    "source_gaps": null,
+    "unmatched_clip_segments": null,
+    "confirmed_added_segments": null,
+    "confirmed_deleted_segments": null
+   }
+  },
+  "limitations": [
+   "The transcript similarity score is a heuristic, not a calibrated accuracy or authenticity probability.",
+   "Audio, visual and deepfake verification were not performed.",
+   "Time bounds use provider word timestamps when available, otherwise enclosing caption or ASR segments; segment boundaries may include surrounding speech.",
+   "The earliest original upload was not established.",
+   "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+   "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+   "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+   "Only one transcript passage was localized; edit and deletion counts were not assessed."
+  ]
+ },
+ "context": {
+  "source_media_id": "media_fc803652038d7713262a24c9",
+  "windows": [
+   {
+    "context_id": "context_001",
+    "match_ids": [
+     "match_001"
+    ],
+    "requested_start_seconds": 0.0,
+    "requested_end_seconds": 141.0,
+    "coverage": "partial",
+    "sentences": [
+     {
+      "sentence_id": "s1",
+      "start_seconds": 0.0,
+      "end_seconds": 5.98,
+      "text": "But folks, let me tell you what I literally tell every world leader I met with and I've met them all",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "But",
+        "start_seconds": 0.0,
+        "end_seconds": 0.52
+       },
+       {
+        "text": "folks,",
+        "start_seconds": 0.52,
+        "end_seconds": 0.8
+       },
+       {
+        "text": "let",
+        "start_seconds": 0.88,
+        "end_seconds": 1.04
+       },
+       {
+        "text": "me",
+        "start_seconds": 1.04,
+        "end_seconds": 1.14
+       },
+       {
+        "text": "tell",
+        "start_seconds": 1.14,
+        "end_seconds": 1.38
+       },
+       {
+        "text": "you",
+        "start_seconds": 1.38,
+        "end_seconds": 1.5
+       },
+       {
+        "text": "what",
+        "start_seconds": 1.5,
+        "end_seconds": 1.68
+       },
+       {
+        "text": "I",
+        "start_seconds": 1.68,
+        "end_seconds": 1.84
+       },
+       {
+        "text": "literally",
+        "start_seconds": 1.84,
+        "end_seconds": 2.32
+       },
+       {
+        "text": "tell",
+        "start_seconds": 2.32,
+        "end_seconds": 2.84
+       },
+       {
+        "text": "every",
+        "start_seconds": 2.84,
+        "end_seconds": 3.72
+       },
+       {
+        "text": "world",
+        "start_seconds": 3.72,
+        "end_seconds": 4.12
+       },
+       {
+        "text": "leader",
+        "start_seconds": 4.12,
+        "end_seconds": 4.38
+       },
+       {
+        "text": "I",
+        "start_seconds": 4.38,
+        "end_seconds": 4.6
+       },
+       {
+        "text": "met",
+        "start_seconds": 4.6,
+        "end_seconds": 4.78
+       },
+       {
+        "text": "with",
+        "start_seconds": 4.78,
+        "end_seconds": 4.98
+       },
+       {
+        "text": "and",
+        "start_seconds": 4.98,
+        "end_seconds": 5.14
+       },
+       {
+        "text": "I've",
+        "start_seconds": 5.14,
+        "end_seconds": 5.34
+       },
+       {
+        "text": "met",
+        "start_seconds": 5.34,
+        "end_seconds": 5.48
+       },
+       {
+        "text": "them",
+        "start_seconds": 5.48,
+        "end_seconds": 5.7
+       },
+       {
+        "text": "all",
+        "start_seconds": 5.7,
+        "end_seconds": 5.98
+       }
+      ]
+     },
+     {
+      "sentence_id": "s2",
+      "start_seconds": 6.800000000000001,
+      "end_seconds": 13.6,
+      "text": "It's never never never been a good bet to bet against America",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "It's",
+        "start_seconds": 6.800000000000001,
+        "end_seconds": 7.5
+       },
+       {
+        "text": "never",
+        "start_seconds": 7.5,
+        "end_seconds": 7.96
+       },
+       {
+        "text": "never",
+        "start_seconds": 7.96,
+        "end_seconds": 9.2
+       },
+       {
+        "text": "never",
+        "start_seconds": 9.2,
+        "end_seconds": 10.2
+       },
+       {
+        "text": "been",
+        "start_seconds": 10.2,
+        "end_seconds": 10.6
+       },
+       {
+        "text": "a",
+        "start_seconds": 10.6,
+        "end_seconds": 10.74
+       },
+       {
+        "text": "good",
+        "start_seconds": 10.74,
+        "end_seconds": 10.96
+       },
+       {
+        "text": "bet",
+        "start_seconds": 10.96,
+        "end_seconds": 11.3
+       },
+       {
+        "text": "to",
+        "start_seconds": 11.3,
+        "end_seconds": 11.76
+       },
+       {
+        "text": "bet",
+        "start_seconds": 11.76,
+        "end_seconds": 12.12
+       },
+       {
+        "text": "against",
+        "start_seconds": 12.12,
+        "end_seconds": 13.04
+       },
+       {
+        "text": "America",
+        "start_seconds": 13.04,
+        "end_seconds": 13.6
+       }
+      ]
+     },
+     {
+      "sentence_id": "s3",
+      "start_seconds": 15.100000000000001,
+      "end_seconds": 18.7,
+      "text": "We have the finest fighting force in the world",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "We",
+        "start_seconds": 15.100000000000001,
+        "end_seconds": 15.8
+       },
+       {
+        "text": "have",
+        "start_seconds": 15.8,
+        "end_seconds": 16.06
+       },
+       {
+        "text": "the",
+        "start_seconds": 16.06,
+        "end_seconds": 16.22
+       },
+       {
+        "text": "finest",
+        "start_seconds": 16.22,
+        "end_seconds": 16.72
+       },
+       {
+        "text": "fighting",
+        "start_seconds": 16.72,
+        "end_seconds": 17.28
+       },
+       {
+        "text": "force",
+        "start_seconds": 17.28,
+        "end_seconds": 17.72
+       },
+       {
+        "text": "in",
+        "start_seconds": 17.72,
+        "end_seconds": 18.08
+       },
+       {
+        "text": "the",
+        "start_seconds": 18.08,
+        "end_seconds": 18.22
+       },
+       {
+        "text": "world",
+        "start_seconds": 18.22,
+        "end_seconds": 18.7
+       }
+      ]
+     },
+     {
+      "sentence_id": "s4",
+      "start_seconds": 20.76,
+      "end_seconds": 21.88,
+      "text": "Not only",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "Not",
+        "start_seconds": 20.76,
+        "end_seconds": 21.46
+       },
+       {
+        "text": "only",
+        "start_seconds": 21.46,
+        "end_seconds": 21.88
+       }
+      ]
+     },
+     {
+      "sentence_id": "s5",
+      "start_seconds": 26.88,
+      "end_seconds": 27.58,
+      "text": "Not",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "Not",
+        "start_seconds": 26.88,
+        "end_seconds": 27.58
+       }
+      ]
+     },
+     {
+      "sentence_id": "s6",
+      "start_seconds": 34.4,
+      "end_seconds": 42.9,
+      "text": "Not only do we have the largest economy in the world, we have the strongest economy in",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "Not",
+        "start_seconds": 34.4,
+        "end_seconds": 35.04
+       },
+       {
+        "text": "only",
+        "start_seconds": 35.04,
+        "end_seconds": 35.42
+       },
+       {
+        "text": "do",
+        "start_seconds": 35.42,
+        "end_seconds": 37.72
+       },
+       {
+        "text": "we",
+        "start_seconds": 37.72,
+        "end_seconds": 37.9
+       },
+       {
+        "text": "have",
+        "start_seconds": 37.9,
+        "end_seconds": 38.16
+       },
+       {
+        "text": "the",
+        "start_seconds": 38.16,
+        "end_seconds": 38.34
+       },
+       {
+        "text": "largest",
+        "start_seconds": 38.34,
+        "end_seconds": 38.78
+       },
+       {
+        "text": "economy",
+        "start_seconds": 38.78,
+        "end_seconds": 39.38
+       },
+       {
+        "text": "in",
+        "start_seconds": 39.38,
+        "end_seconds": 39.58
+       },
+       {
+        "text": "the",
+        "start_seconds": 39.58,
+        "end_seconds": 39.68
+       },
+       {
+        "text": "world,",
+        "start_seconds": 39.68,
+        "end_seconds": 39.88
+       },
+       {
+        "text": "we",
+        "start_seconds": 40.08,
+        "end_seconds": 40.36
+       },
+       {
+        "text": "have",
+        "start_seconds": 40.36,
+        "end_seconds": 40.68
+       },
+       {
+        "text": "the",
+        "start_seconds": 40.68,
+        "end_seconds": 41.04
+       },
+       {
+        "text": "strongest",
+        "start_seconds": 41.04,
+        "end_seconds": 41.66
+       },
+       {
+        "text": "economy",
+        "start_seconds": 41.66,
+        "end_seconds": 42.64
+       },
+       {
+        "text": "in",
+        "start_seconds": 42.64,
+        "end_seconds": 42.9
+       }
+      ]
+     },
+     {
+      "sentence_id": "s7",
+      "start_seconds": 42.9,
+      "end_seconds": 43.32,
+      "text": "the world.",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "the",
+        "start_seconds": 42.9,
+        "end_seconds": 43.02
+       },
+       {
+        "text": "world.",
+        "start_seconds": 43.02,
+        "end_seconds": 43.32
+       }
+      ]
+     },
+     {
+      "sentence_id": "s8",
+      "start_seconds": 44.36,
+      "end_seconds": 46.88,
+      "text": "We have the most productive workers in the world.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s9",
+      "start_seconds": 47.36,
+      "end_seconds": 54.24,
+      "text": "And given a fair shot, given a fair chance, Americans have never, ever, ever, ever let",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "And",
+        "start_seconds": 47.36,
+        "end_seconds": 48.0
+       },
+       {
+        "text": "given",
+        "start_seconds": 48.0,
+        "end_seconds": 48.24
+       },
+       {
+        "text": "a",
+        "start_seconds": 48.24,
+        "end_seconds": 48.5
+       },
+       {
+        "text": "fair",
+        "start_seconds": 48.5,
+        "end_seconds": 48.7
+       },
+       {
+        "text": "shot,",
+        "start_seconds": 48.7,
+        "end_seconds": 49.22
+       },
+       {
+        "text": "given",
+        "start_seconds": 49.84,
+        "end_seconds": 50.0
+       },
+       {
+        "text": "a",
+        "start_seconds": 50.0,
+        "end_seconds": 50.2
+       },
+       {
+        "text": "fair",
+        "start_seconds": 50.2,
+        "end_seconds": 50.38
+       },
+       {
+        "text": "chance,",
+        "start_seconds": 50.38,
+        "end_seconds": 50.96
+       },
+       {
+        "text": "Americans",
+        "start_seconds": 51.34,
+        "end_seconds": 51.78
+       },
+       {
+        "text": "have",
+        "start_seconds": 51.78,
+        "end_seconds": 52.12
+       },
+       {
+        "text": "never,",
+        "start_seconds": 52.12,
+        "end_seconds": 52.54
+       },
+       {
+        "text": "ever,",
+        "start_seconds": 52.82,
+        "end_seconds": 53.12
+       },
+       {
+        "text": "ever,",
+        "start_seconds": 53.24,
+        "end_seconds": 53.62
+       },
+       {
+        "text": "ever",
+        "start_seconds": 53.62,
+        "end_seconds": 53.96
+       },
+       {
+        "text": "let",
+        "start_seconds": 53.96,
+        "end_seconds": 54.24
+       }
+      ]
+     },
+     {
+      "sentence_id": "s10",
+      "start_seconds": 54.24,
+      "end_seconds": 64.54,
+      "text": "their country down. Never. Never. Ordinary people like us who do extraordinary things.",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "their",
+        "start_seconds": 54.24,
+        "end_seconds": 54.46
+       },
+       {
+        "text": "country",
+        "start_seconds": 54.46,
+        "end_seconds": 54.82
+       },
+       {
+        "text": "down.",
+        "start_seconds": 54.82,
+        "end_seconds": 55.28
+       },
+       {
+        "text": "Never.",
+        "start_seconds": 55.8,
+        "end_seconds": 56.32
+       },
+       {
+        "text": "Never.",
+        "start_seconds": 57.6,
+        "end_seconds": 57.88
+       },
+       {
+        "text": "Ordinary",
+        "start_seconds": 60.14,
+        "end_seconds": 60.96
+       },
+       {
+        "text": "people",
+        "start_seconds": 60.96,
+        "end_seconds": 61.46
+       },
+       {
+        "text": "like",
+        "start_seconds": 61.46,
+        "end_seconds": 61.78
+       },
+       {
+        "text": "us",
+        "start_seconds": 61.78,
+        "end_seconds": 62.2
+       },
+       {
+        "text": "who",
+        "start_seconds": 62.2,
+        "end_seconds": 63.16
+       },
+       {
+        "text": "do",
+        "start_seconds": 63.16,
+        "end_seconds": 63.34
+       },
+       {
+        "text": "extraordinary",
+        "start_seconds": 63.34,
+        "end_seconds": 63.92
+       },
+       {
+        "text": "things.",
+        "start_seconds": 63.92,
+        "end_seconds": 64.54
+       }
+      ]
+     },
+     {
+      "sentence_id": "s11",
+      "start_seconds": 69.06,
+      "end_seconds": 74.5,
+      "text": "We've had candidates before who are attempted to get elected by appeal into our fears, but",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s12",
+      "start_seconds": 74.5,
+      "end_seconds": 81.56,
+      "text": "they've never succeeded because we do not scare easily. We never bow. We never bend. We",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "they've",
+        "start_seconds": 74.5,
+        "end_seconds": 74.72
+       },
+       {
+        "text": "never",
+        "start_seconds": 74.72,
+        "end_seconds": 74.9
+       },
+       {
+        "text": "succeeded",
+        "start_seconds": 74.9,
+        "end_seconds": 75.4
+       },
+       {
+        "text": "because",
+        "start_seconds": 75.4,
+        "end_seconds": 76.0
+       },
+       {
+        "text": "we",
+        "start_seconds": 76.0,
+        "end_seconds": 76.46
+       },
+       {
+        "text": "do",
+        "start_seconds": 76.46,
+        "end_seconds": 77.02
+       },
+       {
+        "text": "not",
+        "start_seconds": 77.02,
+        "end_seconds": 77.38
+       },
+       {
+        "text": "scare",
+        "start_seconds": 77.38,
+        "end_seconds": 77.8
+       },
+       {
+        "text": "easily.",
+        "start_seconds": 77.8,
+        "end_seconds": 78.32
+       },
+       {
+        "text": "We",
+        "start_seconds": 78.66,
+        "end_seconds": 78.9
+       },
+       {
+        "text": "never",
+        "start_seconds": 78.9,
+        "end_seconds": 79.36
+       },
+       {
+        "text": "bow.",
+        "start_seconds": 79.36,
+        "end_seconds": 79.74
+       },
+       {
+        "text": "We",
+        "start_seconds": 80.02,
+        "end_seconds": 80.26
+       },
+       {
+        "text": "never",
+        "start_seconds": 80.26,
+        "end_seconds": 80.68
+       },
+       {
+        "text": "bend.",
+        "start_seconds": 80.68,
+        "end_seconds": 81.08
+       },
+       {
+        "text": "We",
+        "start_seconds": 81.38,
+        "end_seconds": 81.56
+       }
+      ]
+     },
+     {
+      "sentence_id": "s13",
+      "start_seconds": 81.56,
+      "end_seconds": 88.56,
+      "text": "never break when confronted with crisis. No, we endure, we overcome, and we always, always,",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "never",
+        "start_seconds": 81.56,
+        "end_seconds": 81.98
+       },
+       {
+        "text": "break",
+        "start_seconds": 81.98,
+        "end_seconds": 82.44
+       },
+       {
+        "text": "when",
+        "start_seconds": 82.44,
+        "end_seconds": 82.82
+       },
+       {
+        "text": "confronted",
+        "start_seconds": 82.82,
+        "end_seconds": 83.12
+       },
+       {
+        "text": "with",
+        "start_seconds": 83.12,
+        "end_seconds": 83.44
+       },
+       {
+        "text": "crisis.",
+        "start_seconds": 83.44,
+        "end_seconds": 83.82
+       },
+       {
+        "text": "No,",
+        "start_seconds": 84.22,
+        "end_seconds": 84.44
+       },
+       {
+        "text": "we",
+        "start_seconds": 84.78,
+        "end_seconds": 85.02
+       },
+       {
+        "text": "endure,",
+        "start_seconds": 85.02,
+        "end_seconds": 85.48
+       },
+       {
+        "text": "we",
+        "start_seconds": 85.96,
+        "end_seconds": 86.06
+       },
+       {
+        "text": "overcome,",
+        "start_seconds": 86.06,
+        "end_seconds": 86.48
+       },
+       {
+        "text": "and",
+        "start_seconds": 87.02,
+        "end_seconds": 87.18
+       },
+       {
+        "text": "we",
+        "start_seconds": 87.18,
+        "end_seconds": 87.32
+       },
+       {
+        "text": "always,",
+        "start_seconds": 87.32,
+        "end_seconds": 87.94
+       },
+       {
+        "text": "always,",
+        "start_seconds": 88.08,
+        "end_seconds": 88.56
+       }
+      ]
+     },
+     {
+      "sentence_id": "s14",
+      "start_seconds": 88.64,
+      "end_seconds": 99.5,
+      "text": "always move forward. That's why, that's why I can say, with absolute conviction, I am",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "always",
+        "start_seconds": 88.64,
+        "end_seconds": 89.0
+       },
+       {
+        "text": "move",
+        "start_seconds": 89.0,
+        "end_seconds": 89.3
+       },
+       {
+        "text": "forward.",
+        "start_seconds": 89.3,
+        "end_seconds": 89.74
+       },
+       {
+        "text": "That's",
+        "start_seconds": 91.42,
+        "end_seconds": 92.14
+       },
+       {
+        "text": "why,",
+        "start_seconds": 92.14,
+        "end_seconds": 92.44
+       },
+       {
+        "text": "that's",
+        "start_seconds": 92.64,
+        "end_seconds": 94.18
+       },
+       {
+        "text": "why",
+        "start_seconds": 94.18,
+        "end_seconds": 94.36
+       },
+       {
+        "text": "I",
+        "start_seconds": 94.36,
+        "end_seconds": 94.54
+       },
+       {
+        "text": "can",
+        "start_seconds": 94.54,
+        "end_seconds": 94.78
+       },
+       {
+        "text": "say,",
+        "start_seconds": 94.78,
+        "end_seconds": 95.18
+       },
+       {
+        "text": "with",
+        "start_seconds": 96.14,
+        "end_seconds": 96.38
+       },
+       {
+        "text": "absolute",
+        "start_seconds": 96.38,
+        "end_seconds": 97.12
+       },
+       {
+        "text": "conviction,",
+        "start_seconds": 97.12,
+        "end_seconds": 97.92
+       },
+       {
+        "text": "I",
+        "start_seconds": 98.46,
+        "end_seconds": 99.24
+       },
+       {
+        "text": "am",
+        "start_seconds": 99.24,
+        "end_seconds": 99.5
+       }
+      ]
+     },
+     {
+      "sentence_id": "s15",
+      "start_seconds": 99.5,
+      "end_seconds": 105.5,
+      "text": "more optimistic about our chances today than when I was elected as a 29-year-old kid",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "more",
+        "start_seconds": 99.5,
+        "end_seconds": 99.78
+       },
+       {
+        "text": "optimistic",
+        "start_seconds": 99.78,
+        "end_seconds": 100.58
+       },
+       {
+        "text": "about",
+        "start_seconds": 100.58,
+        "end_seconds": 100.98
+       },
+       {
+        "text": "our",
+        "start_seconds": 100.98,
+        "end_seconds": 101.32
+       },
+       {
+        "text": "chances",
+        "start_seconds": 101.32,
+        "end_seconds": 101.82
+       },
+       {
+        "text": "today",
+        "start_seconds": 101.82,
+        "end_seconds": 102.46
+       },
+       {
+        "text": "than",
+        "start_seconds": 102.46,
+        "end_seconds": 103.18
+       },
+       {
+        "text": "when",
+        "start_seconds": 103.18,
+        "end_seconds": 103.4
+       },
+       {
+        "text": "I",
+        "start_seconds": 103.4,
+        "end_seconds": 103.54
+       },
+       {
+        "text": "was",
+        "start_seconds": 103.54,
+        "end_seconds": 103.66
+       },
+       {
+        "text": "elected",
+        "start_seconds": 103.66,
+        "end_seconds": 104.06
+       },
+       {
+        "text": "as",
+        "start_seconds": 104.06,
+        "end_seconds": 104.28
+       },
+       {
+        "text": "a",
+        "start_seconds": 104.28,
+        "end_seconds": 104.4
+       },
+       {
+        "text": "29",
+        "start_seconds": 104.4,
+        "end_seconds": 104.96
+       },
+       {
+        "text": "-year",
+        "start_seconds": 104.96,
+        "end_seconds": 105.14
+       },
+       {
+        "text": "-old",
+        "start_seconds": 105.14,
+        "end_seconds": 105.3
+       },
+       {
+        "text": "kid",
+        "start_seconds": 105.3,
+        "end_seconds": 105.5
+       }
+      ]
+     },
+     {
+      "sentence_id": "s16",
+      "start_seconds": 105.5,
+      "end_seconds": 116.24,
+      "text": "to the Senate. The 21st century is going to be the American century. Because we lead",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "to",
+        "start_seconds": 105.5,
+        "end_seconds": 105.66
+       },
+       {
+        "text": "the",
+        "start_seconds": 105.66,
+        "end_seconds": 105.78
+       },
+       {
+        "text": "Senate.",
+        "start_seconds": 105.78,
+        "end_seconds": 106.08
+       },
+       {
+        "text": "The",
+        "start_seconds": 106.62,
+        "end_seconds": 106.8
+       },
+       {
+        "text": "21st",
+        "start_seconds": 106.8,
+        "end_seconds": 107.62
+       },
+       {
+        "text": "century",
+        "start_seconds": 107.62,
+        "end_seconds": 108.08
+       },
+       {
+        "text": "is",
+        "start_seconds": 108.08,
+        "end_seconds": 108.3
+       },
+       {
+        "text": "going",
+        "start_seconds": 108.3,
+        "end_seconds": 108.5
+       },
+       {
+        "text": "to",
+        "start_seconds": 108.5,
+        "end_seconds": 108.68
+       },
+       {
+        "text": "be",
+        "start_seconds": 108.68,
+        "end_seconds": 108.88
+       },
+       {
+        "text": "the",
+        "start_seconds": 108.88,
+        "end_seconds": 109.58
+       },
+       {
+        "text": "American",
+        "start_seconds": 109.58,
+        "end_seconds": 110.54
+       },
+       {
+        "text": "century.",
+        "start_seconds": 110.54,
+        "end_seconds": 111.3
+       },
+       {
+        "text": "Because",
+        "start_seconds": 112.76,
+        "end_seconds": 113.4
+       },
+       {
+        "text": "we",
+        "start_seconds": 113.4,
+        "end_seconds": 115.92
+       },
+       {
+        "text": "lead",
+        "start_seconds": 115.92,
+        "end_seconds": 116.24
+       }
+      ]
+     },
+     {
+      "sentence_id": "s17",
+      "start_seconds": 116.24,
+      "end_seconds": 123.04,
+      "text": "not only by the example of our power, but by the power of our example. That is the history",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "not",
+        "start_seconds": 116.24,
+        "end_seconds": 116.52
+       },
+       {
+        "text": "only",
+        "start_seconds": 116.52,
+        "end_seconds": 116.84
+       },
+       {
+        "text": "by",
+        "start_seconds": 116.84,
+        "end_seconds": 117.1
+       },
+       {
+        "text": "the",
+        "start_seconds": 117.1,
+        "end_seconds": 117.26
+       },
+       {
+        "text": "example",
+        "start_seconds": 117.26,
+        "end_seconds": 117.78
+       },
+       {
+        "text": "of",
+        "start_seconds": 117.78,
+        "end_seconds": 118.0
+       },
+       {
+        "text": "our",
+        "start_seconds": 118.0,
+        "end_seconds": 118.16
+       },
+       {
+        "text": "power,",
+        "start_seconds": 118.16,
+        "end_seconds": 118.66
+       },
+       {
+        "text": "but",
+        "start_seconds": 118.86,
+        "end_seconds": 119.1
+       },
+       {
+        "text": "by",
+        "start_seconds": 119.1,
+        "end_seconds": 119.36
+       },
+       {
+        "text": "the",
+        "start_seconds": 119.36,
+        "end_seconds": 119.5
+       },
+       {
+        "text": "power",
+        "start_seconds": 119.5,
+        "end_seconds": 119.94
+       },
+       {
+        "text": "of",
+        "start_seconds": 119.94,
+        "end_seconds": 120.26
+       },
+       {
+        "text": "our",
+        "start_seconds": 120.26,
+        "end_seconds": 120.46
+       },
+       {
+        "text": "example.",
+        "start_seconds": 120.46,
+        "end_seconds": 121.0
+       },
+       {
+        "text": "That",
+        "start_seconds": 121.56,
+        "end_seconds": 121.96
+       },
+       {
+        "text": "is",
+        "start_seconds": 121.96,
+        "end_seconds": 122.36
+       },
+       {
+        "text": "the",
+        "start_seconds": 122.36,
+        "end_seconds": 122.56
+       },
+       {
+        "text": "history",
+        "start_seconds": 122.56,
+        "end_seconds": 123.04
+       }
+      ]
+     },
+     {
+      "sentence_id": "s18",
+      "start_seconds": 123.58,
+      "end_seconds": 130.46,
+      "text": "of the journey of America. And God willing, God willing, Hillary Clinton will write the",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s19",
+      "start_seconds": 130.46,
+      "end_seconds": 139.56,
+      "text": "next chapter in that journey we are America second to none and we own the finish line don't forget it",
+      "speaker_id": null,
+      "words": [
+       {
+        "text": "next",
+        "start_seconds": 130.46,
+        "end_seconds": 130.8
+       },
+       {
+        "text": "chapter",
+        "start_seconds": 130.8,
+        "end_seconds": 131.32
+       },
+       {
+        "text": "in",
+        "start_seconds": 131.32,
+        "end_seconds": 131.5
+       },
+       {
+        "text": "that",
+        "start_seconds": 131.5,
+        "end_seconds": 131.64
+       },
+       {
+        "text": "journey",
+        "start_seconds": 131.64,
+        "end_seconds": 132.06
+       },
+       {
+        "text": "we",
+        "start_seconds": 132.06,
+        "end_seconds": 132.9
+       },
+       {
+        "text": "are",
+        "start_seconds": 132.9,
+        "end_seconds": 133.14
+       },
+       {
+        "text": "America",
+        "start_seconds": 133.14,
+        "end_seconds": 133.8
+       },
+       {
+        "text": "second",
+        "start_seconds": 133.8,
+        "end_seconds": 134.56
+       },
+       {
+        "text": "to",
+        "start_seconds": 134.56,
+        "end_seconds": 134.84
+       },
+       {
+        "text": "none",
+        "start_seconds": 134.84,
+        "end_seconds": 135.2
+       },
+       {
+        "text": "and",
+        "start_seconds": 135.2,
+        "end_seconds": 135.74
+       },
+       {
+        "text": "we",
+        "start_seconds": 135.74,
+        "end_seconds": 136.1
+       },
+       {
+        "text": "own",
+        "start_seconds": 136.1,
+        "end_seconds": 136.76
+       },
+       {
+        "text": "the",
+        "start_seconds": 136.76,
+        "end_seconds": 137.0
+       },
+       {
+        "text": "finish",
+        "start_seconds": 137.0,
+        "end_seconds": 137.3
+       },
+       {
+        "text": "line",
+        "start_seconds": 137.3,
+        "end_seconds": 137.78
+       },
+       {
+        "text": "don't",
+        "start_seconds": 137.78,
+        "end_seconds": 138.92
+       },
+       {
+        "text": "forget",
+        "start_seconds": 138.92,
+        "end_seconds": 139.28
+       },
+       {
+        "text": "it",
+        "start_seconds": 139.28,
+        "end_seconds": 139.56
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "limitations": [
+   "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+   "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+   "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+   "Conservative caption boundaries; not frame-exact. Context sufficiency is an estimate.",
+   "Surrounding transcript coverage is incomplete; missing speech is not silence."
+  ]
+ },
+ "comparison": {
+  "context_assessment": "uncertain",
+  "caption_assessment": "supported_by_context",
+  "assessment_confidence": {
+   "level": "low",
+   "method": "groq_transcript_context",
+   "basis": [
+    "Clip transcript closely matches the source context speech."
+   ],
+   "limitations": []
+  },
+  "summary": "Takeaways: Joe Biden expresses deep optimism about America and endorses Hillary Clinton to lead the nation.\n\nWhat this means: The available source window supports this reading of the excerpt. Incomplete coverage leaves unobserved speech and broader context unresolved.\n\n\n\nReliability: A source passage was located using timed transcripts. Full clip coverage remains unconfirmed. Factual claims and recording authenticity were not checked.",
+  "findings": [
+   {
+    "finding_id": "finding_1",
+    "type": "context",
+    "explanation": "The clip content aligns directly with the concluding passage of the source context speech without altering the meaning.",
+    "evidence": [
+     {
+      "media_id": "media_3bd11d4bca84cf1958566b53",
+      "sentence_ids": [
+       "s15"
+      ],
+      "start_seconds": 92.94,
+      "end_seconds": 98.7,
+      "quote": "Hillary Clinton will write the next chapter in that journey. We are America, second"
+     },
+     {
+      "media_id": "media_fc803652038d7713262a24c9",
+      "sentence_ids": [
+       "s18"
+      ],
+      "start_seconds": 123.58,
+      "end_seconds": 130.46,
+      "quote": "of the journey of America. And God willing, God willing, Hillary Clinton will write the"
+     }
+    ]
+   }
+  ],
+  "limitations": [
+   "Incomplete transcript coverage prevents a conclusion that no material context is missing.",
+   "Transcript comparison does not establish factual truth, speaker identity or recording authenticity."
+  ]
+ },
+ "summary": "Takeaways: Joe Biden expresses deep optimism about America and endorses Hillary Clinton to lead the nation.\n\nWhat this means: The available source window supports this reading of the excerpt. Incomplete coverage leaves unobserved speech and broader context unresolved.\n\n\n\nReliability: A source passage was located using timed transcripts. Full clip coverage remains unconfirmed. Factual claims and recording authenticity were not checked.",
+ "limitations": [
+  "The transcript similarity score is a heuristic, not a calibrated accuracy or authenticity probability.",
+  "Audio, visual and deepfake verification were not performed.",
+  "Time bounds use provider word timestamps when available, otherwise enclosing caption or ASR segments; segment boundaries may include surrounding speech.",
+  "The earliest original upload was not established.",
+  "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+  "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+  "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+  "Only one transcript passage was localized; edit and deletion counts were not assessed.",
+  "Incomplete transcript coverage prevents a conclusion that no material context is missing.",
+  "Transcript comparison does not establish factual truth, speaker identity or recording authenticity.",
+  "Conservative caption boundaries; not frame-exact. Context sufficiency is an estimate.",
+  "Surrounding transcript coverage is incomplete; missing speech is not silence.",
+  "A repeated short excerpt was retained only as a source lead.",
+  "Unverified source candidate: https://www.youtube.com/watch?v=yuaxljGuXdM",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=yuaxljGuXdM\", \"title\": \"VP Joe Biden: We own the finish line..\ud83d\ude44\ud83d\ude44\ud83d\ude44\ud83d\ude44\ud83d\ude44\ud83d\ude44\ud83d\ude44\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}",
+  "Unverified source candidate: https://www.youtube.com/watch?v=sgn2TpshyqI",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=sgn2TpshyqI\", \"title\": \"Biden: We are Boston, we own the finish line\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}",
+  "Unverified source candidate: https://www.youtube.com/watch?v=88bMVbx1dzM",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=88bMVbx1dzM\", \"title\": \"What's the smallest thing we can ever see?\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}",
+  "Unverified source candidate: https://www.youtube.com/watch?v=wC_lLK1ghlM",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=wC_lLK1ghlM\", \"title\": \"David Bowie | Sweet Thing-Candidate-Sweet Thing (Repr.) | Live at the Universal Amphitheatre | 1974\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}"
+ ]
+}

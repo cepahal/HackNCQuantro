@@ -1,0 +1,4036 @@
+{
+ "context_video": {
+  "media_id": "context_eda9ad93e0fb4fa286154722abfbf32e",
+  "mime_type": "video/mp4",
+  "playback_url": null,
+  "duration_seconds": 81.033333,
+  "width": 640,
+  "height": 360,
+  "fps": 30.0,
+  "has_audio": true
+ },
+ "context_selection": {
+  "after": [
+   {
+    "end": 217.65,
+    "text": "YOU ARE JEWISH.",
+    "start": 215.782
+   },
+   {
+    "end": 221.52100000000002,
+    "text": "HAVE YOU EXPRESSED, OBVIOUSLY, A LOT OF CONCERN ABOUT WHAT IS HAPPENING IN GAZA.",
+    "start": 216.349
+   }
+  ],
+  "before": [
+   {
+    "end": 144.077,
+    "text": "AND REPUBLICANS AREN'T A WHOLE LOT BETTER.",
+    "start": 140.473
+   },
+   {
+    "end": 145.345,
+    "text": "Bret: A LITTLE BIT BETTER BUT NOT A WHOLE LOT.",
+    "start": 143.243
+   }
+  ],
+  "strategy": "nearest_two_sentences",
+  "end_seconds": 221.52100000000002,
+  "timing_note": "Conservative caption boundaries; not frame-exact. Context sufficiency is an estimate.",
+  "after_method": "sentences",
+  "before_method": "sentences",
+  "start_seconds": 140.473
+ },
+ "schema_version": "2.1",
+ "job_id": "job_demo_qzYTN4lfEn4_5",
+ "outcome": "matched",
+ "submitted": {
+  "post": {
+   "post_id": "post_df681e20ed5ea718c655a415",
+   "candidate_id": null,
+   "post_url": "https://www.youtube.com/shorts/qzYTN4lfEn4",
+   "platform": "youtube",
+   "title": "Bernie Sanders SHOCKS Fox News Host #shorts #news #politics",
+   "caption": "Senator Bernie Sanders joined Fox News host Bret Baier to talk about Democrats polling numbers and, in one minute, completely exposed the political corruption problem in the United States.\n\n#liberal #democrat #progressive #maga #foxnews #conservative #republican #doge #congress #senate #trump",
+   "author": {
+    "id": "UCExmL8PAa1O93bUIYN7BJ_A",
+    "handle": null,
+    "display_name": "MoveOn",
+    "profile_url": "https://www.youtube.com/channel/UCExmL8PAa1O93bUIYN7BJ_A",
+    "bio": null,
+    "verified": null,
+    "followers_count": null,
+    "following_count": null,
+    "posts_count": null
+   },
+   "engagement": {
+    "views_count": null,
+    "likes_count": null,
+    "comments_count": null,
+    "shares_count": null
+   },
+   "published_at": null,
+   "media": {
+    "media_id": "media_df681e20ed5ea718c655a415",
+    "mime_type": "video/mp4",
+    "playback_url": "https://www.youtube.com/watch?v=qzYTN4lfEn4",
+    "duration_seconds": 63.0,
+    "width": 144,
+    "height": 256,
+    "fps": 30.0,
+    "has_audio": null
+   },
+   "retrieval": {
+    "retrieved_at": "2026-10-11T12:14:48.256533Z",
+    "provider": "yt-dlp+youtube_captions",
+    "metadata_source_urls": [
+     "https://www.youtube.com/shorts/qzYTN4lfEn4"
+    ],
+    "unavailable_fields": [
+     "published_at",
+     "author.verified",
+     "author.followers_count",
+     "author.following_count",
+     "author.posts_count",
+     "engagement.views_count",
+     "engagement.likes_count",
+     "engagement.comments_count",
+     "engagement.shares_count"
+    ],
+    "warnings": [
+     "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+     "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording."
+    ]
+   }
+  },
+  "transcript": {
+   "status": "complete",
+   "processed_ranges": [
+    {
+     "start_seconds": 0.199,
+     "end_seconds": 64.8
+    }
+   ],
+   "sentences": [
+    {
+     "sentence_id": "s1",
+     "start_seconds": 0.199,
+     "end_seconds": 4.88,
+     "text": "People understand that the political",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s2",
+     "start_seconds": 2.96,
+     "end_seconds": 7.279,
+     "text": "system in this country is largely",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s3",
+     "start_seconds": 4.88,
+     "end_seconds": 9.519,
+     "text": "corrupt. Both parties. Why is that? You",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s4",
+     "start_seconds": 7.279,
+     "end_seconds": 12.2,
+     "text": "know the answer. The answer is that you",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s5",
+     "start_seconds": 9.519,
+     "end_seconds": 15.2,
+     "text": "have billionaires in both political",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s6",
+     "start_seconds": 12.2,
+     "end_seconds": 17.919999999999998,
+     "text": "parties determine what legislation gets",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s7",
+     "start_seconds": 15.2,
+     "end_seconds": 19.358999999999998,
+     "text": "to the floor and who is the candidate.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s8",
+     "start_seconds": 17.92,
+     "end_seconds": 22.240000000000002,
+     "text": "Right now, let me give you both",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s9",
+     "start_seconds": 19.359,
+     "end_seconds": 24.240000000000002,
+     "text": "examples. You're in the Republican party",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s10",
+     "start_seconds": 22.24,
+     "end_seconds": 26.32,
+     "text": "and you say, \"You know what? I don't",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s11",
+     "start_seconds": 24.24,
+     "end_seconds": 28.799999999999997,
+     "text": "like this Trump idea of giving massive",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s12",
+     "start_seconds": 26.32,
+     "end_seconds": 30.96,
+     "text": "tax breaks to the rich and cutting",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s13",
+     "start_seconds": 28.8,
+     "end_seconds": 33.04,
+     "text": "Medicaid and education. You get up and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s14",
+     "start_seconds": 30.96,
+     "end_seconds": 35.52,
+     "text": "say that. What happens to you? The next",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s15",
+     "start_seconds": 33.04,
+     "end_seconds": 37.28,
+     "text": "day, Elon Musk says, \"I got unlimited",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s16",
+     "start_seconds": 35.52,
+     "end_seconds": 38.96,
+     "text": "amounts of money. We're going to run a",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s17",
+     "start_seconds": 37.28,
+     "end_seconds": 41.36,
+     "text": "candidate in a primary against you.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s18",
+     "start_seconds": 38.96,
+     "end_seconds": 43.2,
+     "text": "Democratic party side, what happens?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s19",
+     "start_seconds": 41.36,
+     "end_seconds": 46.32,
+     "text": "Somebody says, \"You know what? Maybe",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s20",
+     "start_seconds": 43.2,
+     "end_seconds": 49.36,
+     "text": "it's not a good idea to fund Netanyahu's",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s21",
+     "start_seconds": 46.32,
+     "end_seconds": 51.52,
+     "text": "war machine, which is creating",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s22",
+     "start_seconds": 49.36,
+     "end_seconds": 53.36,
+     "text": "starvation for children in Gaza. I'm",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s23",
+     "start_seconds": 51.52,
+     "end_seconds": 55.760000000000005,
+     "text": "going to vote against that.\" Next day,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s24",
+     "start_seconds": 53.36,
+     "end_seconds": 58.0,
+     "text": "Apac is going to be running against you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s25",
+     "start_seconds": 55.76,
+     "end_seconds": 60.079,
+     "text": "We have a corrupt campaign finance",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s26",
+     "start_seconds": 58.0,
+     "end_seconds": 61.92,
+     "text": "system. Billionaires in both political",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s27",
+     "start_seconds": 60.079,
+     "end_seconds": 64.8,
+     "text": "parties are calling the tunes. The",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s28",
+     "start_seconds": 61.92,
+     "end_seconds": 64.8,
+     "text": "American people understand",
+     "speaker_id": null
+    }
+   ]
+  },
+  "frames": [],
+  "visual_text": []
+ },
+ "source": {
+  "post": {
+   "post_id": "post_181770437a0a243a26a0b41d",
+   "candidate_id": "candidate_1",
+   "post_url": "https://www.youtube.com/watch?v=4mXBfF6MlgQ",
+   "platform": "youtube",
+   "title": "Bernie Sanders confronted over private jet flights on 'Fight Oligarchy' tour",
+   "caption": null,
+   "author": {
+    "id": null,
+    "handle": null,
+    "display_name": null,
+    "profile_url": null,
+    "bio": null,
+    "verified": null,
+    "followers_count": null,
+    "following_count": null,
+    "posts_count": null
+   },
+   "engagement": {
+    "views_count": null,
+    "likes_count": null,
+    "comments_count": null,
+    "shares_count": null
+   },
+   "published_at": null,
+   "media": {
+    "media_id": "media_181770437a0a243a26a0b41d",
+    "mime_type": "video/mp4",
+    "playback_url": "https://www.youtube.com/watch?v=4mXBfF6MlgQ",
+    "duration_seconds": 676.0,
+    "width": null,
+    "height": null,
+    "fps": null,
+    "has_audio": null
+   },
+   "retrieval": {
+    "retrieved_at": "2026-10-11T12:15:01.606068Z",
+    "provider": "yt-dlp+youtube_captions",
+    "metadata_source_urls": [
+     "https://www.youtube.com/watch?v=4mXBfF6MlgQ"
+    ],
+    "unavailable_fields": [
+     "published_at",
+     "author.verified",
+     "author.followers_count",
+     "author.following_count",
+     "author.posts_count",
+     "engagement.views_count",
+     "engagement.likes_count",
+     "engagement.comments_count",
+     "engagement.shares_count",
+     "media.width",
+     "media.height",
+     "media.fps"
+    ],
+    "warnings": [
+     "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+     "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+     "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+     "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording."
+    ]
+   }
+  },
+  "transcript": {
+   "status": "partial",
+   "processed_ranges": [
+    {
+     "start_seconds": 4.304,
+     "end_seconds": 663.529
+    }
+   ],
+   "sentences": [
+    {
+     "sentence_id": "s1",
+     "start_seconds": 4.304,
+     "end_seconds": 6.806,
+     "text": "OBVIOUSLY THERE IS A LOT TO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s2",
+     "start_seconds": 5.939,
+     "end_seconds": 7.34,
+     "text": "BE PASSIONATELY AGAINST RIGHT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s3",
+     "start_seconds": 6.906,
+     "end_seconds": 8.875,
+     "text": "NOW.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s4",
+     "start_seconds": 7.44,
+     "end_seconds": 10.076,
+     "text": "BUT IT HAS TO TRAVEL WITH A",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s5",
+     "start_seconds": 8.975,
+     "end_seconds": 10.343,
+     "text": "CLEARER PICTURE OF WHAT WE ARE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s6",
+     "start_seconds": 10.176,
+     "end_seconds": 11.845,
+     "text": "FOR.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s7",
+     "start_seconds": 10.443,
+     "end_seconds": 13.145999999999999,
+     "text": "OUR PARTY IS UNIFIED IN MAKING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s8",
+     "start_seconds": 11.945,
+     "end_seconds": 14.481,
+     "text": "SURE THAT WE STAND UP AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s9",
+     "start_seconds": 13.246,
+     "end_seconds": 15.348,
+     "text": "DELIVER ON THE PROMISES THAT WE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s10",
+     "start_seconds": 14.581,
+     "end_seconds": 17.517,
+     "text": "MADE TO THE AMERICAN PEOPLE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s11",
+     "start_seconds": 15.682,
+     "end_seconds": 18.852,
+     "text": "WE CAN'T JUST BE THE PEOPLE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s12",
+     "start_seconds": 17.617,
+     "end_seconds": 20.387,
+     "text": "THAT IS AGAINST DONALD TRUMP.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s13",
+     "start_seconds": 18.952,
+     "end_seconds": 22.856,
+     "text": "WE HAVE TO SHOW PEOPLE HOW WE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s14",
+     "start_seconds": 21.388,
+     "end_seconds": 23.556,
+     "text": "ARE PROVIDING ALTERNATIVE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s15",
+     "start_seconds": 22.956,
+     "end_seconds": 26.259,
+     "text": "MESSAGE, ESPECIALLY FOR YOUNG",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s16",
+     "start_seconds": 23.656,
+     "end_seconds": 27.961,
+     "text": "PEOPLE THAT ARE LOSING FAITH.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s17",
+     "start_seconds": 26.426,
+     "end_seconds": 29.996,
+     "text": "Bret: WELL, ALTHOUGH HE IS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s18",
+     "start_seconds": 28.061,
+     "end_seconds": 30.864,
+     "text": "TECHNICALLY INDEPENDENT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s19",
+     "start_seconds": 30.096,
+     "end_seconds": 33.166,
+     "text": "VERMONT SENATOR BERNIE SANDERS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s20",
+     "start_seconds": 31.431,
+     "end_seconds": 34.401,
+     "text": "HAS INFLUENCE IN DEMOCRATIC",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s21",
+     "start_seconds": 33.266,
+     "end_seconds": 36.169,
+     "text": "PARTY POLITICS OF COURSE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s22",
+     "start_seconds": 35.101,
+     "end_seconds": 36.769999999999996,
+     "text": "HE AND CONGRESSWOMAN ALEXANDRIA",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s23",
+     "start_seconds": 36.269,
+     "end_seconds": 38.538,
+     "text": "OCASIO-CORTEZ HAVE BEEN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s24",
+     "start_seconds": 36.87,
+     "end_seconds": 39.439,
+     "text": "TRAVELING THE COUNTRY TRYING TO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s25",
+     "start_seconds": 38.638,
+     "end_seconds": 41.373999999999995,
+     "text": "UNITE A PROGRESSIVE MOVEMENT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s26",
+     "start_seconds": 39.539,
+     "end_seconds": 42.809000000000005,
+     "text": "THAT TOOK A MAJOR HIT, FRANKLY,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s27",
+     "start_seconds": 41.474,
+     "end_seconds": 44.144,
+     "text": "LAST NOVEMBER.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s28",
+     "start_seconds": 42.909,
+     "end_seconds": 45.211,
+     "text": "SENATOR SANDERS JOINS US LIVE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s29",
+     "start_seconds": 44.244,
+     "end_seconds": 46.179,
+     "text": "HERE IN STUDIO.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s30",
+     "start_seconds": 45.311,
+     "end_seconds": 46.513,
+     "text": "WELCOME BACK TO \"SPECIAL",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s31",
+     "start_seconds": 46.279,
+     "end_seconds": 48.381,
+     "text": "REPORT.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s32",
+     "start_seconds": 46.613,
+     "end_seconds": 51.016999999999996,
+     "text": "GOOD TO BE WITH YOU.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s33",
+     "start_seconds": 48.548,
+     "end_seconds": 51.751000000000005,
+     "text": "Bret: YOU WROTE AFTER THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s34",
+     "start_seconds": 51.117,
+     "end_seconds": 53.186,
+     "text": "NOVEMBER 6TH ELECTION THIS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s35",
+     "start_seconds": 51.851,
+     "end_seconds": 54.153999999999996,
+     "text": "IT SHOULD COME AS NO GREAT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s36",
+     "start_seconds": 53.286,
+     "end_seconds": 55.688,
+     "text": "SURPRISE THAT A DEMOCRATIC",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s37",
+     "start_seconds": 54.254,
+     "end_seconds": 56.623,
+     "text": "PARTY, WHICH HAS ABANDONED",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s38",
+     "start_seconds": 55.789,
+     "end_seconds": 58.324,
+     "text": "WORKING CLASS PEOPLE WOULD FIND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s39",
+     "start_seconds": 56.723,
+     "end_seconds": 59.092,
+     "text": "THAT THE WORKS CLASS HAD",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s40",
+     "start_seconds": 58.425,
+     "end_seconds": 60.526999999999994,
+     "text": "ABANDONED THEM.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s41",
+     "start_seconds": 59.192,
+     "end_seconds": 62.595,
+     "text": "FIRST IT WAS THE WHITE WORKING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s42",
+     "start_seconds": 60.627,
+     "end_seconds": 64.898,
+     "text": "CLASS NOW IT'S LATINO AND BLACK",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s43",
+     "start_seconds": 62.695,
+     "end_seconds": 65.865,
+     "text": "WORKERS AS WELL WHILE THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s44",
+     "start_seconds": 64.998,
+     "end_seconds": 66.866,
+     "text": "DEMOCRATIC LEADERSHIP DEFENDS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s45",
+     "start_seconds": 65.965,
+     "end_seconds": 68.435,
+     "text": "THE STATUS QUO AMERICAN PEOPLE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s46",
+     "start_seconds": 67.0,
+     "end_seconds": 69.002,
+     "text": "ARE ANGRY AND WANT CHANGE AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s47",
+     "start_seconds": 68.535,
+     "end_seconds": 70.904,
+     "text": "THEY ARE RIGHT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s48",
+     "start_seconds": 69.402,
+     "end_seconds": 71.20400000000001,
+     "text": "I AGREE WITH WHAT THEY GUY",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s49",
+     "start_seconds": 71.004,
+     "end_seconds": 72.97200000000001,
+     "text": "SAID.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s50",
+     "start_seconds": 71.304,
+     "end_seconds": 74.174,
+     "text": "GO ON RECORD.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s51",
+     "start_seconds": 73.139,
+     "end_seconds": 74.574,
+     "text": "Bret: 100 DAYS IN, IS IT THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s52",
+     "start_seconds": 74.274,
+     "end_seconds": 75.408,
+     "text": "SAME THING.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s53",
+     "start_seconds": 74.874,
+     "end_seconds": 75.74199999999999,
+     "text": "ABSOLUTELY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s54",
+     "start_seconds": 75.542,
+     "end_seconds": 77.143,
+     "text": "LOOK.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s55",
+     "start_seconds": 75.842,
+     "end_seconds": 79.312,
+     "text": "BRET, WHAT WE DON'T DO AS A",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s56",
+     "start_seconds": 77.243,
+     "end_seconds": 81.514,
+     "text": "NATION IS TAKE A HARD LOOK AT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s57",
+     "start_seconds": 79.412,
+     "end_seconds": 82.94900000000001,
+     "text": "WHERE WE ARE ON THE ISSUES OF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s58",
+     "start_seconds": 81.614,
+     "end_seconds": 83.283,
+     "text": "MOST RELEVANCE TO ORDINARY",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s59",
+     "start_seconds": 83.049,
+     "end_seconds": 84.05000000000001,
+     "text": "PEOPLE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s60",
+     "start_seconds": 83.383,
+     "end_seconds": 85.785,
+     "text": "WHERE ARE WE?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s61",
+     "start_seconds": 84.15,
+     "end_seconds": 89.82300000000001,
+     "text": "IN THE RICHEST COUNTRY IN THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s62",
+     "start_seconds": 85.885,
+     "end_seconds": 91.357,
+     "text": "HISTORY OF THE WORLD, 60 --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s63",
+     "start_seconds": 89.923,
+     "end_seconds": 92.258,
+     "text": "6-0 PERCENT OF OUR PEOPLE LIVING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s64",
+     "start_seconds": 91.458,
+     "end_seconds": 93.893,
+     "text": "PAYCHECK TO PAYCHECK.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s65",
+     "start_seconds": 92.358,
+     "end_seconds": 95.528,
+     "text": "WE HAVE THE HIGHEST RATE OF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s66",
+     "start_seconds": 93.993,
+     "end_seconds": 95.99499999999999,
+     "text": "CHILDHOOD POVERTY OF ALMOST ANY",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s67",
+     "start_seconds": 95.628,
+     "end_seconds": 98.264,
+     "text": "MAJOR COUNTRY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s68",
+     "start_seconds": 96.096,
+     "end_seconds": 100.333,
+     "text": "WE HAVE THE HIGHEST RATE OF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s69",
+     "start_seconds": 98.364,
+     "end_seconds": 101.768,
+     "text": "SENIOR POVERTY, 22% OF SENIORS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s70",
+     "start_seconds": 100.433,
+     "end_seconds": 106.239,
+     "text": "IN AMERICA TODAY TRYING TO GET",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s71",
+     "start_seconds": 102.435,
+     "end_seconds": 108.741,
+     "text": "BY ON $15,000 A YEAR OR LESS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s72",
+     "start_seconds": 106.339,
+     "end_seconds": 110.276,
+     "text": "MEANWHILE THE PEOPLE ON TOP HAVE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s73",
+     "start_seconds": 108.842,
+     "end_seconds": 111.911,
+     "text": "NEVER EVER HAD IT SO GOOD.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s74",
+     "start_seconds": 110.376,
+     "end_seconds": 116.71600000000001,
+     "text": "ONE GUY OWNS MORE WEALTH THAN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s75",
+     "start_seconds": 112.812,
+     "end_seconds": 118.051,
+     "text": "THE BOTTOM 53% OF THE AMERICAN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s76",
+     "start_seconds": 116.816,
+     "end_seconds": 119.25200000000001,
+     "text": "HOUSEHOLDS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s77",
+     "start_seconds": 118.151,
+     "end_seconds": 119.586,
+     "text": "MOST PEOPLE UNDERSTAND THAT IS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s78",
+     "start_seconds": 119.352,
+     "end_seconds": 120.453,
+     "text": "INSANE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s79",
+     "start_seconds": 119.686,
+     "end_seconds": 121.98800000000001,
+     "text": "THAT IS ABSURD.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s80",
+     "start_seconds": 120.553,
+     "end_seconds": 125.158,
+     "text": "THERE IS NO REASON WHY WE SHOULD",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s81",
+     "start_seconds": 122.122,
+     "end_seconds": 126.126,
+     "text": "BE THE ONLY MAJOR COUNTRY NOT TO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s82",
+     "start_seconds": 125.258,
+     "end_seconds": 126.526,
+     "text": "GUARANTEE HEALTHCARE FOR ALL",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s83",
+     "start_seconds": 126.226,
+     "end_seconds": 128.328,
+     "text": "PEOPLE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s84",
+     "start_seconds": 126.626,
+     "end_seconds": 129.963,
+     "text": "WHY WE HAVE THE HOUSING CRISIS,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s85",
+     "start_seconds": 128.428,
+     "end_seconds": 131.164,
+     "text": "WHY OUR KIDS CAN'T AFFORD TO GO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s86",
+     "start_seconds": 130.53,
+     "end_seconds": 132.365,
+     "text": "TO COLLEGE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s87",
+     "start_seconds": 131.331,
+     "end_seconds": 133.433,
+     "text": "Bret: SO WHY DO YOU THINK AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s88",
+     "start_seconds": 132.465,
+     "end_seconds": 136.336,
+     "text": "LATEST FOX NEWS POLL THE OPINION",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s89",
+     "start_seconds": 133.533,
+     "end_seconds": 137.303,
+     "text": "OF THE DEMOCRATIC PARTY IS NOW",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s90",
+     "start_seconds": 136.436,
+     "end_seconds": 138.17100000000002,
+     "text": "AT 41% FAVORABLE?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s91",
+     "start_seconds": 137.403,
+     "end_seconds": 140.373,
+     "text": "WHY IS THAT?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s92",
+     "start_seconds": 138.271,
+     "end_seconds": 141.67399999999998,
+     "text": "WHY IS IT SO UNDERWATER.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s93",
+     "start_seconds": 140.473,
+     "end_seconds": 143.07600000000002,
+     "text": "AND REPUBLICANS AREN'T A",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s94",
+     "start_seconds": 141.774,
+     "end_seconds": 144.077,
+     "text": "WHOLE LOT BETTER.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s95",
+     "start_seconds": 143.243,
+     "end_seconds": 145.011,
+     "text": "Bret: A LITTLE BIT BETTER BUT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s96",
+     "start_seconds": 144.177,
+     "end_seconds": 145.345,
+     "text": "NOT A WHOLE LOT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s97",
+     "start_seconds": 145.111,
+     "end_seconds": 147.24699999999999,
+     "text": "I AGREE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s98",
+     "start_seconds": 145.512,
+     "end_seconds": 147.914,
+     "text": "I WILL TELL YOU WHY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s99",
+     "start_seconds": 147.347,
+     "end_seconds": 149.249,
+     "text": "PEOPLE UNDERSTAND THAT THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s100",
+     "start_seconds": 148.014,
+     "end_seconds": 150.15,
+     "text": "POLITICAL SYSTEM IN THIS COUNTRY",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s101",
+     "start_seconds": 149.349,
+     "end_seconds": 150.85,
+     "text": "IS LARGELY CORRUPT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s102",
+     "start_seconds": 150.25,
+     "end_seconds": 151.618,
+     "text": "BOTH PARTIES.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s103",
+     "start_seconds": 150.95,
+     "end_seconds": 152.619,
+     "text": "WHY IS THAT?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s104",
+     "start_seconds": 151.718,
+     "end_seconds": 154.587,
+     "text": "YOU KNOW THE ANSWER.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s105",
+     "start_seconds": 152.986,
+     "end_seconds": 157.624,
+     "text": "THE ANSWER IS THAT YOU HAVE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s106",
+     "start_seconds": 154.687,
+     "end_seconds": 158.858,
+     "text": "BILLIONAIRES IN BOTH POLITICAL",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s107",
+     "start_seconds": 157.724,
+     "end_seconds": 160.493,
+     "text": "PARTIES DETERMINE WHAT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s108",
+     "start_seconds": 158.958,
+     "end_seconds": 162.028,
+     "text": "LEGISLATION GETS TO THE FLOOR.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s109",
+     "start_seconds": 160.593,
+     "end_seconds": 165.231,
+     "text": "AND WHO IS THE CANDIDATE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s110",
+     "start_seconds": 162.128,
+     "end_seconds": 165.59799999999998,
+     "text": "RIGHT NOW, LET ME GIVE YOU BOTH",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s111",
+     "start_seconds": 165.331,
+     "end_seconds": 166.399,
+     "text": "EXAMPLES.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s112",
+     "start_seconds": 165.698,
+     "end_seconds": 168.001,
+     "text": "YOU ARE IN THE REPUBLICAN PARTY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s113",
+     "start_seconds": 166.499,
+     "end_seconds": 170.97,
+     "text": "AND YOU SAY, YOU KNOW WHAT?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s114",
+     "start_seconds": 168.101,
+     "end_seconds": 172.639,
+     "text": "I DON'T LIKE THIS TRUMP IDEA",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s115",
+     "start_seconds": 171.07,
+     "end_seconds": 175.041,
+     "text": "GIVING MASSIVE TAX BREAKS TO THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s116",
+     "start_seconds": 172.739,
+     "end_seconds": 175.40800000000002,
+     "text": "RICH AND CUTTING MEDICAID AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s117",
+     "start_seconds": 175.141,
+     "end_seconds": 176.476,
+     "text": "EDUCATION.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s118",
+     "start_seconds": 175.508,
+     "end_seconds": 177.877,
+     "text": "GET UP AND SAY THAT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s119",
+     "start_seconds": 176.576,
+     "end_seconds": 179.612,
+     "text": "WHAT HAPPENS TO YOU IN THE NEXT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s120",
+     "start_seconds": 177.977,
+     "end_seconds": 180.91400000000002,
+     "text": "DAY ELON MUSK SAYS I GOT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s121",
+     "start_seconds": 179.746,
+     "end_seconds": 181.81400000000002,
+     "text": "UNLIMITED AMOUNTS OF MONEY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s122",
+     "start_seconds": 181.014,
+     "end_seconds": 184.55100000000002,
+     "text": "WE'RE GOING TO RUN A CANDIDATE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s123",
+     "start_seconds": 182.115,
+     "end_seconds": 185.45100000000002,
+     "text": "IN A PRIMARY AGAINST YOU.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s124",
+     "start_seconds": 184.717,
+     "end_seconds": 186.55300000000003,
+     "text": "DEMOCRATIC PARTY SIDE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s125",
+     "start_seconds": 185.552,
+     "end_seconds": 187.287,
+     "text": "WHAT HAPPENS IF SOMEBODY SAYS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s126",
+     "start_seconds": 186.653,
+     "end_seconds": 189.355,
+     "text": "YOU KNOW WHAT?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s127",
+     "start_seconds": 187.387,
+     "end_seconds": 193.059,
+     "text": "MAYBE IT'S NOT A GOOD IDEA TO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s128",
+     "start_seconds": 189.455,
+     "end_seconds": 194.727,
+     "text": "FUND NETANYAHU'S WAR MACHINE,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s129",
+     "start_seconds": 193.159,
+     "end_seconds": 195.695,
+     "text": "WHICH IS CREATING STARVATION FOR",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s130",
+     "start_seconds": 194.827,
+     "end_seconds": 197.664,
+     "text": "CHILDREN IN GAZA.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s131",
+     "start_seconds": 195.795,
+     "end_seconds": 199.432,
+     "text": "I'M GOING TO VOTE AGAINST THAT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s132",
+     "start_seconds": 197.764,
+     "end_seconds": 200.4,
+     "text": "NEXT DAY AIPAC IS GOING TO BE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s133",
+     "start_seconds": 199.532,
+     "end_seconds": 202.46800000000002,
+     "text": "RUNNING AGAINST YOU.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s134",
+     "start_seconds": 200.5,
+     "end_seconds": 203.369,
+     "text": "WE HAVE A CORRUPT CAMPAIGN,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s135",
+     "start_seconds": 202.569,
+     "end_seconds": 206.506,
+     "text": "FINANCE SYSTEM.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s136",
+     "start_seconds": 203.469,
+     "end_seconds": 208.07399999999998,
+     "text": "BILLIONAIRES IN BOTH POLITICAL",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s137",
+     "start_seconds": 206.606,
+     "end_seconds": 209.509,
+     "text": "PARTIES ARE CALLING THE TUNES,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s138",
+     "start_seconds": 208.174,
+     "end_seconds": 210.31,
+     "text": "AMERICAN PEOPLE UNDERSTAND THAT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s139",
+     "start_seconds": 209.676,
+     "end_seconds": 212.545,
+     "text": "Bret: YOU MENTION GAZA THERE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s140",
+     "start_seconds": 210.476,
+     "end_seconds": 214.948,
+     "text": "WAS A HOUSE HEARING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s141",
+     "start_seconds": 212.645,
+     "end_seconds": 215.68200000000002,
+     "text": "ANTI-SEMITISM AT NINE IVY LEAGUE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s142",
+     "start_seconds": 215.048,
+     "end_seconds": 216.249,
+     "text": "UNIVERSITIES ON THE HILL.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s143",
+     "start_seconds": 215.782,
+     "end_seconds": 217.65,
+     "text": "YOU ARE JEWISH.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s144",
+     "start_seconds": 216.349,
+     "end_seconds": 218.885,
+     "text": "HAVE YOU EXPRESSED, OBVIOUSLY, A",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s145",
+     "start_seconds": 217.75,
+     "end_seconds": 220.086,
+     "text": "LOT OF CONCERN ABOUT WHAT IS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s146",
+     "start_seconds": 218.985,
+     "end_seconds": 221.52100000000002,
+     "text": "HAPPENING IN GAZA.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s147",
+     "start_seconds": 220.186,
+     "end_seconds": 222.889,
+     "text": "WHAT DO YOU THINK ABOUT WHAT IS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s148",
+     "start_seconds": 221.621,
+     "end_seconds": 226.75900000000001,
+     "text": "HAPPENING ON COLLEGE CAMPUSES?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s149",
+     "start_seconds": 223.189,
+     "end_seconds": 227.96099999999998,
+     "text": "ANTI-SEMITISM IS A VILE AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s150",
+     "start_seconds": 226.859,
+     "end_seconds": 229.12800000000001,
+     "text": "DISGUSTING IDEOLOGY RESULTING IN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s151",
+     "start_seconds": 228.061,
+     "end_seconds": 229.829,
+     "text": "6 MILLION PEOPLE GETTING KILLED",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s152",
+     "start_seconds": 229.229,
+     "end_seconds": 231.798,
+     "text": "UNDER HITLER.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s153",
+     "start_seconds": 229.929,
+     "end_seconds": 234.334,
+     "text": "LET'S BE CLEAR, TO CRITICIZE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s154",
+     "start_seconds": 231.898,
+     "end_seconds": 235.969,
+     "text": "WHAT THE NETANYAHU GOVERNMENT IS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s155",
+     "start_seconds": 234.434,
+     "end_seconds": 238.271,
+     "text": "DOING RIGHT NOW, WHICH IS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s156",
+     "start_seconds": 236.069,
+     "end_seconds": 239.772,
+     "text": "DELIBERATELY STARVING CHILDREN,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s157",
+     "start_seconds": 238.371,
+     "end_seconds": 240.87300000000002,
+     "text": "50,000 PEOPLE HAVE ALREADY DIED.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s158",
+     "start_seconds": 239.872,
+     "end_seconds": 243.17600000000002,
+     "text": "CHILDREN ARE STARVING TO DEATH",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s159",
+     "start_seconds": 240.974,
+     "end_seconds": 244.177,
+     "text": "RIGHT NOW, IT IS NOT SEMITIC TO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s160",
+     "start_seconds": 243.276,
+     "end_seconds": 245.812,
+     "text": "POINT THAT OUT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s161",
+     "start_seconds": 245.979,
+     "end_seconds": 249.08200000000002,
+     "text": "Bret: I WANT TO PLAY A CLIP",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s162",
+     "start_seconds": 247.714,
+     "end_seconds": 249.816,
+     "text": "FROM THIS BBC INTERVIEW FROM",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s163",
+     "start_seconds": 249.182,
+     "end_seconds": 250.45,
+     "text": "FORMER PRESIDENT BIDEN.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s164",
+     "start_seconds": 249.916,
+     "end_seconds": 258.95799999999997,
+     "text": "TAKE A LISTEN.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s165",
+     "start_seconds": 250.55,
+     "end_seconds": 260.827,
+     "text": "IT WAS A HARD DECISION BUT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s166",
+     "start_seconds": 259.926,
+     "end_seconds": 261.928,
+     "text": "WAS IT --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s167",
+     "start_seconds": 261.661,
+     "end_seconds": 264.597,
+     "text": "NO.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s168",
+     "start_seconds": 262.028,
+     "end_seconds": 265.46500000000003,
+     "text": "I THINK IT WAS THE RIGHT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s169",
+     "start_seconds": 264.697,
+     "end_seconds": 267.033,
+     "text": "DECISION.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s170",
+     "start_seconds": 265.565,
+     "end_seconds": 270.003,
+     "text": "-- WELL -- IT WAS JUST A",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s171",
+     "start_seconds": 267.133,
+     "end_seconds": 272.37199999999996,
+     "text": "DIFFICULT DECISION.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s172",
+     "start_seconds": 270.303,
+     "end_seconds": 272.705,
+     "text": "BUT YOU SHOULD HAVE TAKEN IT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s173",
+     "start_seconds": 272.472,
+     "end_seconds": 273.239,
+     "text": "EARLIER?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s174",
+     "start_seconds": 272.805,
+     "end_seconds": 274.34000000000003,
+     "text": "I DON'T THINK SO.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s175",
+     "start_seconds": 273.339,
+     "end_seconds": 276.643,
+     "text": "I MEAN, I DON'T KNOW HOW THAT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s176",
+     "start_seconds": 274.44,
+     "end_seconds": 277.377,
+     "text": "WOULD HAVE MADE MUCH DIFFERENCE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s177",
+     "start_seconds": 276.809,
+     "end_seconds": 278.37800000000004,
+     "text": "Bret: SO SHOULD PRESIDENT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s178",
+     "start_seconds": 277.477,
+     "end_seconds": 279.04499999999996,
+     "text": "BIDEN HAVE GOTTEN OUT OF THAT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s179",
+     "start_seconds": 278.478,
+     "end_seconds": 281.147,
+     "text": "RACE EARLIER?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s180",
+     "start_seconds": 279.178,
+     "end_seconds": 282.115,
+     "text": "BRET, I'M NOT GOING BACK.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s181",
+     "start_seconds": 281.314,
+     "end_seconds": 284.18300000000005,
+     "text": "Bret: YOU'RE NOT GOING BACK?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s182",
+     "start_seconds": 282.215,
+     "end_seconds": 284.984,
+     "text": "ISN'T THAT A BIG PART OF WHERE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s183",
+     "start_seconds": 284.284,
+     "end_seconds": 285.952,
+     "text": "THE DEMOCRATIC PARTY IS?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s184",
+     "start_seconds": 285.518,
+     "end_seconds": 286.686,
+     "text": "NO.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s185",
+     "start_seconds": 286.052,
+     "end_seconds": 287.887,
+     "text": "IT'S NOT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s186",
+     "start_seconds": 286.786,
+     "end_seconds": 289.222,
+     "text": "IT'S NOTHING TO DO WITH BIDEN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s187",
+     "start_seconds": 287.987,
+     "end_seconds": 290.757,
+     "text": "RIGHT NOW OR KAMALA HARRIS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s188",
+     "start_seconds": 289.355,
+     "end_seconds": 296.22900000000004,
+     "text": "THE QUESTION IS WHAT IS THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s189",
+     "start_seconds": 291.09,
+     "end_seconds": 297.76399999999995,
+     "text": "FUNDAMENTAL ISSUE IN POLITICS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s190",
+     "start_seconds": 296.329,
+     "end_seconds": 298.96500000000003,
+     "text": "WHICH SIDE ARE YOU ON.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s191",
+     "start_seconds": 297.864,
+     "end_seconds": 299.49899999999997,
+     "text": "MASSIVE INCOME HEALTH AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s192",
+     "start_seconds": 299.065,
+     "end_seconds": 301.134,
+     "text": "NAWLTS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s193",
+     "start_seconds": 299.599,
+     "end_seconds": 301.567,
+     "text": "YOU HAVE THE RICH GETTING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s194",
+     "start_seconds": 301.234,
+     "end_seconds": 303.436,
+     "text": "RICHER.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s195",
+     "start_seconds": 301.668,
+     "end_seconds": 304.30400000000003,
+     "text": "WEALTHIEST PEOPLE, LARGE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s196",
+     "start_seconds": 303.536,
+     "end_seconds": 304.871,
+     "text": "CORPORATIONS CONTROL OUR",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s197",
+     "start_seconds": 304.404,
+     "end_seconds": 305.738,
+     "text": "ECONOMY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s198",
+     "start_seconds": 304.971,
+     "end_seconds": 306.406,
+     "text": "BILLIONAIRES CONTROL OUR",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s199",
+     "start_seconds": 305.838,
+     "end_seconds": 307.206,
+     "text": "POLITICAL SYSTEM.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s200",
+     "start_seconds": 306.506,
+     "end_seconds": 310.00899999999996,
+     "text": "THE QUESTION IS DO YOU STAND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s201",
+     "start_seconds": 307.307,
+     "end_seconds": 310.97700000000003,
+     "text": "WITH THE WORKS CLASS WITH THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s202",
+     "start_seconds": 310.109,
+     "end_seconds": 312.745,
+     "text": "ELDERLY, WITH THE KIDS OR DO YOU",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s203",
+     "start_seconds": 311.077,
+     "end_seconds": 313.613,
+     "text": "STAND WITH BIG MONEY?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s204",
+     "start_seconds": 312.912,
+     "end_seconds": 315.58099999999996,
+     "text": "Bret: THAT'S A BIG QUESTION",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s205",
+     "start_seconds": 313.713,
+     "end_seconds": 316.249,
+     "text": "BECAUSE NOW YOU HAVE THIS TARIFF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s206",
+     "start_seconds": 315.682,
+     "end_seconds": 317.884,
+     "text": "POLICY FROM PRESIDENT TRUMP.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s207",
+     "start_seconds": 316.683,
+     "end_seconds": 320.52,
+     "text": "AND IT'S REALLY INTEREST THAT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s208",
+     "start_seconds": 317.984,
+     "end_seconds": 322.255,
+     "text": "SOME DEMOCRATS HAVE NOW KIND OF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s209",
+     "start_seconds": 320.62,
+     "end_seconds": 323.456,
+     "text": "ABANDONED THE PRO-PROGRESSIVE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s210",
+     "start_seconds": 322.355,
+     "end_seconds": 324.457,
+     "text": "THING THAT THEY HAD BEFORE AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s211",
+     "start_seconds": 323.556,
+     "end_seconds": 326.159,
+     "text": "THEY ARE AGREEING WITH THE \"WALL",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s212",
+     "start_seconds": 324.557,
+     "end_seconds": 327.19300000000004,
+     "text": "STREET JOURNAL\" EDITORIAL PAGE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s213",
+     "start_seconds": 326.259,
+     "end_seconds": 328.194,
+     "text": "DO YOU SEE THAT?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s214",
+     "start_seconds": 327.96,
+     "end_seconds": 329.89599999999996,
+     "text": "YEAH.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s215",
+     "start_seconds": 328.294,
+     "end_seconds": 332.365,
+     "text": "THIS IS WHAT I THINK.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s216",
+     "start_seconds": 330.129,
+     "end_seconds": 333.499,
+     "text": "THE IDEA TO SAY OH, WE BELIEVE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s217",
+     "start_seconds": 332.665,
+     "end_seconds": 334.5,
+     "text": "IN UNFETTERED FREE TRADE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s218",
+     "start_seconds": 333.966,
+     "end_seconds": 335.702,
+     "text": "NO TARIFFS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s219",
+     "start_seconds": 334.6,
+     "end_seconds": 337.00300000000004,
+     "text": "AND SOME DEMOCRATS ARE SAYING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s220",
+     "start_seconds": 335.802,
+     "end_seconds": 339.872,
+     "text": "THAT I THINK THAT'S NONSENSE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s221",
+     "start_seconds": 337.103,
+     "end_seconds": 341.507,
+     "text": "THE IDEA THAT YOU ARBITRARILY",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s222",
+     "start_seconds": 339.972,
+     "end_seconds": 344.243,
+     "text": "ONE DAY COME UP WITH TARIFFS ON",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s223",
+     "start_seconds": 341.607,
+     "end_seconds": 345.11100000000005,
+     "text": "EVERY COUNTRY ON EARTH FOR NO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s224",
+     "start_seconds": 344.344,
+     "end_seconds": 346.746,
+     "text": "PARTICULAR REASON, WHICH IS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s225",
+     "start_seconds": 345.211,
+     "end_seconds": 348.081,
+     "text": "GOING TO RAISE PRICENESS THIS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s226",
+     "start_seconds": 346.846,
+     "end_seconds": 350.149,
+     "text": "COUNTRY THAT'S ALSO ABSURD.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s227",
+     "start_seconds": 348.181,
+     "end_seconds": 352.018,
+     "text": "NOT ONLY DID I VOTE AGAINST",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s228",
+     "start_seconds": 350.249,
+     "end_seconds": 353.519,
+     "text": "NAFTA AND PERMANENT NORMAL TRADE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s229",
+     "start_seconds": 352.118,
+     "end_seconds": 354.954,
+     "text": "RELATIONS WITH CHINA.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s230",
+     "start_seconds": 353.619,
+     "end_seconds": 355.72200000000004,
+     "text": "I HELD HELPED END THE EFFORT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s231",
+     "start_seconds": 355.054,
+     "end_seconds": 357.48999999999995,
+     "text": "AGAINST THOSE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s232",
+     "start_seconds": 355.822,
+     "end_seconds": 358.624,
+     "text": "THOSE WITH DISASTROUS TRADE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s233",
+     "start_seconds": 357.59,
+     "end_seconds": 359.75899999999996,
+     "text": "AGREEMENTS WRITTEN BY CORPORATE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s234",
+     "start_seconds": 358.725,
+     "end_seconds": 361.394,
+     "text": "AMERICA DESIGNED TO ALLOW",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s235",
+     "start_seconds": 359.859,
+     "end_seconds": 361.728,
+     "text": "CORPORATIONS TO SHUT DOWN IN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s236",
+     "start_seconds": 361.494,
+     "end_seconds": 362.39500000000004,
+     "text": "AMERICA.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s237",
+     "start_seconds": 361.828,
+     "end_seconds": 365.231,
+     "text": "MOVE TO CHINA.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s238",
+     "start_seconds": 362.495,
+     "end_seconds": 366.966,
+     "text": "MOVE TO MEXICO AND HIRE PEOPLE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s239",
+     "start_seconds": 365.331,
+     "end_seconds": 367.767,
+     "text": "THERE ON STARVATION WAGES.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s240",
+     "start_seconds": 367.066,
+     "end_seconds": 370.503,
+     "text": "VERY BAD POLICY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s241",
+     "start_seconds": 368.234,
+     "end_seconds": 371.471,
+     "text": "I BELIEVE IN SELECTED TARIFFS TO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s242",
+     "start_seconds": 370.603,
+     "end_seconds": 373.673,
+     "text": "PROTECT AMERICAN WORKERS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s243",
+     "start_seconds": 371.871,
+     "end_seconds": 375.308,
+     "text": "THE BROAD TARIFF PROPOSALS THAT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s244",
+     "start_seconds": 373.773,
+     "end_seconds": 376.27500000000003,
+     "text": "TRUMP BROUGHT FORTH, THAT IS NOT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s245",
+     "start_seconds": 375.408,
+     "end_seconds": 377.377,
+     "text": "THE WAY TO PROCEED.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s246",
+     "start_seconds": 376.442,
+     "end_seconds": 379.312,
+     "text": "Bret: IF HE GETS GOOD DEALS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s247",
+     "start_seconds": 377.477,
+     "end_seconds": 380.947,
+     "text": "WITH BIG COUNTRIES LIKE INDIA,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s248",
+     "start_seconds": 379.412,
+     "end_seconds": 381.748,
+     "text": "SOUTH KOREA, JAPAN, AND OTHERS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s249",
+     "start_seconds": 381.047,
+     "end_seconds": 383.61600000000004,
+     "text": "COME TO THE TABLE WITH",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s250",
+     "start_seconds": 381.848,
+     "end_seconds": 383.95,
+     "text": "PROPOSALS, ISN'T HE MOVING THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s251",
+     "start_seconds": 383.716,
+     "end_seconds": 385.818,
+     "text": "NEEDLE?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s252",
+     "start_seconds": 384.05,
+     "end_seconds": 387.45300000000003,
+     "text": "ISN'T HE CHANGING THE PARADIGM.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s253",
+     "start_seconds": 385.918,
+     "end_seconds": 388.254,
+     "text": "IF YOU DO IT SELECTIVELY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s254",
+     "start_seconds": 387.553,
+     "end_seconds": 389.722,
+     "text": "IF YOU HAVE A SITUATION WHERE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s255",
+     "start_seconds": 388.354,
+     "end_seconds": 390.923,
+     "text": "YOU ARE PROTECTING THE AMERICAN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s256",
+     "start_seconds": 389.822,
+     "end_seconds": 392.158,
+     "text": "CONSUMER, YOU KNOW, WHEN HE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s257",
+     "start_seconds": 391.09,
+     "end_seconds": 393.693,
+     "text": "SAYS, YOU KNOW, I'M NOT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s258",
+     "start_seconds": 392.258,
+     "end_seconds": 394.894,
+     "text": "CONCERNED ABOUT TOY PRICES, YOU",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s259",
+     "start_seconds": 393.793,
+     "end_seconds": 396.42900000000003,
+     "text": "KNOW, I THINK HE DOESN'T",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s260",
+     "start_seconds": 394.994,
+     "end_seconds": 397.29600000000005,
+     "text": "UNDERSTAND WHAT IS GOING ON FOR",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s261",
+     "start_seconds": 396.529,
+     "end_seconds": 401.0,
+     "text": "WORKING CLASS FAMILIES.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s262",
+     "start_seconds": 399.265,
+     "end_seconds": 402.001,
+     "text": "SO SELECTIVE TARIFFS THAT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s263",
+     "start_seconds": 401.1,
+     "end_seconds": 402.935,
+     "text": "PROTECT AMERICAN WORKERS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s264",
+     "start_seconds": 402.101,
+     "end_seconds": 404.103,
+     "text": "INDUSTRY GOOD IDEA.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s265",
+     "start_seconds": 403.035,
+     "end_seconds": 406.80600000000004,
+     "text": "JUST ACROSS THE BOARD TARIFFS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s266",
+     "start_seconds": 404.203,
+     "end_seconds": 407.106,
+     "text": "THAT RAISE PRICES A VERY BAD",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s267",
+     "start_seconds": 406.906,
+     "end_seconds": 408.708,
+     "text": "IDEA.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s268",
+     "start_seconds": 407.273,
+     "end_seconds": 409.87600000000003,
+     "text": "Bret: HAVE YOU THIS TOUR WITH",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s269",
+     "start_seconds": 408.808,
+     "end_seconds": 410.643,
+     "text": "ALEXANDRIA OCASIO-CORTEZ FIGHT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s270",
+     "start_seconds": 410.309,
+     "end_seconds": 412.278,
+     "text": "THE OLIGARCHY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s271",
+     "start_seconds": 410.743,
+     "end_seconds": 414.781,
+     "text": "HAVE YOU SEEN BIG CROWDS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s272",
+     "start_seconds": 412.412,
+     "end_seconds": 415.381,
+     "text": "HUGE CROWDS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s273",
+     "start_seconds": 414.947,
+     "end_seconds": 416.349,
+     "text": "Bret: EXPLAIN IT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s274",
+     "start_seconds": 415.481,
+     "end_seconds": 419.719,
+     "text": "WHY DO YOU THINK IT'S HAPPENING?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s275",
+     "start_seconds": 416.983,
+     "end_seconds": 420.787,
+     "text": "I THINK -- AND BY THE WAY, WE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s276",
+     "start_seconds": 419.819,
+     "end_seconds": 422.221,
+     "text": "ACTUALLY HAVE INFORMATION ON",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s277",
+     "start_seconds": 420.887,
+     "end_seconds": 424.056,
+     "text": "THIS, BRET.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s278",
+     "start_seconds": 422.321,
+     "end_seconds": 424.45700000000005,
+     "text": "IT'S NOT JUST, YOU KNOW, I'M AN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s279",
+     "start_seconds": 424.157,
+     "end_seconds": 425.758,
+     "text": "INDEPENDENT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s280",
+     "start_seconds": 424.557,
+     "end_seconds": 427.927,
+     "text": "WE ATTRACT A LOT OF DEMOCRATS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s281",
+     "start_seconds": 425.858,
+     "end_seconds": 430.563,
+     "text": "IT IS NOT JUST DEMOCRATS COMING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s282",
+     "start_seconds": 428.06,
+     "end_seconds": 431.964,
+     "text": "OUT TO OUR RALLIES.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s283",
+     "start_seconds": 430.663,
+     "end_seconds": 432.79900000000004,
+     "text": "IT IS REPUBLICANS, IT IS A LOT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s284",
+     "start_seconds": 432.432,
+     "end_seconds": 434.2,
+     "text": "OF INDEPENDENTS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s285",
+     "start_seconds": 433.032,
+     "end_seconds": 437.103,
+     "text": "AND WHY IS THAT?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s286",
+     "start_seconds": 434.4,
+     "end_seconds": 437.503,
+     "text": "I THINK THERE ARE A FEW",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s287",
+     "start_seconds": 437.203,
+     "end_seconds": 439.505,
+     "text": "CONCERNS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s288",
+     "start_seconds": 437.603,
+     "end_seconds": 441.274,
+     "text": "NUMBER ONE, WHEN TRUMP GETS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s289",
+     "start_seconds": 439.605,
+     "end_seconds": 443.276,
+     "text": "INAUGURATED AND STANDING BEHIND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s290",
+     "start_seconds": 441.374,
+     "end_seconds": 446.41200000000003,
+     "text": "HIM ARE THE THREE WEALTHIEST",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s291",
+     "start_seconds": 443.376,
+     "end_seconds": 448.714,
+     "text": "GUYS IN AMERICA, MUSK, BEZOS AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s292",
+     "start_seconds": 446.512,
+     "end_seconds": 450.349,
+     "text": "ZUCKERBERG, AND STANDING BEHIND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s293",
+     "start_seconds": 448.815,
+     "end_seconds": 452.218,
+     "text": "THEM ARE 13 OTHER BILLIONAIRES",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s294",
+     "start_seconds": 450.45,
+     "end_seconds": 453.286,
+     "text": "THAT TRUMP HAS APPOINTED TO HEAD",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s295",
+     "start_seconds": 452.318,
+     "end_seconds": 455.154,
+     "text": "UP MAJOR GOVERNMENT AGENCIES,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s296",
+     "start_seconds": 453.386,
+     "end_seconds": 455.555,
+     "text": "PEOPLE ARE REALLY SAYING,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s297",
+     "start_seconds": 455.321,
+     "end_seconds": 457.12300000000005,
+     "text": "REALLY?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s298",
+     "start_seconds": 455.655,
+     "end_seconds": 458.25699999999995,
+     "text": "THIS IS A GOVERNMENT OF THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s299",
+     "start_seconds": 457.223,
+     "end_seconds": 458.791,
+     "text": "BILLIONAIRE CLASS FOR THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s300",
+     "start_seconds": 458.357,
+     "end_seconds": 459.959,
+     "text": "BILLIONAIRE CLASS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s301",
+     "start_seconds": 458.891,
+     "end_seconds": 462.495,
+     "text": "PEOPLE ARE WORRIED ABOUT THAT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s302",
+     "start_seconds": 460.059,
+     "end_seconds": 464.464,
+     "text": "THE OTHER AREA, BIG DEAL, IS THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s303",
+     "start_seconds": 462.995,
+     "end_seconds": 464.964,
+     "text": "MOVEMENT TOWARD",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s304",
+     "start_seconds": 464.564,
+     "end_seconds": 467.20000000000005,
+     "text": "AUTHORITARIANISM.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s305",
+     "start_seconds": 465.064,
+     "end_seconds": 471.437,
+     "text": "YOU DON'T HAVE A PRESIDENT OF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s306",
+     "start_seconds": 467.3,
+     "end_seconds": 472.538,
+     "text": "THE UNITED STATES SUING THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s307",
+     "start_seconds": 471.537,
+     "end_seconds": 473.806,
+     "text": "MEDIA BECAUSE THEY DID STORIES",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s308",
+     "start_seconds": 472.638,
+     "end_seconds": 476.275,
+     "text": "YOU DON'T LIKE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s309",
+     "start_seconds": 473.906,
+     "end_seconds": 478.144,
+     "text": "YOU DON'T HAVE FEDERAL AGENTS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s310",
+     "start_seconds": 476.375,
+     "end_seconds": 479.545,
+     "text": "PICKING UP COLLEGE STUDENTS WHO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s311",
+     "start_seconds": 478.244,
+     "end_seconds": 481.814,
+     "text": "MAY HAVE COME FROM ANOTHER",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s312",
+     "start_seconds": 479.645,
+     "end_seconds": 483.84999999999997,
+     "text": "COUNTRY THROWING THEM INTO A",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s313",
+     "start_seconds": 481.914,
+     "end_seconds": 486.55199999999996,
+     "text": "VAN, TAKING THEM TO A DETENTION",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s314",
+     "start_seconds": 483.95,
+     "end_seconds": 487.65299999999996,
+     "text": "CENTER WITHOUT ANY CHARGES BEING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s315",
+     "start_seconds": 486.652,
+     "end_seconds": 489.388,
+     "text": "LEVELED AGAINST THEM.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s316",
+     "start_seconds": 487.753,
+     "end_seconds": 491.02299999999997,
+     "text": "YOU DON'T HAVE THE PRESIDENT OF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s317",
+     "start_seconds": 489.489,
+     "end_seconds": 492.12399999999997,
+     "text": "THE UNITED STATES OH, A JUDGE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s318",
+     "start_seconds": 491.123,
+     "end_seconds": 494.093,
+     "text": "RULED AGAINST ME.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s319",
+     "start_seconds": 492.358,
+     "end_seconds": 498.531,
+     "text": "WE GOT TO IMPEACH THAT JUDGE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s320",
+     "start_seconds": 494.193,
+     "end_seconds": 499.131,
+     "text": "THAT IS CALLED AUTHORITARIANISM.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s321",
+     "start_seconds": 498.631,
+     "end_seconds": 500.433,
+     "text": "I DON'T CARE IF YOU ARE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s322",
+     "start_seconds": 499.232,
+     "end_seconds": 501.46700000000004,
+     "text": "CONSERVATIVE OR PROGRESSIVE OR",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s323",
+     "start_seconds": 500.533,
+     "end_seconds": 503.16900000000004,
+     "text": "MIDDLE OF THE ROAD GUY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s324",
+     "start_seconds": 501.567,
+     "end_seconds": 505.90500000000003,
+     "text": "I WOULD HOPE WE ALL STAND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s325",
+     "start_seconds": 503.269,
+     "end_seconds": 507.44,
+     "text": "TOGETHER TOWARDS THAT MOVEMENT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s326",
+     "start_seconds": 506.005,
+     "end_seconds": 508.741,
+     "text": "TOWARD AUTHORITARIANISM.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s327",
+     "start_seconds": 507.54,
+     "end_seconds": 511.043,
+     "text": "LASTLY, YOU ARE SEEING POLICIES",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s328",
+     "start_seconds": 508.841,
+     "end_seconds": 512.812,
+     "text": "THAT THAT TRUMP AND THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s329",
+     "start_seconds": 511.143,
+     "end_seconds": 514.78,
+     "text": "REPUBLICANS ARE BRINGING FORTH",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s330",
+     "start_seconds": 513.179,
+     "end_seconds": 515.1139999999999,
+     "text": "TAX DID YOU TELL US BILLIONS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s331",
+     "start_seconds": 514.881,
+     "end_seconds": 516.182,
+     "text": "SNARES.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s332",
+     "start_seconds": 515.281,
+     "end_seconds": 517.8499999999999,
+     "text": "Bret: THEY CLAIM NOT CUTS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s333",
+     "start_seconds": 516.282,
+     "end_seconds": 518.1500000000001,
+     "text": "TAKING OUT WASTE, FRAUD AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s334",
+     "start_seconds": 517.95,
+     "end_seconds": 518.885,
+     "text": "ABUSE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s335",
+     "start_seconds": 518.251,
+     "end_seconds": 519.7189999999999,
+     "text": "I UNDERSTAND WHAT YOU ARE SAYING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s336",
+     "start_seconds": 518.985,
+     "end_seconds": 521.988,
+     "text": "BUT THAT'S WHAT THEY SAY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s337",
+     "start_seconds": 519.819,
+     "end_seconds": 522.755,
+     "text": "TO THE EYES OF THE BEE HOLDER",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s338",
+     "start_seconds": 522.088,
+     "end_seconds": 524.6239999999999,
+     "text": "WASTE FRAUD.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s339",
+     "start_seconds": 522.855,
+     "end_seconds": 526.692,
+     "text": "YOU DON'T CUT $800 BILLION",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s340",
+     "start_seconds": 524.724,
+     "end_seconds": 529.095,
+     "text": "WITHOUT REALLY DEVASTATING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s341",
+     "start_seconds": 526.792,
+     "end_seconds": 531.4970000000001,
+     "text": "MEDICAID.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s342",
+     "start_seconds": 529.195,
+     "end_seconds": 533.599,
+     "text": "ATTACKING SOCIAL SECURITY SO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s343",
+     "start_seconds": 531.597,
+     "end_seconds": 534.367,
+     "text": "THAT SENIORS HAVE A HARD TIME.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s344",
+     "start_seconds": 533.766,
+     "end_seconds": 536.002,
+     "text": "Bret: THERE ARE A LOT OF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s345",
+     "start_seconds": 534.467,
+     "end_seconds": 538.304,
+     "text": "PEOPLE WHO LOOK AT THIS AND SAY",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s346",
+     "start_seconds": 536.102,
+     "end_seconds": 540.139,
+     "text": "THE GOVERNMENT IS BLOATED.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s347",
+     "start_seconds": 538.404,
+     "end_seconds": 541.173,
+     "text": "IT'S OUT OF CONTROL.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s348",
+     "start_seconds": 540.239,
+     "end_seconds": 543.409,
+     "text": "IT'S $37 TRILLION IN DEBT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s349",
+     "start_seconds": 541.274,
+     "end_seconds": 543.843,
+     "text": "DO YOU THINK THE FEDERAL",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s350",
+     "start_seconds": 543.509,
+     "end_seconds": 544.844,
+     "text": "GOVERNMENT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s351",
+     "start_seconds": 543.943,
+     "end_seconds": 545.211,
+     "text": "DOES THE FEDERAL GOVERNMENT NEED",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s352",
+     "start_seconds": 544.944,
+     "end_seconds": 546.8789999999999,
+     "text": "TO BE CUT?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s353",
+     "start_seconds": 545.645,
+     "end_seconds": 548.781,
+     "text": "THE FEDERAL GOVERNMENT NEEDS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s354",
+     "start_seconds": 546.979,
+     "end_seconds": 550.5500000000001,
+     "text": "TO BE MADE MORE EFFICIENT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s355",
+     "start_seconds": 548.881,
+     "end_seconds": 551.884,
+     "text": "IN SOME SAYS IT SHOULD BE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s356",
+     "start_seconds": 550.65,
+     "end_seconds": 554.2529999999999,
+     "text": "EXPANDED IN OTHER WAYS CUT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s357",
+     "start_seconds": 551.984,
+     "end_seconds": 556.1220000000001,
+     "text": "IF YOU ARE ASKING ME, IS THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s358",
+     "start_seconds": 554.854,
+     "end_seconds": 557.69,
+     "text": "FEDERAL BUREAUCRACY A PROBLEM?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s359",
+     "start_seconds": 556.222,
+     "end_seconds": 560.626,
+     "text": "YOU ARE DAMN RIGHT IT IS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s360",
+     "start_seconds": 557.79,
+     "end_seconds": 562.361,
+     "text": "CAN WE MAKE IT MORE EFFICIENT?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s361",
+     "start_seconds": 560.726,
+     "end_seconds": 562.762,
+     "text": "ABSOLUTELY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s362",
+     "start_seconds": 562.461,
+     "end_seconds": 563.529,
+     "text": "ABSOLUTELY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s363",
+     "start_seconds": 562.929,
+     "end_seconds": 564.664,
+     "text": "Bret: ISN'T THAT WHAT DOGE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s364",
+     "start_seconds": 563.796,
+     "end_seconds": 566.7320000000001,
+     "text": "WAS TRY DOG DO?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s365",
+     "start_seconds": 564.864,
+     "end_seconds": 568.3670000000001,
+     "text": "YOU DON'T MAKE IT MORE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s366",
+     "start_seconds": 566.832,
+     "end_seconds": 570.4689999999999,
+     "text": "EFFICIENT BY LAYING OFF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s367",
+     "start_seconds": 568.467,
+     "end_seconds": 571.17,
+     "text": "THOUSANDS OF WORKERS AT THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s368",
+     "start_seconds": 570.57,
+     "end_seconds": 574.4730000000001,
+     "text": "SOCIAL SECURITY ADMINISTRATION",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s369",
+     "start_seconds": 571.27,
+     "end_seconds": 575.4739999999999,
+     "text": "SO THAT SENIORS CAN'T GET THEIR",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s370",
+     "start_seconds": 574.574,
+     "end_seconds": 577.276,
+     "text": "BENEFITS AND THEIR CONCERNS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s371",
+     "start_seconds": 575.575,
+     "end_seconds": 579.412,
+     "text": "ADDRESSED IN A TIMELY MANNER.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s372",
+     "start_seconds": 577.376,
+     "end_seconds": 581.28,
+     "text": "YOU DON'T MAKE THE SYSTEM MORE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s373",
+     "start_seconds": 579.512,
+     "end_seconds": 582.8149999999999,
+     "text": "EFFICIENT BY THREATENING TO LAY",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s374",
+     "start_seconds": 581.38,
+     "end_seconds": 584.016,
+     "text": "OFF 83,000 WORKERS AT THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s375",
+     "start_seconds": 582.915,
+     "end_seconds": 585.184,
+     "text": "VETERANS ADMINISTRATION, WHICH",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s376",
+     "start_seconds": 584.116,
+     "end_seconds": 586.953,
+     "text": "WILL CLEARLY IMPACT THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s377",
+     "start_seconds": 585.284,
+     "end_seconds": 587.286,
+     "text": "HEALTHCARE THAT OUR VETERANS",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s378",
+     "start_seconds": 587.053,
+     "end_seconds": 589.855,
+     "text": "RECEIVE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s379",
+     "start_seconds": 587.453,
+     "end_seconds": 590.79,
+     "text": "Bret: ALL RIGHT, LAST THING.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s380",
+     "start_seconds": 589.956,
+     "end_seconds": 592.525,
+     "text": "ELISSA SLOTKIN SENATOR FROM",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s381",
+     "start_seconds": 590.89,
+     "end_seconds": 593.626,
+     "text": "MICHIGAN SAID YOU SHOULDN'T BE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s382",
+     "start_seconds": 592.625,
+     "end_seconds": 594.961,
+     "text": "USING OLIGARCH.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s383",
+     "start_seconds": 593.726,
+     "end_seconds": 596.462,
+     "text": "IT'S OVER PEOPLE'S HEAD.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s384",
+     "start_seconds": 595.061,
+     "end_seconds": 599.0310000000001,
+     "text": "HAVE YOU GOTTEN CRITICIZED FROM",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s385",
+     "start_seconds": 596.562,
+     "end_seconds": 601.067,
+     "text": "OTHER PEOPLE FREE BEACON BERNIE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s386",
+     "start_seconds": 599.131,
+     "end_seconds": 603.035,
+     "text": "SANDERS SPENT 331,000 ON PRIVATE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s387",
+     "start_seconds": 601.167,
+     "end_seconds": 604.904,
+     "text": "JETS FIGHTING THE OLIGARCHY TOUR",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s388",
+     "start_seconds": 603.135,
+     "end_seconds": 605.237,
+     "text": "PAID FOR BY FRIENDS OF BERNIE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s389",
+     "start_seconds": 605.004,
+     "end_seconds": 606.172,
+     "text": "SANDERS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s390",
+     "start_seconds": 605.338,
+     "end_seconds": 607.9399999999999,
+     "text": "HAVE YOU SPENT MILLIONS OF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s391",
+     "start_seconds": 606.272,
+     "end_seconds": 609.1750000000001,
+     "text": "DOLLARS ON CAMPAIGN FUNDS ON",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s392",
+     "start_seconds": 608.04,
+     "end_seconds": 609.4749999999999,
+     "text": "PRIVATE JET TRAVEL OVER THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s393",
+     "start_seconds": 609.275,
+     "end_seconds": 611.01,
+     "text": "YEARS.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s394",
+     "start_seconds": 609.575,
+     "end_seconds": 611.4440000000001,
+     "text": "HOW DO YOU PUSHBACK ON BOTH OF",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s395",
+     "start_seconds": 611.11,
+     "end_seconds": 612.878,
+     "text": "THOSE THINGS?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s396",
+     "start_seconds": 611.544,
+     "end_seconds": 615.081,
+     "text": "WHEN IS THE LAST TIME YOU SAW",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s397",
+     "start_seconds": 612.979,
+     "end_seconds": 617.35,
+     "text": "DONALD TRUMP DURING A CAMPAIGN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s398",
+     "start_seconds": 615.181,
+     "end_seconds": 618.1170000000001,
+     "text": "MODE AT NATIONAL AIRPORT?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s399",
+     "start_seconds": 617.516,
+     "end_seconds": 618.5509999999999,
+     "text": "Bret: NO, NO, NO.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s400",
+     "start_seconds": 618.25,
+     "end_seconds": 620.753,
+     "text": "IT DOESN'T.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s401",
+     "start_seconds": 618.651,
+     "end_seconds": 621.12,
+     "text": "IS HE ALSO NOT FIGHTING THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s402",
+     "start_seconds": 620.853,
+     "end_seconds": 621.42,
+     "text": "OLIGARCHY.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s403",
+     "start_seconds": 621.22,
+     "end_seconds": 622.822,
+     "text": "NO.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s404",
+     "start_seconds": 621.52,
+     "end_seconds": 624.49,
+     "text": "YOU RUN A CAMPAIGN AND DO YOU",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s405",
+     "start_seconds": 622.922,
+     "end_seconds": 625.091,
+     "text": "THREE OR FOUR OR FIVE RALLIES IN",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s406",
+     "start_seconds": 624.624,
+     "end_seconds": 626.325,
+     "text": "A WEEK.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s407",
+     "start_seconds": 625.191,
+     "end_seconds": 630.496,
+     "text": "THE ONLY WAY YOU CAN GET AROUND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s408",
+     "start_seconds": 626.425,
+     "end_seconds": 632.231,
+     "text": "TO TALK TO 30,000 PEOPLE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s409",
+     "start_seconds": 630.596,
+     "end_seconds": 633.933,
+     "text": "THINK SITTING WAITING LINE AT",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s410",
+     "start_seconds": 632.331,
+     "end_seconds": 634.433,
+     "text": "UNITED WAITING WHILE 30,000",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s411",
+     "start_seconds": 634.033,
+     "end_seconds": 636.068,
+     "text": "PEOPLE WAITING?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s412",
+     "start_seconds": 634.533,
+     "end_seconds": 637.269,
+     "text": "IT'S THE ONLY WAY TO GET AROUND.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s413",
+     "start_seconds": 636.168,
+     "end_seconds": 638.537,
+     "text": "NO APOLOGIES FOR THAT. THAT'S",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s414",
+     "start_seconds": 637.37,
+     "end_seconds": 639.705,
+     "text": "WHAT CAMPAIGN TRAVEL IS ABOUT.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s415",
+     "start_seconds": 638.638,
+     "end_seconds": 641.407,
+     "text": "WE HAVE DONE IT IN THE PAST AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s416",
+     "start_seconds": 639.805,
+     "end_seconds": 642.308,
+     "text": "WE WILL DO IT IN THE FUTURE.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s417",
+     "start_seconds": 641.574,
+     "end_seconds": 642.742,
+     "text": "Bret: YOU THINK IT'S HITTING",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s418",
+     "start_seconds": 642.475,
+     "end_seconds": 644.71,
+     "text": "A MARK.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s419",
+     "start_seconds": 642.875,
+     "end_seconds": 648.614,
+     "text": "YOU THINK IT'S SCRATCHING THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s420",
+     "start_seconds": 647.046,
+     "end_seconds": 649.615,
+     "text": "ITCH VOTERS WANT TO HEAR.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s421",
+     "start_seconds": 648.714,
+     "end_seconds": 651.7170000000001,
+     "text": "FROM AT A TIME THE PEOPLE ON",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s422",
+     "start_seconds": 649.715,
+     "end_seconds": 653.019,
+     "text": "THE TOP DOING PHENOMENALLY WELL.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s423",
+     "start_seconds": 651.817,
+     "end_seconds": 654.32,
+     "text": "SENIORS AND WORKING CLASS PEOPLE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s424",
+     "start_seconds": 653.352,
+     "end_seconds": 655.655,
+     "text": "ARE STRUGGLING, PEOPLE WANT TO",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s425",
+     "start_seconds": 654.42,
+     "end_seconds": 656.856,
+     "text": "HEAR ACTION TO STAND UP TO THE",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s426",
+     "start_seconds": 655.755,
+     "end_seconds": 658.257,
+     "text": "PEOPLE WHO HAVE THE WEALTH AND",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s427",
+     "start_seconds": 656.956,
+     "end_seconds": 659.692,
+     "text": "THE POWER AND CREATE AN ECONOMY",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s428",
+     "start_seconds": 658.357,
+     "end_seconds": 663.062,
+     "text": "THAT WORKS FOR ALL OF US.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s429",
+     "start_seconds": 659.792,
+     "end_seconds": 663.529,
+     "text": "NOT JUST THE PEOPLE ON TOP.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s430",
+     "start_seconds": 663.229,
+     "end_seconds": 663.529,
+     "text": "Bret: SENATOR SAN",
+     "speaker_id": null
+    }
+   ]
+  },
+  "frames": [],
+  "visual_text": []
+ },
+ "alignment": {
+  "status": "verified",
+  "clip_media_id": "media_df681e20ed5ea718c655a415",
+  "source_media_id": "media_181770437a0a243a26a0b41d",
+  "matches": [
+   {
+    "match_id": "match_001",
+    "clip_start_seconds": 0.199,
+    "clip_end_seconds": 64.8,
+    "source_start_seconds": 147.347,
+    "source_end_seconds": 210.31,
+    "evidence": [
+     {
+      "method": "transcript_partial_ratio",
+      "clip_refs": [
+       "s1",
+       "s2",
+       "s3",
+       "s4",
+       "s5",
+       "s6",
+       "s7",
+       "s8",
+       "s9",
+       "s10",
+       "s11",
+       "s12",
+       "s13",
+       "s14",
+       "s15",
+       "s16",
+       "s17",
+       "s18",
+       "s19",
+       "s20",
+       "s21",
+       "s22",
+       "s23",
+       "s24",
+       "s25",
+       "s26",
+       "s27",
+       "s28"
+      ],
+      "source_refs": [
+       "s99",
+       "s100",
+       "s101",
+       "s102",
+       "s103",
+       "s104",
+       "s105",
+       "s106",
+       "s107",
+       "s108",
+       "s109",
+       "s110",
+       "s111",
+       "s112",
+       "s113",
+       "s114",
+       "s115",
+       "s116",
+       "s117",
+       "s118",
+       "s119",
+       "s120",
+       "s121",
+       "s122",
+       "s123",
+       "s124",
+       "s125",
+       "s126",
+       "s127",
+       "s128",
+       "s129",
+       "s130",
+       "s131",
+       "s132",
+       "s133",
+       "s134",
+       "s135",
+       "s136",
+       "s137",
+       "s138"
+      ],
+      "description": "A distinctive fuzzy transcript passage was localized to supplied provider timestamps; time bounds were not interpolated from text."
+     }
+    ]
+   }
+  ],
+  "match_quality": {
+   "confidence": {
+    "level": "high",
+    "method": "transcript_partial_ratio_v1",
+    "basis": [
+     "Distinctive transcript similarity scored 98.9/100 using a lexical matching heuristic."
+    ],
+    "limitations": [
+     "The transcript similarity score is a heuristic, not a calibrated accuracy or authenticity probability.",
+     "Audio, visual and deepfake verification were not performed.",
+     "Time bounds use provider word timestamps when available, otherwise enclosing caption or ASR segments; segment boundaries may include surrounding speech.",
+     "The earliest original upload was not established.",
+     "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+     "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+     "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+     "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+     "Transcript coverage is partial; unprocessed content was not compared.",
+     "Only one transcript passage was localized; edit and deletion counts were not assessed."
+    ]
+   },
+   "matched_clip_seconds": 64.601,
+   "clip_coverage_ratio": 0.996929012345679,
+   "metrics": [
+    {
+     "name": "transcript_partial_ratio",
+     "unit": "score_0_100",
+     "value": 98.90329012961116
+    }
+   ],
+   "methods_used": [
+    "transcript_partial_ratio"
+   ]
+  },
+  "edit_analysis": {
+   "status": "not_assessed",
+   "scope": "single_passage",
+   "minimum_gap_seconds": 1.0,
+   "source_gaps": [],
+   "unmatched_clip_ranges": [],
+   "counts": {
+    "matched_passages": 1,
+    "source_gaps": null,
+    "unmatched_clip_segments": null,
+    "confirmed_added_segments": null,
+    "confirmed_deleted_segments": null
+   }
+  },
+  "limitations": [
+   "The transcript similarity score is a heuristic, not a calibrated accuracy or authenticity probability.",
+   "Audio, visual and deepfake verification were not performed.",
+   "Time bounds use provider word timestamps when available, otherwise enclosing caption or ASR segments; segment boundaries may include surrounding speech.",
+   "The earliest original upload was not established.",
+   "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+   "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+   "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+   "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+   "Transcript coverage is partial; unprocessed content was not compared.",
+   "Only one transcript passage was localized; edit and deletion counts were not assessed."
+  ]
+ },
+ "context": {
+  "source_media_id": "media_181770437a0a243a26a0b41d",
+  "windows": [
+   {
+    "context_id": "context_001",
+    "match_ids": [
+     "match_001"
+    ],
+    "requested_start_seconds": 140.473,
+    "requested_end_seconds": 221.52100000000002,
+    "coverage": "complete",
+    "sentences": [
+     {
+      "sentence_id": "s92",
+      "start_seconds": 138.271,
+      "end_seconds": 141.67399999999998,
+      "text": "WHY IS IT SO UNDERWATER.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s93",
+      "start_seconds": 140.473,
+      "end_seconds": 143.07600000000002,
+      "text": "AND REPUBLICANS AREN'T A",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s94",
+      "start_seconds": 141.774,
+      "end_seconds": 144.077,
+      "text": "WHOLE LOT BETTER.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s95",
+      "start_seconds": 143.243,
+      "end_seconds": 145.011,
+      "text": "Bret: A LITTLE BIT BETTER BUT",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s96",
+      "start_seconds": 144.177,
+      "end_seconds": 145.345,
+      "text": "NOT A WHOLE LOT.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s97",
+      "start_seconds": 145.111,
+      "end_seconds": 147.24699999999999,
+      "text": "I AGREE.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s98",
+      "start_seconds": 145.512,
+      "end_seconds": 147.914,
+      "text": "I WILL TELL YOU WHY.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s99",
+      "start_seconds": 147.347,
+      "end_seconds": 149.249,
+      "text": "PEOPLE UNDERSTAND THAT THE",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s100",
+      "start_seconds": 148.014,
+      "end_seconds": 150.15,
+      "text": "POLITICAL SYSTEM IN THIS COUNTRY",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s101",
+      "start_seconds": 149.349,
+      "end_seconds": 150.85,
+      "text": "IS LARGELY CORRUPT.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s102",
+      "start_seconds": 150.25,
+      "end_seconds": 151.618,
+      "text": "BOTH PARTIES.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s103",
+      "start_seconds": 150.95,
+      "end_seconds": 152.619,
+      "text": "WHY IS THAT?",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s104",
+      "start_seconds": 151.718,
+      "end_seconds": 154.587,
+      "text": "YOU KNOW THE ANSWER.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s105",
+      "start_seconds": 152.986,
+      "end_seconds": 157.624,
+      "text": "THE ANSWER IS THAT YOU HAVE",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s106",
+      "start_seconds": 154.687,
+      "end_seconds": 158.858,
+      "text": "BILLIONAIRES IN BOTH POLITICAL",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s107",
+      "start_seconds": 157.724,
+      "end_seconds": 160.493,
+      "text": "PARTIES DETERMINE WHAT",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s108",
+      "start_seconds": 158.958,
+      "end_seconds": 162.028,
+      "text": "LEGISLATION GETS TO THE FLOOR.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s109",
+      "start_seconds": 160.593,
+      "end_seconds": 165.231,
+      "text": "AND WHO IS THE CANDIDATE.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s110",
+      "start_seconds": 162.128,
+      "end_seconds": 165.59799999999998,
+      "text": "RIGHT NOW, LET ME GIVE YOU BOTH",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s111",
+      "start_seconds": 165.331,
+      "end_seconds": 166.399,
+      "text": "EXAMPLES.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s112",
+      "start_seconds": 165.698,
+      "end_seconds": 168.001,
+      "text": "YOU ARE IN THE REPUBLICAN PARTY.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s113",
+      "start_seconds": 166.499,
+      "end_seconds": 170.97,
+      "text": "AND YOU SAY, YOU KNOW WHAT?",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s114",
+      "start_seconds": 168.101,
+      "end_seconds": 172.639,
+      "text": "I DON'T LIKE THIS TRUMP IDEA",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s115",
+      "start_seconds": 171.07,
+      "end_seconds": 175.041,
+      "text": "GIVING MASSIVE TAX BREAKS TO THE",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s116",
+      "start_seconds": 172.739,
+      "end_seconds": 175.40800000000002,
+      "text": "RICH AND CUTTING MEDICAID AND",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s117",
+      "start_seconds": 175.141,
+      "end_seconds": 176.476,
+      "text": "EDUCATION.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s118",
+      "start_seconds": 175.508,
+      "end_seconds": 177.877,
+      "text": "GET UP AND SAY THAT.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s119",
+      "start_seconds": 176.576,
+      "end_seconds": 179.612,
+      "text": "WHAT HAPPENS TO YOU IN THE NEXT",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s120",
+      "start_seconds": 177.977,
+      "end_seconds": 180.91400000000002,
+      "text": "DAY ELON MUSK SAYS I GOT",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s121",
+      "start_seconds": 179.746,
+      "end_seconds": 181.81400000000002,
+      "text": "UNLIMITED AMOUNTS OF MONEY.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s122",
+      "start_seconds": 181.014,
+      "end_seconds": 184.55100000000002,
+      "text": "WE'RE GOING TO RUN A CANDIDATE",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s123",
+      "start_seconds": 182.115,
+      "end_seconds": 185.45100000000002,
+      "text": "IN A PRIMARY AGAINST YOU.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s124",
+      "start_seconds": 184.717,
+      "end_seconds": 186.55300000000003,
+      "text": "DEMOCRATIC PARTY SIDE.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s125",
+      "start_seconds": 185.552,
+      "end_seconds": 187.287,
+      "text": "WHAT HAPPENS IF SOMEBODY SAYS",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s126",
+      "start_seconds": 186.653,
+      "end_seconds": 189.355,
+      "text": "YOU KNOW WHAT?",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s127",
+      "start_seconds": 187.387,
+      "end_seconds": 193.059,
+      "text": "MAYBE IT'S NOT A GOOD IDEA TO",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s128",
+      "start_seconds": 189.455,
+      "end_seconds": 194.727,
+      "text": "FUND NETANYAHU'S WAR MACHINE,",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s129",
+      "start_seconds": 193.159,
+      "end_seconds": 195.695,
+      "text": "WHICH IS CREATING STARVATION FOR",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s130",
+      "start_seconds": 194.827,
+      "end_seconds": 197.664,
+      "text": "CHILDREN IN GAZA.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s131",
+      "start_seconds": 195.795,
+      "end_seconds": 199.432,
+      "text": "I'M GOING TO VOTE AGAINST THAT.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s132",
+      "start_seconds": 197.764,
+      "end_seconds": 200.4,
+      "text": "NEXT DAY AIPAC IS GOING TO BE",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s133",
+      "start_seconds": 199.532,
+      "end_seconds": 202.46800000000002,
+      "text": "RUNNING AGAINST YOU.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s134",
+      "start_seconds": 200.5,
+      "end_seconds": 203.369,
+      "text": "WE HAVE A CORRUPT CAMPAIGN,",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s135",
+      "start_seconds": 202.569,
+      "end_seconds": 206.506,
+      "text": "FINANCE SYSTEM.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s136",
+      "start_seconds": 203.469,
+      "end_seconds": 208.07399999999998,
+      "text": "BILLIONAIRES IN BOTH POLITICAL",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s137",
+      "start_seconds": 206.606,
+      "end_seconds": 209.509,
+      "text": "PARTIES ARE CALLING THE TUNES,",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s138",
+      "start_seconds": 208.174,
+      "end_seconds": 210.31,
+      "text": "AMERICAN PEOPLE UNDERSTAND THAT.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s139",
+      "start_seconds": 209.676,
+      "end_seconds": 212.545,
+      "text": "Bret: YOU MENTION GAZA THERE",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s140",
+      "start_seconds": 210.476,
+      "end_seconds": 214.948,
+      "text": "WAS A HOUSE HEARING",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s141",
+      "start_seconds": 212.645,
+      "end_seconds": 215.68200000000002,
+      "text": "ANTI-SEMITISM AT NINE IVY LEAGUE",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s142",
+      "start_seconds": 215.048,
+      "end_seconds": 216.249,
+      "text": "UNIVERSITIES ON THE HILL.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s143",
+      "start_seconds": 215.782,
+      "end_seconds": 217.65,
+      "text": "YOU ARE JEWISH.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s144",
+      "start_seconds": 216.349,
+      "end_seconds": 218.885,
+      "text": "HAVE YOU EXPRESSED, OBVIOUSLY, A",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s145",
+      "start_seconds": 217.75,
+      "end_seconds": 220.086,
+      "text": "LOT OF CONCERN ABOUT WHAT IS",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s146",
+      "start_seconds": 218.985,
+      "end_seconds": 221.52100000000002,
+      "text": "HAPPENING IN GAZA.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s147",
+      "start_seconds": 220.186,
+      "end_seconds": 222.889,
+      "text": "WHAT DO YOU THINK ABOUT WHAT IS",
+      "speaker_id": null
+     }
+    ]
+   }
+  ],
+  "limitations": [
+   "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+   "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+   "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+   "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+   "Conservative caption boundaries; not frame-exact. Context sufficiency is an estimate."
+  ]
+ },
+ "comparison": {
+  "context_assessment": "no_material_difference_found",
+  "caption_assessment": "supported_by_context",
+  "assessment_confidence": {
+   "level": "moderate",
+   "method": "groq_transcript_context",
+   "basis": [
+    "The clip is a continuous segment of the source interview where Sanders discusses campaign finance."
+   ],
+   "limitations": []
+  },
+  "summary": "Takeaways: Senator Bernie Sanders argues that the U.S. political system is corrupt because billionaires in both parties use their wealth to control legislation and primary candidates. \n\nWhat this means: The surrounding context shows this was part of a broader discussion with Bret Baier regarding why political polling numbers are low for both major parties. Sanders uses specific examples involving Elon Musk and AIPAC to illustrate how financial pressure is applied to politicians who deviate from donor interests.\n\nReliability: A source passage was located using timed transcripts. Factual claims and recording authenticity were not checked.",
+  "findings": [
+   {
+    "finding_id": "finding_1",
+    "type": "context",
+    "explanation": "Sanders explicitly defines the political system as corrupt due to billionaire influence in both parties.",
+    "evidence": [
+     {
+      "media_id": "media_181770437a0a243a26a0b41d",
+      "sentence_ids": [
+       "s101"
+      ],
+      "start_seconds": 149.349,
+      "end_seconds": 150.85,
+      "quote": "IS LARGELY CORRUPT."
+     },
+     {
+      "media_id": "media_181770437a0a243a26a0b41d",
+      "sentence_ids": [
+       "s106"
+      ],
+      "start_seconds": 154.687,
+      "end_seconds": 158.858,
+      "quote": "BILLIONAIRES IN BOTH POLITICAL"
+     }
+    ]
+   }
+  ],
+  "limitations": [
+   "Transcript comparison does not establish factual truth, speaker identity or recording authenticity."
+  ]
+ },
+ "summary": "Takeaways: Senator Bernie Sanders argues that the U.S. political system is corrupt because billionaires in both parties use their wealth to control legislation and primary candidates. \n\nWhat this means: The surrounding context shows this was part of a broader discussion with Bret Baier regarding why political polling numbers are low for both major parties. Sanders uses specific examples involving Elon Musk and AIPAC to illustrate how financial pressure is applied to politicians who deviate from donor interests.\n\nReliability: A source passage was located using timed transcripts. Factual claims and recording authenticity were not checked.",
+ "limitations": [
+  "The transcript similarity score is a heuristic, not a calibrated accuracy or authenticity probability.",
+  "Audio, visual and deepfake verification were not performed.",
+  "Time bounds use provider word timestamps when available, otherwise enclosing caption or ASR segments; segment boundaries may include surrounding speech.",
+  "The earliest original upload was not established.",
+  "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+  "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+  "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+  "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+  "Transcript coverage is partial; unprocessed content was not compared.",
+  "Only one transcript passage was localized; edit and deletion counts were not assessed.",
+  "Transcript comparison does not establish factual truth, speaker identity or recording authenticity.",
+  "Conservative caption boundaries; not frame-exact. Context sufficiency is an estimate.",
+  "Unverified source candidate: https://www.youtube.com/watch?v=VktJUYksduE",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=VktJUYksduE\", \"title\": \"Neither party can control capitalism: Bill O'Reilly on affordability, tax loopholes | On Balance\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}",
+  "Unverified source candidate: https://www.youtube.com/watch?v=wZjKcby6T5A",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=wZjKcby6T5A\", \"title\": \"Trump\u2019s Corporate Enablers Should Be VERY Worried About 2027\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}",
+  "Unverified source candidate: https://www.youtube.com/watch?v=vyLhLS4cm2o",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=vyLhLS4cm2o\", \"title\": \"Is Bernie Sanders' presidential campaign gaining momentum?\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}",
+  "Unverified source candidate: https://www.youtube.com/watch?v=8rwCoCcepVo",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=8rwCoCcepVo\", \"title\": \"Bernie Sends Fox News Into Damage Control\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}"
+ ]
+}

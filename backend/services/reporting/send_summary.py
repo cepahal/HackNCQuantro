@@ -20,7 +20,13 @@ from ..shared.errors import ErrorCode, QuantroError, Stage
 from ..shared.errors import QuantroError as _ContractError
 from ..shared.errors import Stage as _ContractStage
 from ..shared.errors import normalize_exception as _normalize_contract_exception
-from ..shared.types import DeliveryResult
+from ..shared.types import (
+    ConfidenceLevel,
+    DeliveryResult,
+    Outcome,
+    ReportV2,
+    TranscriptSentence,
+)
 from ..shared.types import DeliveryResult as _ReturnModel
 
 
@@ -122,6 +128,72 @@ def get_delivery_tracker() -> DeliveryTracker:
 
 def format_summary_message(summary: str, report_url: str) -> str:
     return f"{summary} View the evidence: {report_url}"
+
+
+def format_context_summary(report: ReportV2) -> str:
+    """Quote only observed source sentences outside the verified matched passage."""
+    missing = "Not available in the source transcript."
+    unavailable = "No verified source context available."
+
+    def message(before: str, after: str) -> str:
+        return f"Context before: {before}\n\nContext after: {after}"
+
+    source, alignment, context = report.source, report.alignment, report.context
+    if (
+        report.outcome != Outcome.MATCHED or source is None or alignment is None or context is None
+        or alignment.status != "verified" or not alignment.matches
+        or alignment.match_quality.confidence.level not in {ConfidenceLevel.HIGH, ConfidenceLevel.MODERATE}
+        or source.post.media.media_id == report.submitted.post.media.media_id
+        or alignment.clip_media_id != report.submitted.post.media.media_id
+        or alignment.source_media_id != source.post.media.media_id
+        or context.source_media_id != source.post.media.media_id
+        or source.transcript.status == "unavailable"
+    ):
+        return message(unavailable, unavailable)
+    matches = {item.match_id: item for item in alignment.matches}
+    if len(matches) != len(alignment.matches) or any(
+        not item.match_id or item.source_start_seconds >= item.source_end_seconds
+        for item in matches.values()
+    ):
+        return message(unavailable, unavailable)
+    first = min(item.source_start_seconds for item in matches.values())
+    last = max(item.source_end_seconds for item in matches.values())
+    canonical: dict[str, TranscriptSentence] = {}
+    for sentence in source.transcript.sentences:
+        if sentence.sentence_id in canonical and canonical[sentence.sentence_id] != sentence:
+            return message(unavailable, unavailable)
+        canonical[sentence.sentence_id] = sentence
+    observed: dict[str, TranscriptSentence] = {}
+    for window in context.windows:
+        if (window.coverage == "unavailable" or not window.match_ids
+                or window.requested_start_seconds >= window.requested_end_seconds
+                or any(identity not in matches for identity in window.match_ids)):
+            continue
+        if any(not window.requested_start_seconds <= matches[identity].source_start_seconds
+                   < matches[identity].source_end_seconds <= window.requested_end_seconds
+               for identity in window.match_ids):
+            continue
+        for sentence in window.sentences:
+            if (canonical.get(sentence.sentence_id) == sentence and sentence.text.strip()
+                    and sentence.start_seconds < sentence.end_seconds
+                    and sentence.start_seconds < window.requested_end_seconds
+                    and sentence.end_seconds > window.requested_start_seconds
+                    and any(interval.start_seconds <= sentence.start_seconds
+                            < sentence.end_seconds <= interval.end_seconds
+                            for interval in source.transcript.processed_ranges)):
+                observed[sentence.sentence_id] = sentence
+    before = [sentence for sentence in observed.values() if sentence.end_seconds <= first]
+    after = [sentence for sentence in observed.values() if sentence.start_seconds >= last]
+
+    def excerpt(sentences: list[TranscriptSentence], *, preceding: bool) -> str:
+        if not sentences:
+            return missing
+        sentence = (max(sentences, key=lambda item: (item.end_seconds, item.start_seconds, item.sentence_id))
+                    if preceding else min(sentences, key=lambda item: (item.start_seconds, item.end_seconds, item.sentence_id)))
+        text = re.sub(r"\s+", " ", sentence.text).strip()
+        return text if len(text) <= 650 else text[:649].rstrip() + "…"
+
+    return message(excerpt(before, preceding=True), excerpt(after, preceding=False))
 
 
 def _send_failed(message: str, *, retryable: bool = True) -> QuantroError:

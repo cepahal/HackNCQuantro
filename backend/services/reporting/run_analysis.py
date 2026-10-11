@@ -84,7 +84,12 @@ from .remote_youtube import (
     canonical_youtube_url,
 )
 from .save_report import report_id_for_job, save_report_and_complete_job
-from .send_summary import DeliveryTracker, MessagingProvider, send_summary
+from .send_summary import (
+    DeliveryTracker,
+    MessagingProvider,
+    format_context_summary,
+    send_summary,
+)
 from .submitted_interpretation import interpret_submitted
 
 logger = logging.getLogger(__name__)
@@ -811,7 +816,7 @@ def _complete_and_deliver(
     delivery, delivery_warning = deliver_summary_after_save(
         job_id,
         conversation_id,
-        report.summary or NO_SOURCE_SUMMARY,
+        format_context_summary(report),
         saved.report_url,
         provider=provider,
         tracker=tracker,

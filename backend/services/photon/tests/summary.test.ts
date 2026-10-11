@@ -597,6 +597,34 @@ const structuredInput: SummaryInput = {
   summary: "Takeaways: The excerpt includes a conditional promise.\n\nWhat this means: The qualifier changes how the post claim reads.\n\nReliability: A source comparison is available, but factual accuracy and intent remain unestablished.",
 };
 
+test("source context replies use simple before and after labels, then the report link", () => {
+  const messages = formatSummaryMessages({ ...input, summary:
+    "Context before: We considered **both** options.\nThe decision was conditional.\n\nContext after: The condition still applies." });
+  assert.deepEqual(messages, [
+    "Context before: We considered both options. The decision was conditional.",
+    "Context after: The condition still applies.",
+    `Full report:\n${input.report_url}`,
+  ]);
+  assert.doesNotMatch(messages.join(" "), /TL;DR|Takeaways|What this means|Reliability/);
+});
+
+test("unavailable source context stays explicit without a truth or authenticity verdict", () => {
+  const messages = formatSummaryMessages({ ...input, summary:
+    "Context before: No verified source context available.\n\nContext after: No verified source context available." });
+  assert.deepEqual(messages.slice(0, 2), [
+    "Context before: No verified source context available.",
+    "Context after: No verified source context available.",
+  ]);
+  assert.doesNotMatch(messages.join(" "), /misleading|fake|false|fabricated|lying|authentic/i);
+});
+
+test("each source context excerpt is bounded and visibly marked when truncated", () => {
+  const messages = formatSummaryMessages({ ...input, summary:
+    `Context before: ${"b".repeat(800)}\n\nContext after: ${"a".repeat(800)}` });
+  assert.equal(messages[0], `Context before: ${"b".repeat(649)}…`);
+  assert.equal(messages[1], `Context after: ${"a".repeat(649)}…`);
+});
+
 test("three concise messages put reliability first, explanation second, and the report link last", () => {
   const messages = formatSummaryMessages(structuredInput);
   assert.deepEqual(messages, [

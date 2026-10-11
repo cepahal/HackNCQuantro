@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
-import { createEnrollmentHandler, EnrollmentError, WELCOME_MESSAGE, type WelcomeDiagnostic } from "../src/enroll.ts";
+import { createEnrollmentHandler, EnrollmentError, WELCOME_MESSAGE, type EnrollmentDiagnostic, type WelcomeDiagnostic } from "../src/enroll.ts";
 import { createBridgeServer } from "../src/server.ts";
 
 const projectId = "12345678-1234-4123-8123-123456789abc";
@@ -19,6 +19,10 @@ const legacyLedgerName = `${createHash("sha256").update(`${projectId}:${phone}`)
 const ledgerName = (id = userId): string => `${createHash("sha256").update(`${projectId}:${phone}:${id}`).digest("hex")}.json`;
 const input = { phone_number: phone, consent: true };
 const user = { type: "shared", phoneNumber: phone, assignedPhoneNumber: assigned, id: userId };
+const welcomeRequestId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const explicitKey = (id = welcomeRequestId): string => `enroll_${createHash("sha256").update(`${phone}:${id.toLowerCase()}`).digest("hex")}`;
+const explicitLedgerName = (id = welcomeRequestId): string => `${createHash("sha256").update(`${projectId}:${phone}:${id.toLowerCase()}`).digest("hex")}.json`;
+const explicitInput = { ...input, welcome_request_id: welcomeRequestId };
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -35,17 +39,19 @@ function hasError(status: number, code: string) {
   };
 }
 
-async function fixture(t: TestContext) {
+async function fixture(t: TestContext, explicitRequestId?: string) {
   const directory = await mkdtemp(join(tmpdir(), "quantro-enroll-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const calls: { url: string; options: RequestInit }[] = [];
   const sends: { recipient: string; text: string }[] = [];
   const diagnostics: WelcomeDiagnostic[] = [];
+  const enrollmentDiagnostics: EnrollmentDiagnostic[] = [];
   let listed: unknown = { succeed: true, data: { users: [], total: 0 } };
   let created: unknown = { succeed: true, data: user };
   const options = {
     projectId, projectSecret, deliveryDirectory: directory,
     diagnostic: (event: WelcomeDiagnostic) => { diagnostics.push(event); },
+    enrollmentDiagnostic: (event: EnrollmentDiagnostic) => { enrollmentDiagnostics.push(event); },
     fetch: (async (url: string | URL | Request, init?: RequestInit) => {
       calls.push({ url: String(url), options: init! });
       if (init?.method === "GET") return json(listed);
@@ -54,13 +60,13 @@ async function fixture(t: TestContext) {
       return json(created);
     }) as typeof fetch,
     sendWelcome: async (recipient: string, text: string) => {
-      const persisted = JSON.parse(await readFile(join(directory, ledgerName()), "utf8"));
+      const persisted = JSON.parse(await readFile(join(directory, explicitRequestId ? explicitLedgerName(explicitRequestId) : ledgerName()), "utf8"));
       assert.equal(persisted.state, "pending");
       sends.push({ recipient, text });
       return { id: "welcome-message-id" };
     },
   };
-  return { directory, calls, sends, diagnostics, options,
+  return { directory, calls, sends, diagnostics, enrollmentDiagnostics, options,
     setListed: (value: unknown) => { listed = value; }, setCreated: (value: unknown) => { created = value; } };
 }
 
@@ -102,6 +108,217 @@ test("existing provider user without receipt history is recognized without creat
   assert.equal((await createEnrollmentHandler(state.options)(input, key)).welcome_status, "uncertain");
   assert.equal(state.calls.length, 2);
 });
+
+test("explicit welcome intent sends to an existing user while preserving previous uncertain receipts", async (t) => {
+  const state = await fixture(t, welcomeRequestId);
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  const old = JSON.stringify({ version: 1, state: "uncertain", assigned_phone_number: assigned });
+  await writeFile(join(state.directory, ledgerName()), old);
+  await writeFile(join(state.directory, legacyLedgerName), old);
+  const result = await createEnrollmentHandler(state.options)(explicitInput, explicitKey());
+  assert.equal(result.already_enrolled, true);
+  assert.equal(result.welcome_status, "accepted");
+  assert.equal(state.calls.length, 1);
+  assert.deepEqual(state.sends, [{ recipient: phone, text: WELCOME_MESSAGE }]);
+  assert.equal(await readFile(join(state.directory, ledgerName()), "utf8"), old);
+  assert.equal(await readFile(join(state.directory, legacyLedgerName), "utf8"), old);
+  const receipt = JSON.parse(await readFile(join(state.directory, explicitLedgerName()), "utf8"));
+  assert.equal(receipt.state, "accepted");
+  assert.equal(receipt.message_id, "welcome-message-id");
+});
+
+test("one explicit request coalesces concurrent signup and remains deduplicated after restart", async (t) => {
+  const state = await fixture(t, welcomeRequestId);
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  const enroll = createEnrollmentHandler(state.options);
+  const results = await Promise.all(Array.from({ length: 10 }, () => enroll(explicitInput, explicitKey())));
+  assert.ok(results.every(result => result.welcome_status === "accepted" && result.already_enrolled));
+  assert.equal(state.calls.length, 1);
+  assert.equal(state.sends.length, 1);
+  assert.equal((await createEnrollmentHandler(state.options)(explicitInput, explicitKey())).welcome_status, "accepted");
+  assert.equal(state.calls.length, 2);
+  assert.equal(state.sends.length, 1);
+});
+
+test("uppercase UUID spelling is normalized to the same welcome request and idempotency key", async (t) => {
+  const state = await fixture(t, welcomeRequestId);
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  const enroll = createEnrollmentHandler(state.options);
+  const results = await Promise.all([
+    enroll(explicitInput, explicitKey()),
+    enroll({ ...explicitInput, welcome_request_id: welcomeRequestId.toUpperCase() }, explicitKey()),
+  ]);
+  assert.ok(results.every(result => result.welcome_status === "accepted"));
+  assert.equal(state.calls.length, 1);
+  assert.equal(state.sends.length, 1);
+  assert.equal((await createEnrollmentHandler(state.options)({
+    ...explicitInput, welcome_request_id: welcomeRequestId.toUpperCase(),
+  }, explicitKey())).welcome_status, "accepted");
+  assert.equal(state.sends.length, 1);
+});
+
+test("the same explicit request never sends again after provider user revocation and recreation", async (t) => {
+  const state = await fixture(t, welcomeRequestId);
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  assert.equal((await createEnrollmentHandler(state.options)(explicitInput, explicitKey())).welcome_status, "accepted");
+  const receipt = await readFile(join(state.directory, explicitLedgerName()), "utf8");
+  state.setListed({ succeed: true, data: { users: [], total: 0 } });
+  state.setCreated({ succeed: true, data: { ...user, id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" } });
+  const restored = await createEnrollmentHandler(state.options)(explicitInput, explicitKey());
+  assert.equal(restored.already_enrolled, false);
+  assert.equal(restored.welcome_status, "uncertain");
+  assert.equal(state.sends.length, 1);
+  assert.equal(await readFile(join(state.directory, explicitLedgerName()), "utf8"), receipt);
+  assert.equal((await createEnrollmentHandler(state.options)(explicitInput, explicitKey())).welcome_status, "uncertain");
+  assert.equal(state.sends.length, 1);
+});
+
+test("independent handlers share the durable explicit pending claim before a send", async (t) => {
+  const state = await fixture(t, welcomeRequestId);
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  let release!: (value: { id: string }) => void;
+  let started!: () => void;
+  const sending = new Promise<void>(resolve => { started = resolve; });
+  let sends = 0;
+  const options = { ...state.options, sendWelcome: async () => {
+    sends++;
+    started();
+    return new Promise<{ id: string }>(resolve => { release = resolve; });
+  } };
+  const first = createEnrollmentHandler(options)(explicitInput, explicitKey());
+  await sending;
+  const second = await createEnrollmentHandler(options)(explicitInput, explicitKey());
+  assert.equal(second.welcome_status, "uncertain");
+  assert.equal(sends, 1);
+  release({ id: "explicit-accepted" });
+  assert.equal((await first).welcome_status, "accepted");
+});
+
+for (const kind of ["pending", "timeout", "exception"] as const) {
+  test(`same explicit request with ${kind} delivery never sends another welcome`, async (t) => {
+    const state = await fixture(t, welcomeRequestId);
+    state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+    let sends = 0;
+    if (kind === "pending") await writeFile(join(state.directory, explicitLedgerName()), JSON.stringify({
+      version: 1, state: "pending", assigned_phone_number: assigned,
+    }));
+    const options = { ...state.options, sendTimeoutMs: 5, sendWelcome: async () => {
+      sends++;
+      if (kind === "timeout") return new Promise<never>(() => {});
+      throw new Error("PRIVATE_PROVIDER_DETAILS");
+    } };
+    assert.equal((await createEnrollmentHandler(options)(explicitInput, explicitKey())).welcome_status, "uncertain");
+    assert.equal((await createEnrollmentHandler(options)(explicitInput, explicitKey())).welcome_status, "uncertain");
+    assert.equal(sends, kind === "pending" ? 0 : 1);
+  });
+}
+
+test("a distinct explicit welcome request has a separate receipt without rewriting the first", async (t) => {
+  const state = await fixture(t, welcomeRequestId);
+  state.setListed({ succeed: true, data: { users: [user], total: 1 } });
+  const old = JSON.stringify({ version: 1, state: "accepted", assigned_phone_number: assigned, message_id: "older-welcome" });
+  await writeFile(join(state.directory, explicitLedgerName()), old);
+  const next = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  let sends = 0;
+  const options = { ...state.options, sendWelcome: async () => {
+    assert.equal(JSON.parse(await readFile(join(state.directory, explicitLedgerName(next)), "utf8")).state, "pending");
+    sends++;
+    return { id: "new-welcome" };
+  } };
+  assert.equal((await createEnrollmentHandler(options)({ ...input, welcome_request_id: next }, explicitKey(next))).welcome_status, "accepted");
+  assert.equal(sends, 1);
+  assert.equal(await readFile(join(state.directory, explicitLedgerName()), "utf8"), old);
+});
+
+for (const id of [null, true, "", "not-a-uuid", "bbbbbbbb-bbbb-1bbb-8bbb-bbbbbbbbbbbb", "bbbbbbbb-bbbb-4bbb-7bbb-bbbbbbbbbbbb", `${welcomeRequestId}\n`]) {
+  test(`invalid explicit welcome request ${JSON.stringify(id)} is rejected before provider interaction`, async (t) => {
+    const state = await fixture(t);
+    await assert.rejects(createEnrollmentHandler(state.options)({ ...input, welcome_request_id: id }, key), hasError(400, "INVALID_ENROLLMENT_INPUT"));
+    assert.equal(state.calls.length, 0);
+    assert.equal(state.sends.length, 0);
+  });
+}
+
+test("explicit intent requires its matching idempotency key and rejects unknown fields", async (t) => {
+  const state = await fixture(t);
+  await assert.rejects(createEnrollmentHandler(state.options)(explicitInput, key), hasError(400, "INVALID_IDEMPOTENCY_KEY"));
+  await assert.rejects(createEnrollmentHandler(state.options)({ ...explicitInput, retry: true }, explicitKey()), hasError(400, "INVALID_ENROLLMENT_INPUT"));
+  assert.equal(state.calls.length, 0);
+  assert.equal(state.sends.length, 0);
+});
+
+test("enrollment diagnostics separate lookup and create without retaining private data", async (t) => {
+  const state = await fixture(t);
+  assert.equal((await createEnrollmentHandler(state.options)(input, key)).welcome_status, "accepted");
+  assert.deepEqual(state.enrollmentDiagnostics.map(({ phase, category, http_status }) => ({ phase, category, http_status })), [
+    { phase: "lookup", category: "response_ok", http_status: 200 },
+    { phase: "create", category: "response_ok", http_status: 200 },
+  ]);
+  for (const event of state.enrollmentDiagnostics) {
+    assert.deepEqual(Object.keys(event).sort(), ["category", "elapsed_ms", "http_status", "phase"]);
+    assert.ok(Number.isInteger(event.elapsed_ms) && event.elapsed_ms >= 0);
+  }
+  assert.doesNotMatch(JSON.stringify(state.enrollmentDiagnostics), /15551234567|15557654321|test-only|aaaaaaaa|12345678|https|Basic/);
+});
+
+for (const phase of ["lookup", "create"] as const) {
+  for (const category of ["http_error", "invalid_response", "timeout", "network_error"] as const) {
+    test(`${phase} ${category} is diagnosed once without provider details or retries`, async (t) => {
+      const state = await fixture(t);
+      let requests = 0;
+      const options = { ...state.options, requestTimeoutMs: 10, fetch: (async (url, init) => {
+        requests++;
+        if (phase === "create" && init?.method === "GET") return json({ succeed: true, data: { users: [] } });
+        if (category === "http_error") return new Response(`PRIVATE_PROVIDER_DETAILS ${phone}`, { status: 403 });
+        if (category === "invalid_response") return json({ succeed: false, details: { phone, projectSecret, userId } });
+        if (category === "timeout") return new Promise<never>((_resolve, reject) => {
+          const signal = init!.signal!;
+          signal.addEventListener("abort", () => reject(new Error(`PRIVATE_PROVIDER_DETAILS ${phone}`)), { once: true });
+        });
+        throw Object.assign(new Error(`PRIVATE_PROVIDER_DETAILS ${phone} ${projectSecret}`), { url, projectId, userId });
+      }) as typeof fetch };
+      // AbortSignal.timeout is unrefed; keep the process alive while the fake fetch waits.
+      const keepAlive = setTimeout(() => {}, 1_000);
+      try {
+        await assert.rejects(createEnrollmentHandler(options)(input, key), hasError(503, "ENROLLMENT_UNAVAILABLE"));
+      } finally { clearTimeout(keepAlive); }
+      assert.equal(requests, phase === "lookup" ? 1 : 2);
+      assert.equal(state.sends.length, 0);
+      const event = state.enrollmentDiagnostics.at(-1)!;
+      assert.equal(event.phase, phase);
+      assert.equal(event.category, category);
+      assert.equal(event.http_status, category === "http_error" ? 403 : category === "invalid_response" ? 200 : undefined);
+      assert.ok(Number.isInteger(event.elapsed_ms) && event.elapsed_ms >= 0);
+      assert.doesNotMatch(JSON.stringify(state.enrollmentDiagnostics), /PRIVATE_PROVIDER|15551234567|test-only|aaaaaaaa|12345678|https|Basic/);
+    });
+  }
+}
+
+test("default enrollment logging exposes only fixed phase and response fields", async (t) => {
+  const state = await fixture(t);
+  const logged: unknown[][] = [];
+  t.mock.method(console, "info", (...values: unknown[]) => { logged.push(values); });
+  const options = { ...state.options, enrollmentDiagnostic: undefined };
+  assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "accepted");
+  assert.equal(logged.length, 2);
+  assert.ok(logged.every(([label]) => label === "Photon enrollment diagnostic:"));
+  assert.deepEqual(logged.map(([, value]) => JSON.parse(String(value)).phase), ["lookup", "create"]);
+  assert.doesNotMatch(JSON.stringify(logged), /15551234567|15557654321|test-only|aaaaaaaa|12345678|https|Basic/);
+});
+
+for (const asynchronous of [false, true]) {
+  test(`${asynchronous ? "async" : "sync"} enrollment diagnostic failure cannot break signup or resend`, async (t) => {
+    const state = await fixture(t);
+    const options = { ...state.options, enrollmentDiagnostic: () => {
+      if (asynchronous) return Promise.reject(new Error("PRIVATE_DIAGNOSTIC_FAILURE"));
+      throw new Error("PRIVATE_DIAGNOSTIC_FAILURE");
+    } };
+    assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "accepted");
+    assert.equal((await createEnrollmentHandler(options)(input, key)).welcome_status, "accepted");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(state.sends.length, 1);
+  });
+}
 
 test("duplicate after restart reconciles active provider user and sends no further message", async (t) => {
   const state = await fixture(t);

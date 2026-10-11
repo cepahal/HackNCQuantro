@@ -1,0 +1,12 @@
+{
+ "report_id": "report_job_demo_qzYTN4lfEn4_5",
+ "status": "unavailable",
+ "context_gap": null,
+ "summary": null,
+ "reliability": "This reading compares recorded words. It does not verify factual accuracy, identity or video authenticity.",
+ "references": [],
+ "source_review": null,
+ "provider": "gemini",
+ "model": null,
+ "generated_at": "2026-10-11T12:16:07.111483Z"
+}

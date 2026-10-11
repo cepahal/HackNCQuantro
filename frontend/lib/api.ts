@@ -3,6 +3,9 @@ import type {
 } from "./api-types";
 export type { AnalysisResult, ReportMedia, ReportV2 } from "./api-types";
 import type { ReportDiagnostics } from "./report-diagnostics";
+import {
+  DEMO_DELAY_MS, demoAssetPath, demoJobForUrl, demoMediaPath, demoProgressFraction, demoReportPath, isDemoJob, markDemoStarted,
+} from "./demo-reports.ts";
 
 const IDENTIFIER = /^[A-Za-z0-9_-]{1,128}$/;
 const REPORT_ID = /^report_[A-Za-z0-9_-]{1,128}$/;
@@ -133,6 +136,10 @@ function assertIngestResult(data: unknown, jobId: string): IngestResult {
 export async function runAnalysis(
   url: string, conversationId?: string, jobId = `job_${crypto.randomUUID()}`,
 ): Promise<AnalysisResult> {
+  if (demoJobForUrl(url) === jobId) {
+    await new Promise(resolve => setTimeout(resolve, DEMO_DELAY_MS));
+    return assertAnalysisResult(await request(demoAssetPath(jobId, "result")!, undefined, ""), jobId);
+  }
   const body = conversationId === undefined ? { url } : { url, conversation_id: conversationId };
   return assertAnalysisResult(await postJson(`/analyze/${encodeURIComponent(jobId)}/run`, body), jobId);
 }
@@ -146,7 +153,9 @@ const inFlight = new Map<string, AnalysisInFlight>();
 
 /** Starts the synchronous analysis and returns its job id so another page can await it after client-side navigation. */
 export function startAnalysis(url: string): string {
-  const jobId = `job_${crypto.randomUUID()}`;
+  const demoJob = demoJobForUrl(url);
+  const jobId = demoJob ?? `job_${crypto.randomUUID()}`;
+  if (demoJob) markDemoStarted(demoJob);
   const result = runAnalysis(url, undefined, jobId);
   // The awaiting page reports the rejection; this only stops an unhandled-rejection report before it mounts.
   result.catch(() => undefined);
@@ -196,7 +205,8 @@ export function getReportInterpretation(reportId: string): Promise<ReportInterpr
   if (!REPORT_ID.test(reportId)) return Promise.reject(new ReportNotFoundError());
   const previous = interpretationRequests.get(reportId);
   if (previous) return previous;
-  const promise = postJson(`/reports/${encodeURIComponent(reportId)}/interpretation`, {}).then(data => {
+  const path = `/reports/${encodeURIComponent(reportId)}/interpretation`;
+  const promise = (demoReportPath(path) ? requestReport(path) : postJson(path, {})).then(data => {
     if (!isRecord(data) || data.report_id !== reportId || !["ready", "unavailable"].includes(String(data.status))
       || data.provider !== "gemini" || typeof data.reliability !== "string" || typeof data.generated_at !== "string"
       || !Array.isArray(data.references) || !data.references.every(ref => isRecord(ref) && typeof ref.media_id === "string" && typeof ref.sentence_id === "string")
@@ -224,8 +234,9 @@ export async function recheckReportSource(reportId: string, url: string, jobId =
 }
 
 async function requestReport(path: string): Promise<unknown> {
+  const demo = demoReportPath(path);
   try {
-    return await request(path, undefined, reportApiBase());
+    return await (demo ? request(demo, undefined, "") : request(path, undefined, reportApiBase()));
   } catch (error) {
     if (error instanceof QuantroApiError && error.status === 404) throw new ReportNotFoundError();
     throw error;
@@ -258,7 +269,7 @@ export function publicUrl(value: string | null | undefined): string | null {
 }
 
 export function mediaUrl(media: Pick<PublicMediaAsset, "media_id" | "playback_url">): string | null {
-  return publicUrl(media.playback_url) || (IDENTIFIER.test(media.media_id)
+  return demoMediaPath(media.media_id) || publicUrl(media.playback_url) || (IDENTIFIER.test(media.media_id)
     ? `${reportApiBase()}/media/${encodeURIComponent(media.media_id)}` : null);
 }
 
@@ -266,6 +277,7 @@ export function mediaUrl(media: Pick<PublicMediaAsset, "media_id" | "playback_ur
 /** Reconnect to persisted job state without starting another analysis. */
 export async function waitForReport(jobId: string, signal?: AbortSignal): Promise<string> {
   if (!IDENTIFIER.test(jobId)) throw new Error("The job identifier is invalid.");
+  if (isDemoJob(jobId)) return `report_${jobId}`;
   const pause = () => new Promise<void>((resolve, reject) => {
     const abort = () => { clearTimeout(timer); reject(new DOMException("Cancelled", "AbortError")); };
     const timer = setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, 2000);
@@ -298,5 +310,12 @@ export async function waitForReport(jobId: string, signal?: AbortSignal): Promis
 export async function getAnalysisProgress(jobId:string, signal?:AbortSignal) {
   if(!IDENTIFIER.test(jobId)) throw new Error('Invalid job identifier');
   const {parseProgress}=await import('./analysis-progress');
+  if(isDemoJob(jobId)){
+    // Replay the recorded snapshots of the real run, compressed into the demo delay.
+    const recorded=await request(demoAssetPath(jobId,'progress')!,{signal},'');
+    if(!Array.isArray(recorded)||!recorded.length||!recorded.every(item=>isRecord(item)&&typeof item.elapsed==='number'))throw new Error('Invalid progress');
+    const total=recorded.at(-1).elapsed as number,reached=demoProgressFraction(jobId)*total;
+    return parseProgress(recorded.findLast(item=>item.elapsed<=reached)?.progress??recorded[0].progress,jobId);
+  }
   return parseProgress(await request(`/reports/report_${encodeURIComponent(jobId)}/progress`,{signal},reportApiBase()),jobId);
 }
