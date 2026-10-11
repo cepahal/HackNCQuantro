@@ -164,7 +164,7 @@ test("a verified source is the single prominent video and the submitted clip is 
   const value = report();
   value.limitations.push("Unverified source candidate: https://www.youtube.com/watch?v=FX6GQSyxA-8");
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
-  const primary = html.slice(0, html.indexOf('aria-label="Submitted clip"'));
+  const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
   assert.match(primary, /aria-label="Source video result"/);
   assert.match(primary, /aria-label="Matched source recording"/);
   assert.match(primary, /Verified speech match/);
@@ -178,7 +178,7 @@ test("without verification only the highest-ranked lead is promoted and remains 
   const value = unmatchedReport();
   const before = JSON.stringify(value);
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
-  const primary = html.slice(0, html.indexOf('aria-label="Submitted clip"'));
+  const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
   assert.match(primary, /Most likely source candidate|Top candidate recording/);
   assert.match(primary, /Unverified lead/);
   assert.match(primary, /youtube-nocookie.com\/embed\/FX6GQSyxA-8/);
@@ -194,7 +194,7 @@ test("an unmatched report with no lead has a neutral empty source result and kee
   const value = unmatchedReport();
   value.limitations = [];
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
-  const primary = html.slice(0, html.indexOf('aria-label="Submitted clip"'));
+  const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
   assert.match(primary, /No source candidate found/);
   assert.doesNotMatch(primary, /<video|<iframe|Verified speech match|data-assessment="difference"/);
   assert.match(html, /aria-label="Submitted excerpt"/);
@@ -205,8 +205,33 @@ test("stale unmatched source fields cannot acquire a verified label in the main 
   const value = report();
   value.outcome = "no_verified_match";
   const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: display(value) }));
-  const primary = html.slice(0, html.indexOf('aria-label="Submitted clip"'));
+  const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
   assert.match(primary, /Unverified lead/);
   assert.match(primary, /aria-label="Unverified source candidate"/);
   assert.doesNotMatch(primary, /Verified speech match/);
+});
+
+test("diagnostic mode preserves old panels in a hidden container and shows every saved field", () => {
+  const value = report();
+  value.summary = "<script>unsafe()</script> " + "complete diagnostic text ".repeat(300);
+  value.submitted.post.author.followers_count = null;
+  const model = display(value);
+  const diagnostics = { job_id: value.job_id, capture_status: "recorded" as const,
+    events: [{ stage: "search_candidates", status: "completed", elapsed_seconds: 1.25,
+      data: { query: "verbatim words", scores: [88, 76], unknown: null } }],
+    terminal_output: "search_candidates completed\nCandidate score: 88\n<script>unsafe()</script>",
+  };
+  const before = JSON.stringify(value);
+  const html = renderToStaticMarkup(createElement(ReportContent, { report: value, display: model, diagnostics }));
+  assert.match(html, /<div hidden=""[^>]*data-testid="preserved-report-panels"/);
+  assert.match(html, /Analysis terminal|Copy output|Download \.txt/);
+  assert.match(html, /Candidate score: 88/);
+  assert.match(html, /&lt;script&gt;unsafe\(\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>unsafe/);
+  const terminal = html.split('aria-label="Complete recorded analysis output"')[1]!.split("</pre>")[0]!;
+  for (const field of Object.keys(value)) assert.ok(terminal.includes(`&quot;${field}&quot;`), field);
+  assert.match(terminal, /&quot;followers_count&quot;: null/);
+  assert.match(terminal, /complete diagnostic text /);
+  assert.equal((terminal.match(/complete diagnostic text /g) ?? []).length, 300);
+  assert.equal(JSON.stringify(value), before);
 });

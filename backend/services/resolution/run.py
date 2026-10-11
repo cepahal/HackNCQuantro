@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlsplit
 
@@ -30,6 +31,7 @@ from ..storage.tiger import TigerJobStore, TigerReportStore, TigerStore
 from .alignment import build_alignment, build_context
 from .analysis import compare_clip, interpret_clip
 from .candidates import CandidateSearchError, find_source_video
+from .diagnostics import DiagnosticCapture, media_snapshot, record
 from .media import resolve_media
 
 logger = logging.getLogger(__name__)
@@ -56,7 +58,7 @@ def _failed(store: TigerStore, job_id: str, error: QuantroError) -> None:
             str(error.public_dict()["message"]),
             error.retryable,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - Recording a failure is best effort; details remain private.
         logger.warning(
             "Could not persist resolver failure; private diagnostics omitted."
         )
@@ -105,7 +107,7 @@ def _deliver(
                 tracker=tracker,
             )
             status = "accepted"
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Delivery errors preserve the completed report.
             status = "failed"
             warning = normalize_exception(Stage.SEND_SUMMARY, exc).message
     return AnalysisResult(
@@ -158,7 +160,7 @@ def run_ingest(
         )
     except JobConflictError:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Normalize all provider failures at the public boundary.
         error = normalize_exception(stage, exc)
         logger.warning(
             "Pipeline failure code=%s stage=%s type=%s",
@@ -176,14 +178,19 @@ def run_ingest(
 async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
     stage = Stage.RETRIEVE_POST
     try:
+        started = time.monotonic()
         post, features = await resolve_media(url)
+        record(stage.value, "completed", media_snapshot(post, features), started=started)
         stage = Stage.SAVE_REPORT_AND_COMPLETE_JOB
+        started = time.monotonic()
         _persist_media(post)
         store.save_post_and_features(
             job_id, post.model_dump(mode="json"), features.model_dump(mode="json")
         )
         store.set_job_status(job_id, "ingested")
+        record("persist_submitted_media", "completed", {"media_id": post.media.media_id}, started=started)
         stage = Stage.SEARCH_CANDIDATES
+        started = time.monotonic()
         short_text = getattr(features, "full_transcript_text", None) or " ".join(
             sentence.text for sentence in features.transcript.sentences
         )
@@ -192,12 +199,21 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
             title=post.title or post.caption,
             exclude_ids=[identity] if (identity := _id(url)) else [],
         )
+        record(stage.value, "completed", {"status": discovered.get("status"), "match_score": discovered.get("match_score"),
+                "search_metadata": discovered.get("search_metadata"), "leads": discovered.get("leads", []),
+                "candidate_count": len(discovered.get("candidates", [])), "warnings": discovered.get("warnings", [])}, started=started)
         store.touch_job(job_id)
         chosen = None
         viable = []
         warnings = list(discovered.get("warnings", []))
         for number, candidate in enumerate(discovered.get("candidates", []), 1):
+            candidate_started = time.monotonic()
+            candidate_data = {"candidate_number": number, **candidate}
+            record("candidate_evaluation", "scored", candidate_data, started=candidate_started)
+            # The full provider transcript is captured above; decisions only reference this candidate.
+            candidate_data = {key: value for key, value in candidate_data.items() if key != "transcript_result"}
             if candidate["match_score"] < 75:
+                record("candidate_evaluation", "rejected", {**candidate_data, "reason": "lexical_score_below_threshold", "threshold": 75}, started=candidate_started)
                 continue
             stage = Stage.RETRIEVE_CANDIDATE_MEDIA
             try:
@@ -208,6 +224,7 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
                     metadata=candidate,
                 )
                 _persist_media(source_post)
+                record(stage.value, "completed", {"candidate_number": number, **media_snapshot(source_post, source_features)}, started=candidate_started)
                 ensure_distinct_source(post, source_post, stage)
                 if source_features.duration_seconds < max(
                     180.0, features.duration_seconds + 20.0
@@ -215,14 +232,17 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
                     warnings.append(
                         "A repeated short excerpt was retained only as a source lead."
                     )
+                    record("candidate_evaluation", "rejected", {**candidate_data, "reason": "recording_too_short_for_surrounding_context"}, started=candidate_started)
                     continue
                 alignment = build_alignment(
                     features, source_features, candidate["match_score"]
                 )
                 if alignment.status != "verified":
+                    record("candidate_evaluation", "rejected", {**candidate_data, "reason": "timed_alignment_not_verified", "alignment": alignment.model_dump(mode="json")}, started=candidate_started)
                     continue
                 context = build_context(alignment, source_features)
                 if context is None:
+                    record("candidate_evaluation", "rejected", {**candidate_data, "reason": "surrounding_context_unavailable", "alignment": alignment.model_dump(mode="json")}, started=candidate_started)
                     continue
                 # A longer title alone cannot supply the missing surrounding words.
                 match = alignment.matches[0]
@@ -232,11 +252,14 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
                     for window in context.windows
                     for sentence in window.sentences
                 ):
+                    record("candidate_evaluation", "rejected", {**candidate_data, "reason": "no_surrounding_words_outside_match", "alignment": alignment.model_dump(mode="json"), "context": context.model_dump(mode="json")}, started=candidate_started)
                     continue
                 viable.append(
                     (source_post, source_features, alignment, context, candidate)
                 )
-            except Exception:
+                record("candidate_evaluation", "eligible", {**candidate_data, "alignment": alignment.model_dump(mode="json"), "context": context.model_dump(mode="json")}, started=candidate_started)
+            except Exception:  # noqa: BLE001 - One unavailable candidate must not stop other candidates.
+                record("candidate_evaluation", "rejected", {**candidate_data, "reason": "candidate_media_or_alignment_unavailable"}, started=candidate_started)
                 warnings.append(
                     f"Source candidate {number} could not be aligned; other candidates were checked."
                 )
@@ -248,6 +271,7 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
                     "Multiple plausible recordings contain the excerpt. The strongest transcript match is shown."
                 )
         chosen_url = chosen[0].post_url if chosen else None
+        record("select_source", "completed", {"url": chosen_url, "selected": chosen is not None, "candidate_count": len(viable)})
         for candidate in discovered.get("leads", discovered.get("candidates", []))[:5]:
             candidate_url = candidate.get("video_url")
             if candidate_url and candidate_url != chosen_url:
@@ -264,9 +288,12 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
                     )
                 )
         stage = Stage.COMPARE_CONTEXT_AND_CAPTION
+        started = time.monotonic()
         comparison = compare_clip(post, features, chosen[3]) if chosen else None
         summary = comparison.summary if comparison else interpret_clip(post, features)
+        record(stage.value, "completed", {"comparison": comparison.model_dump(mode="json") if comparison else None, "summary": summary}, started=started)
         stage = Stage.BUILD_REPORT
+        started = time.monotonic()
         report = build_report(
             job_id,
             post,
@@ -279,12 +306,13 @@ async def _build(job_id: str, url: str, store: TigerStore) -> ReportV2:
             extra_limitations=warnings,
         )
         report.summary = summary
+        record(stage.value, "completed", {"report": report.model_dump(mode="json")}, started=started)
         return ReportV2.model_validate(report.model_dump(mode="json"))
     except CandidateSearchError:
         raise QuantroError(
             ErrorCode.SEARCH_FAILED, Stage.SEARCH_CANDIDATES, retryable=True
         ) from None
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Normalize all provider failures at the public boundary.
         raise normalize_exception(stage, exc) from None
 
 
@@ -302,6 +330,7 @@ def run_analysis(
     owned = store is None
     store = store or TigerStore.from_env()
     reserved = False
+    capture = None
     try:
         if owned:
             store.ensure_schema()
@@ -339,25 +368,35 @@ def run_analysis(
         if not store.try_create_job(job_id, url):
             raise JobConflictError("This analysis is already running.")
         reserved = True
-        report = asyncio.run(_build(job_id, url, store))
-        save_report_and_complete_job(
-            job_id,
-            report,
-            report_store=TigerReportStore(store),
-            job_store=TigerJobStore(store),
-        )
+        capture = DiagnosticCapture(job_id, store)
+        with capture.bind():
+            record(Stage.RUN_ANALYSIS.value, "started", {"job_id": job_id, "url": url})
+            report = asyncio.run(_build(job_id, url, store))
+            started = time.monotonic()
+            save_report_and_complete_job(
+                job_id,
+                report,
+                report_store=TigerReportStore(store),
+                job_store=TigerJobStore(store),
+            )
+            record(Stage.SAVE_REPORT_AND_COMPLETE_JOB.value, "completed", {"report_id": report_id_for_job(job_id), "outcome": report.outcome.value}, started=started)
         saved = store.get_report(report_id_for_job(job_id))
         if saved is None:
             raise QuantroError(
                 ErrorCode.STORAGE_FAILED, Stage.SAVE_REPORT_AND_COMPLETE_JOB
             )
-        return _deliver(
+        result = _deliver(
             ReportV2.model_validate(saved), conversation_id, store, provider, tracker
         )
+        capture.record(Stage.SEND_SUMMARY.value, result.delivery_status, {"delivery_status": result.delivery_status})
+        capture.record(Stage.RUN_ANALYSIS.value, "completed", {"report_id": result.report_id, "outcome": result.outcome.value})
+        return result
     except JobConflictError:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Persist only safe normalized failure details.
         error = normalize_exception(Stage.RUN_ANALYSIS, exc)
+        if capture is not None:
+            capture.record(error.stage.value, "failed", error.public_dict())
         if reserved:
             _failed(store, job_id, error)
         raise error from None

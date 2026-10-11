@@ -2,6 +2,7 @@ import type {
   AnalysisResult, DisplayModel, ErrorCode, IngestResult, Outcome, PublicMediaAsset, ReportV2, Stage, TranscriptStatus,
 } from "./api-types";
 export type { AnalysisResult, ReportMedia, ReportV2 } from "./api-types";
+import type { ReportDiagnostics } from "./report-diagnostics";
 
 const IDENTIFIER = /^[A-Za-z0-9_-]{1,128}$/;
 const REPORT_ID = /^report_[A-Za-z0-9_-]{1,128}$/;
@@ -168,6 +169,20 @@ export async function getDisplayModel(reportId: string): Promise<DisplayModel> {
     throw new Error("The analysis service returned an invalid display model.");
   }
   return data as unknown as DisplayModel;
+}
+
+export async function getReportDiagnostics(reportId: string): Promise<ReportDiagnostics> {
+  if (!REPORT_ID.test(reportId)) throw new ReportNotFoundError();
+  const data = await requestReport(`/reports/${encodeURIComponent(reportId)}/diagnostics`);
+  if (!isRecord(data) || typeof data.job_id !== "string" || reportId !== `report_${data.job_id}`
+      || !["recorded", "unavailable"].includes(String(data.capture_status))
+      || typeof data.terminal_output !== "string" || !Array.isArray(data.events)
+      || !data.events.every(event => isRecord(event) && typeof event.stage === "string" && typeof event.status === "string"
+        && typeof event.elapsed_seconds === "number" && Number.isFinite(event.elapsed_seconds) && event.elapsed_seconds >= 0
+        && isRecord(event.data))) {
+    throw new Error("The analysis service returned invalid diagnostics.");
+  }
+  return data as unknown as ReportDiagnostics;
 }
 
 async function requestReport(path: string): Promise<unknown> {

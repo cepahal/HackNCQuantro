@@ -42,6 +42,9 @@ async function setup(t: TestContext, readAllowedReports: () => Promise<unknown> 
     } else if (incoming.url === "/reports/report_public/display") {
       response.setHeader("Content-Type", "application/json");
       response.end(JSON.stringify({ confidence_note: "Evidence, not a probability." }));
+    } else if (incoming.url === "/reports/report_public/diagnostics") {
+      response.setHeader("Content-Type", "application/json");
+      response.end(JSON.stringify({ job_id: "public", capture_status: "recorded", events: [], terminal_output: "Per-job output" }));
     } else if (incoming.url === "/media/media_public") {
       const data = "0123456789";
       response.setHeader("Content-Type", "video/mp4");
@@ -55,16 +58,16 @@ async function setup(t: TestContext, readAllowedReports: () => Promise<unknown> 
   return { origin, calls };
 }
 
-test("gateway serves only selected report and display routes; strips private response headers", async (t) => {
+test("gateway serves only selected report, display and diagnostic routes; strips private response headers", async (t) => {
   const { origin, calls } = await setup(t);
-  for (const path of ["/reports/report_public", "/api/reports/report_public", "/api/reports/report_public/display"]) {
+  for (const path of ["/reports/report_public", "/api/reports/report_public", "/api/reports/report_public/display", "/api/reports/report_public/diagnostics"]) {
     const response = await call(origin, path, "GET", { Cookie: "private=browser", Authorization: "Bearer browser-secret" });
     assert.equal(response.status, 200);
     assert.equal(response.headers["cache-control"], "no-store");
     assert.equal(response.headers["set-cookie"], undefined);
     assert.equal(response.headers["x-internal-key"], undefined);
   }
-  assert.deepEqual(calls.map((item) => item.path), ["/reports/report_public", "/reports/report_public", "/reports/report_public/display"]);
+  assert.deepEqual(calls.map((item) => item.path), ["/reports/report_public", "/reports/report_public", "/reports/report_public/display", "/reports/report_public/diagnostics"]);
   assert.ok(calls.every((item) => !item.headers.cookie && !item.headers.authorization));
   const head = await call(origin, "/api/reports/report_public", "HEAD");
   assert.equal(head.status, 200);
@@ -74,7 +77,7 @@ test("gateway serves only selected report and display routes; strips private res
 test("unlisted reports, queries, mutations, backend routes and traversal fail closed", async (t) => {
   const { origin, calls } = await setup(t);
   for (const path of ["/", "/docs", "/api/ingest/job_1", "/api/reports/report_private", "/reports/report_private", "/reports/report_public/display",
-    "/api/reports/report_public?debug=1", "/reports/report_public/../report_private", "/reports/%72eport_public", "/_next/static/../../.env",
+    "/api/reports/report_public?debug=1", "/api/reports/report_private/diagnostics", "/reports/report_public/diagnostics", "/api/reports/report_public/diagnostics?debug=1", "/reports/report_public/../report_private", "/reports/%72eport_public", "/_next/static/../../.env",
     "/_next/static/%2e%2e/.env", "/_next/static/\\private", "//reports/report_public", "/api/media/media_private"]) {
     assert.equal((await call(origin, path)).status, 404, path);
   }

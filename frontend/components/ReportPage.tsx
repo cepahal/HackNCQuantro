@@ -8,12 +8,13 @@ import AnalysisLoadingScreen from "./AnalysisLoadingScreen";
 import ReportPlayer from "./ReportPlayer";
 import ReportSummary, { reportAssessment, ReportVerdict } from "./ReportSummary";
 import SourceLeads from "./SourceLeads";
-import { analysisInFlight, getReport, getDisplayModel, publicUrl, startAnalysis, waitForReport } from "../lib/api";
+import { analysisInFlight, getReport, getDisplayModel, getReportDiagnostics, publicUrl, startAnalysis, waitForReport } from "../lib/api";
 import type { ReportV2 as Report, DisplayModel } from "../lib/api-types";
 import { errorDisplay, type ErrorDisplay } from "../lib/display";
 import { compact, date, percent, time, unique } from "../lib/format";
 import { summaryText } from "../lib/report-summary";
 import { sourceLeads } from "../lib/source-leads";
+import { diagnosticOutput, type ReportDiagnostics } from "../lib/report-diagnostics";
 import styles from "./ReportPage.module.css";
 
 export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:string|null}){
@@ -43,16 +44,16 @@ export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:
  return <><Navbar/><div className={styles.page}><main className={styles.main}>
   <header className={styles.header}>
    <Link className={styles.back} href="/">← New analysis</Link>
-   <div className={styles.heading}><div><p className={styles.eyebrow}>Zoomout / Results</p><h1>Source result</h1></div>
+   <div className={styles.heading}><div><p className={styles.eyebrow}>Zoomout / Diagnostics</p><h1>Analysis output</h1></div>
     <div className={styles.actions}><button className={styles.copyButton} onClick={copyLink}>{copyStatus.startsWith("Link copied")?"Copied":copyStatus.startsWith("Couldn’t")?"Copy failed":"Copy link"}<span aria-hidden="true">↗</span></button><span role="status" className="sr-only">{copyStatus}</span></div>
    </div>
   </header>
-  {error?<div className={styles.error} role="alert"><h2>We couldn’t load this report.</h2><p>{error.error.message}</p><p className={styles.note}>{error.error.code} · {error.error.stage}</p>{error.error.retryable&&<button className={styles.copyButton} onClick={retry}>Retry</button>}</div>:report&&display?<ReportContent report={report} display={display}/>:null}
+  {error?<><div className={styles.error} role="alert"><h2>We couldn’t load this report.</h2><p>{error.error.message}</p><p className={styles.note}>{error.error.code} · {error.error.stage}</p>{error.error.retryable&&<button className={styles.copyButton} onClick={retry}>Retry</button>}</div>{(jobId||reportId)&&<DiagnosticPanel key={jobId||reportId} jobId={jobId??reportId!.replace(/^report_/,"")}/>}</>:report&&display?<ReportContent report={report} display={display}/>:null}
  </main><footer className={styles.footer}><Link href="/" aria-label="Zoomout home"><Image src="/logo-light.png" alt="Zoomout" width={129} height={25} unoptimized /></Link><p>The full record, in context.</p><span>Built at HackNC · © 2026 Zoomout</span></footer></div>{!loadingDismissed&&<AnalysisLoadingScreen complete={ready} onDone={finishLoading}/>}</>;
 }
 export function ReportLoading(){return <AnalysisLoadingScreen/>}
 
-export function ReportContent({ report, display }: { report: Report; display: DisplayModel }) {
+export function ReportContent({ report, display, diagnostics }: { report: Report; display: DisplayModel; diagnostics?: ReportDiagnostics }) {
  const { source, submitted, alignment, comparison } = report;
  const limitations = unique([
   ...report.limitations, ...(alignment?.limitations ?? []), ...(comparison?.limitations ?? []),
@@ -66,6 +67,7 @@ export function ReportContent({ report, display }: { report: Report; display: Di
  const candidateMedia = !verifiedSource && !primaryLead ? source : null;
  const additionalLeadCount = leads.length - (primaryLead ? 1 : 0);
  return <article className={styles.report}>
+  <div className={styles.diagnosticGrid}>
   <section className={styles.primarySource} aria-label="Source video result">
    <div className={styles.primaryHead}>
     <div><p className={styles.eyebrow}>{verifiedSource ? "Matched source recording" : primaryLead || candidateMedia ? "Most likely source candidate" : "Source recording"}</p>
@@ -89,6 +91,10 @@ export function ReportContent({ report, display }: { report: Report; display: Di
     : primaryLead || candidateMedia ? "This is the strongest available search lead. Its speech and surrounding context have not been verified against the excerpt."
       : "No source found does not establish whether the excerpt is accurate or unedited."}</p>
   </section>
+  <DiagnosticPanel key={report.job_id} report={report} display={display} initialDiagnostics={diagnostics}/>
+  </div>
+  {/* Preserved for restoration after diagnostic mode; intentionally hidden. */}
+  <div hidden className={styles.legacyPanels} data-testid="preserved-report-panels">
   <details className={styles.submittedClip} aria-label="Submitted clip">
    <summary><span>Submitted clip</span><span>View the input <span aria-hidden="true">+</span></span></summary>
    <div className={styles.submittedVideo}><ReportPlayer key={submitted.post.media.media_id} media={submitted} label="Submitted excerpt"/></div>
@@ -147,7 +153,54 @@ export function ReportContent({ report, display }: { report: Report; display: Di
     {limitations.length?<ul className={styles.limitations}>{limitations.map(item=><li key={item}>{summaryText(item)}</li>)}</ul>:<p className={styles.note}>No additional limitations were recorded. This does not establish accuracy or authenticity.</p>}
    </details>
   </section>
+  </div>
  </article>;
+}
+
+export function DiagnosticPanel({ report=null, display=null, initialDiagnostics, jobId=report?.job_id??"" }: {
+ report?: Report|null; display?: DisplayModel|null; initialDiagnostics?: ReportDiagnostics; jobId?:string;
+}) {
+ const reportAvailable=Boolean(report);
+ const savedDataNote=reportAvailable?"All saved report data is shown below.":"No saved report was loaded.";
+ const [diagnostics,setDiagnostics]=useState<ReportDiagnostics|null>(initialDiagnostics??null);
+ const [state,setState]=useState(initialDiagnostics?.capture_status==="recorded"?"Captured output loaded.":initialDiagnostics?`Resolver output was not recorded for this older report. ${savedDataNote}`:"Loading captured output...");
+ const [actionStatus,setActionStatus]=useState("");
+ const [attempt,setAttempt]=useState(0);
+ useEffect(()=>{
+  if(initialDiagnostics)return;
+  let active=true;
+  getReportDiagnostics(`report_${jobId}`).then(value=>{
+   if(!active)return;
+   setDiagnostics(value);
+   setState(value.capture_status==="recorded"?"Captured output loaded.":`Resolver output was not recorded for this older report. ${savedDataNote}`);
+  }).catch(()=>{if(active)setState(`Captured output could not be loaded. ${savedDataNote}`)});
+  return()=>{active=false};
+ },[jobId,initialDiagnostics,attempt,savedDataNote]);
+ const output=diagnosticOutput(report,display,diagnostics,state,jobId);
+ const copy=async()=>{
+  try{await navigator.clipboard.writeText(output);setActionStatus("Output copied.")}
+  catch{setActionStatus("Copy unavailable. Select the output or download it.")}
+ };
+ const download=()=>{
+  const link=document.createElement("a");
+  const url=URL.createObjectURL(new Blob([output],{type:"text/plain;charset=utf-8"}));
+  link.href=url;link.download=`${jobId}-diagnostics.txt`;link.click();
+  window.setTimeout(()=>URL.revokeObjectURL(url),0);
+  setActionStatus("Output downloaded.");
+ };
+ return <section className={styles.diagnosticPanel} aria-label="Analysis diagnostic output">
+  <div className={styles.diagnosticHeader}>
+   <div><p className={styles.eyebrow}>Diagnostic mode</p><h2>Analysis terminal</h2></div>
+   <div className={styles.diagnosticActions}>
+    <button className={styles.copyButton} onClick={copy}>Copy output</button>
+    <button className={styles.copyButton} onClick={download}>Download .txt</button>
+   </div>
+  </div>
+  <p className={styles.diagnosticNote}>Per-job resolver events and saved public analysis data, without summary truncation. {reportAvailable?"The complete saved report is included.":"No saved report was loaded."} Credentials, private paths and other jobs’ server logs are excluded.</p>
+  <p className={styles.diagnosticStatus} role="status">{actionStatus||state}</p>
+  {!diagnostics&&state.startsWith("Captured output could")&&<button className={styles.copyButton} onClick={()=>{setState("Loading captured output...");setAttempt(value=>value+1)}}>Retry diagnostics</button>}
+  <pre className={styles.diagnosticOutput} tabIndex={0} aria-label="Complete recorded analysis output">{output}</pre>
+ </section>;
 }
 
 function Transcript({ media, label }: { media: Report["submitted"]; label: string }) {

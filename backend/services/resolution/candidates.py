@@ -17,13 +17,14 @@ import ssl
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 from urllib.parse import urlsplit
 
 import httpx
 from groq import AsyncGroq
 from rapidfuzz import fuzz
 
+from .diagnostics import record
 from .download import _guarded_call, fetch_media_info
 from .transcribe import (
     _fetch_youtube_captions_sync,
@@ -103,6 +104,7 @@ class MatchResult(TypedDict):
     candidates: list[ScoredCandidate]
     leads: list[dict[str, Any]]
     warnings: list[str]
+    search_metadata: NotRequired[SearchMetadata]
 
 
 @dataclass(frozen=True)
@@ -416,12 +418,20 @@ async def search_candidates(
     excluded = set(exclude_ids or ())
 
     async def run(query: str) -> list[Candidate]:
-        return [
+        started = time.monotonic()
+        try:
+            returned = await _search(query, _SEARCH_RESULTS)
+        except Exception:
+            record("search_query", "failed", {"query": query, "reason": "search_provider_unavailable"}, started=started)
+            raise
+        kept = [
             candidate
-            for candidate in await _search(query, _SEARCH_RESULTS)
+            for candidate in returned
             if candidate.video_id not in excluded
             and (candidate.duration is None or candidate.duration >= MIN_DURATION_S)
         ]
+        record("search_query", "completed", {"query": query, "returned_count": len(returned), "kept_count": len(kept)}, started=started)
+        return kept
 
     queries = list(
         dict.fromkeys(query for query in (meta["query"], meta["title_query"]) if query)
@@ -544,8 +554,13 @@ async def find_source_video(
     short_norm = normalize_text(transcript or "")
     if not short_norm:
         raise CandidateSearchError("no_transcript", "Transcript is empty.")
+    started = time.monotonic()
     meta = await extract_search_metadata(transcript, title)
+    record("build_search_queries", "completed", dict(meta), started=started)
+    started = time.monotonic()
     candidates = await search_candidates(meta, exclude_ids, max_candidates)
+    record("search_candidates", "discovered", {"search_metadata": meta, "candidate_count": len(candidates),
+           "candidates": [{"video_id": item.video_id, "video_url": item.url, "title": item.title, "duration": item.duration} for item in candidates]}, started=started)
     leads = [
         {
             "video_id": candidate.video_id,
@@ -558,15 +573,21 @@ async def find_source_video(
     scored: list[ScoredCandidate] = []
     for candidate in candidates:
         # Sequential captions avoid a burst of requests to the same provider.
+        started = time.monotonic()
+        data = {"video_id": candidate.video_id, "video_url": candidate.url, "title": candidate.title, "duration": candidate.duration}
         try:
             result = await _score_candidate(candidate, short_norm)
         except Exception as exc:  # noqa: BLE001 - One failed lead must not abort source search.
             logger.warning(
                 "Skipping candidate %s (%s).", candidate.video_id, type(exc).__name__
             )
+            record("candidate_transcript", "unavailable", {**data, "reason": "candidate_transcript_or_scoring_failed"}, started=started)
             continue
         if result is not None:
             scored.append(result)
+            record("candidate_transcript", "scored", dict(result), started=started)
+        else:
+            record("candidate_transcript", "unavailable", {**data, "reason": "no_usable_candidate_transcript"}, started=started)
     # Python's stable sort resolves score ties by original interleaved search rank.
     scored.sort(key=lambda candidate: candidate["match_score"], reverse=True)
     scored_ids = {candidate["video_id"] for candidate in scored}
@@ -583,7 +604,7 @@ async def find_source_video(
         else []
     )
     if not scored:
-        return {
+        empty: MatchResult = {
             "status": "not_found",
             "match_score": 0.0,
             "video_id": None,
@@ -593,6 +614,9 @@ async def find_source_video(
             "leads": leads,
             "warnings": warnings,
         }
+        if meta:
+            empty["search_metadata"] = meta
+        return empty
     best = scored[0]
     return {
         "status": "success" if best["match_score"] >= threshold else "low_confidence",
@@ -603,4 +627,5 @@ async def find_source_video(
         "candidates": scored,
         "leads": leads,
         "warnings": warnings,
+        "search_metadata": meta,
     }

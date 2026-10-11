@@ -1,5 +1,5 @@
 .page { --report-line: #dce1e6; min-height: calc(100dvh - 80px); background: #f7f8fa; color: #25313d; padding: 0 28px; }
-.main { width: min(1080px, 100%); margin: 0 auto; padding-bottom: 55px; }
+.main { width: min(1480px, 100%); margin: 0 auto; padding-bottom: 55px; }
 .header { padding: 28px 0; }
 .back { display: inline-flex; align-items: center; min-height: 40px; margin-bottom: 18px; color: #707b87; text-decoration: none; font-size: 12px; gap: 6px; }
 .back:hover { color: #263747; }
@@ -110,6 +110,26 @@
 .sourceLeads :global(.claim-box) { padding: 20px; background: #fff; border-radius: 8px; border-color: #dce2e8; box-shadow: none; }
 .sourceLeads :global(.claim-box) h3 { margin-top: 0; font-size: 14px; font-weight: 550; color: #435668; line-height: 1.6; }
 .sourceLeads a { font-size: 12px; color: #486a85; text-underline-offset: 3px; }
+.diagnosticGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: 20px; min-width: 0; }
+.diagnosticGrid > * { min-width: 0; }
+.diagnosticGrid > .primarySource { margin-bottom: 0; }
+.diagnosticPanel { min-width: 0; overflow: hidden; color: #edf3fa; background: #0b1018; border: 1px solid #2b3b4d; border-radius: 10px; }
+.diagnosticHeader { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding: 18px 20px; border-bottom: 1px solid #2b3b4d; }
+.diagnosticHeader h2 { margin: 0; color: #f5f8fc; font-size: 16px; line-height: 1.5; font-weight: 600; }
+.diagnosticActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.diagnosticActions button { min-height: 36px; padding: 8px 12px; color: #edf3fa; background: #172331; border: 1px solid #53657a; border-radius: 6px; font-size: 12px; line-height: 1.4; cursor: pointer; }
+.diagnosticActions button:hover { background: #233448; border-color: #8398af; }
+.diagnosticActions button:focus-visible,.diagnosticOutput:focus-visible { outline: 2px solid #9cc9ff; outline-offset: 3px; }
+.diagnosticNote { margin: 0; padding: 14px 20px; color: #c2cfdf; font-size: 12px; line-height: 1.7; border-bottom: 1px solid #2b3b4d; overflow-wrap: anywhere; }
+.diagnosticOutput { min-width: 0; max-height: 75vh; margin: 0; padding: 20px; overflow: auto; overscroll-behavior: contain; color: #edf3fa; background: #0b1018; font-family: ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; font-size: 12px; line-height: 1.7; tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.diagnosticStatus { color: #afe8c6; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.legacyPanels { display: none !important; }
+@media (max-width: 900px) {
+  .diagnosticGrid { grid-template-columns: minmax(0,1fr); }
+  .diagnosticHeader { align-items: flex-start; }
+  .diagnosticActions { flex-wrap: wrap; }
+  .diagnosticOutput { max-height: 65vh; }
+}
 @media (max-width: 700px) {
   .page { padding-inline: 20px; }
   .header { padding: 20px 0 24px; }

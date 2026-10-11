@@ -134,7 +134,7 @@ export function createGateway(options = {}) {
         return;
       }
       const reports = await allowedReports(readAllowedReports);
-      const reportRoute = /^\/(api\/)?reports\/(report_[A-Za-z0-9_-]{1,128})(\/display)?$/.exec(path);
+      const reportRoute = /^\/(api\/)?reports\/(report_[A-Za-z0-9_-]{1,128})(\/(?:display|diagnostics))?$/.exec(path);
       if (reportRoute && reports.has(reportRoute[2]) && (reportRoute[1] || !reportRoute[3])) {
         await forward(request, response, reportRoute[1] ? backendOrigin : frontendOrigin, path.replace(/^\/api\//, "/"));
         return;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  analysisInFlight, getDisplayModel, getReport, ingest, mediaUrl, publicUrl, QuantroApiError, ReportNotFoundError, runAnalysis, startAnalysis, waitForReport,
+  analysisInFlight, getDisplayModel, getReport, getReportDiagnostics, ingest, mediaUrl, publicUrl, QuantroApiError, ReportNotFoundError, runAnalysis, startAnalysis, waitForReport,
 } from "../lib/api.ts";
 import type { ReportV2 } from "../lib/api-types.ts";
 import { reportFixture } from "./fixtures/report_v2.ts";
@@ -19,6 +19,17 @@ test("getReport returns the typed ReportV2 from the report route", async (t) => 
   assert.deepEqual(report, reportFixture);
   assert.equal(report.alignment?.match_quality.confidence.level, "moderate");
   assert.match(String(fetch.mock.calls[0]?.arguments[0]), /\/reports\/report_job_1$/);
+});
+
+test("diagnostics use the report endpoint and reject a different job or malformed event", async (t) => {
+  const value = {job_id:"job_1",capture_status:"recorded",events:[{stage:"search_candidates",status:"completed",elapsed_seconds:1,data:{score:88}}],terminal_output:"Recorded output"};
+  const fetch = t.mock.method(globalThis, "fetch", async () => Response.json(value));
+  assert.deepEqual(await getReportDiagnostics("report_job_1"), value);
+  assert.match(String(fetch.mock.calls[0]?.arguments[0]), /\/reports\/report_job_1\/diagnostics$/);
+  fetch.mock.mockImplementation(async () => Response.json({...value,job_id:"job_other"}));
+  await assert.rejects(getReportDiagnostics("report_job_1"), /invalid diagnostics/);
+  fetch.mock.mockImplementation(async () => Response.json({...value,events:[{stage:"x",status:"x",elapsed_seconds:-1,data:{}}]}));
+  await assert.rejects(getReportDiagnostics("report_job_1"), /invalid diagnostics/);
 });
 
 test("a 400 error envelope throws QuantroApiError with its code and stage", async (t) => {

@@ -122,6 +122,12 @@ class TigerStore:
             Column("report_json", _JsonColumn, nullable=False),
             Column("created_at", DateTime(timezone=True), nullable=False),
         )
+        self.analysis_diagnostics = Table(
+            f"{table_prefix}analysis_diagnostics", metadata,
+            Column("job_id", Text, ForeignKey(f"{table_prefix}jobs.id"), primary_key=True),
+            Column("events_json", _JsonColumn, nullable=False),
+            Column("updated_at", DateTime(timezone=True), nullable=False),
+        )
         self.deliveries = Table(
             f"{table_prefix}message_deliveries", metadata,
             Column("id", Text, primary_key=True),
@@ -576,6 +582,25 @@ class TigerStore:
 
     def get_report(self, report_id: str) -> dict[str, Any] | None:
         query = select(self.reports.c.report_json).where(self.reports.c.report_id == report_id)
+        with self._engine.connect() as connection:
+            return connection.execute(query).scalar_one_or_none()
+
+    def save_diagnostics(self, job_id: str, events: list[dict[str, Any]]) -> None:
+        """Save only the current job's explicitly projected public diagnostic events."""
+        from ..resolution.diagnostics import public_events
+
+        statement = self._insert(self.analysis_diagnostics).values(
+            job_id=job_id, events_json=public_events(events), updated_at=datetime.now(UTC),
+        )
+        statement = statement.on_conflict_do_update(
+            index_elements=[self.analysis_diagnostics.c.job_id],
+            set_={"events_json": statement.excluded.events_json, "updated_at": statement.excluded.updated_at},
+        )
+        with self._engine.begin() as connection:
+            connection.execute(statement)
+
+    def get_diagnostics(self, job_id: str) -> list[dict[str, Any]] | None:
+        query = select(self.analysis_diagnostics.c.events_json).where(self.analysis_diagnostics.c.job_id == job_id)
         with self._engine.connect() as connection:
             return connection.execute(query).scalar_one_or_none()
 

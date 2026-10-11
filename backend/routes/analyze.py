@@ -10,9 +10,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.routes.common import get_tiger_store, not_found, quantro_error_response
 from backend.services.reporting.build_report import sanitize_report
 from backend.services.reporting.display_report import display_report
-from backend.services.resolution.run import run_analysis
 from backend.services.reporting.save_report import report_id_for_job
-from backend.services.shared.errors import RETRYABLE_CODES, ErrorCode, QuantroError, Stage
+from backend.services.resolution.diagnostics import diagnostic_response
+from backend.services.resolution.run import run_analysis
+from backend.services.shared.errors import (
+    RETRYABLE_CODES,
+    ErrorCode,
+    QuantroError,
+    Stage,
+)
 from backend.services.shared.post_identity import ensure_distinct_source
 from backend.services.shared.types import ReportV2, parse_stage_output
 from backend.services.storage.tiger import TigerReportStore, TigerStore
@@ -87,6 +93,27 @@ def job_status(job_id: JobId, store: TigerDependency) -> JSONResponse:
         "report_id": report_id_for_job(job_id) if status == "completed" else None,
         "error": error.public_dict() if error is not None else None,
     })
+
+
+@router.get("/reports/{report_id}/diagnostics")
+def get_report_diagnostics(report_id: ReportId, store: TigerDependency) -> JSONResponse:
+    """Public, per-report capture only; no global logs or filesystem access."""
+    job_id = report_id.removeprefix("report_")
+    try:
+        raw = store.get_report(report_id)
+        if raw is not None:
+            report = parse_stage_output(ReportV2, sanitize_report(raw), Stage.DISPLAY_REPORT)
+            if report.job_id != job_id:
+                return not_found("Report not found")
+        elif store.get_job(job_id) is None:
+            return not_found("Report not found")
+    except Exception:  # noqa: BLE001 - Storage and validation details stay private.
+        return quantro_error_response(QuantroError(ErrorCode.STORAGE_FAILED, Stage.DISPLAY_REPORT, retryable=True))
+    try:
+        events = store.get_diagnostics(job_id)
+    except Exception:  # noqa: BLE001 - Missing optional captures must not break saved reports.
+        events = None
+    return JSONResponse(content=diagnostic_response(job_id, events))
 
 
 @router.get("/reports/{report_id}/display")
