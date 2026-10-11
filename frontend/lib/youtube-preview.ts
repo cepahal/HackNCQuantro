@@ -1,5 +1,5 @@
-/** Construct a fixed-host player URL; never embed arbitrary report URLs. */
-export function youtubePreviewUrl(value: string | null | undefined): string | null {
+/** Extract the video ID from a known fixed-host YouTube link; never from arbitrary report URLs. */
+export function youtubeVideoId(value: string | null | undefined): string | null {
   if (!value || value !== value.trim() || /\s/.test(value)) return null;
   try {
     const url = new URL(value);
@@ -19,7 +19,12 @@ export function youtubePreviewUrl(value: string | null | undefined): string | nu
         id = match?.[1];
       }
     }
-    return id && /^[A-Za-z0-9_-]{11}$/.test(id)
-      ? `https://www.youtube-nocookie.com/embed/${id}?playsinline=1&rel=0` : null;
+    return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
   } catch { return null; }
+}
+
+/** Construct a fixed-host player URL; never embed arbitrary report URLs. */
+export function youtubePreviewUrl(value: string | null | undefined): string | null {
+  const id = youtubeVideoId(value);
+  return id ? `https://www.youtube-nocookie.com/embed/${id}?playsinline=1&rel=0` : null;
 }

@@ -1,0 +1,4282 @@
+{
+ "context_video": {
+  "media_id": "context_5c1fbce551014940a561c688ae7b58ee",
+  "mime_type": "video/mp4",
+  "playback_url": null,
+  "duration_seconds": 94.066667,
+  "width": 640,
+  "height": 360,
+  "fps": 30.0,
+  "has_audio": true
+ },
+ "context_selection": {
+  "after": [
+   {
+    "end": 1152.6999999999998,
+    "text": "You now hail from a lineage and legacy of immeasurably strong men -- men who bore tremendous burdens and still laid the stones for the path on which we now walk.",
+    "start": 1138.834
+   },
+   {
+    "end": 1168.0330000000001,
+    "text": "You wear the mantle of Frederick Douglass and Booker T. Washington, and Ralph Bunche and Langston Hughes, and George Washington Carver and Ralph Abernathy and Thurgood Marshall, and, yes, Dr. Martin Luther King, Jr. These men were many things to many people.",
+    "start": 1152.7
+   }
+  ],
+  "before": [
+   {
+    "end": 1081.066,
+    "text": "Not because the bitter legacy of slavery and segregation have vanished entirely; they have not.",
+    "start": 1073.967
+   },
+   {
+    "end": 1086.8999999999999,
+    "text": "Not because racism and discrimination no longer exist; we know those are still out there.",
+    "start": 1081.066
+   }
+  ],
+  "strategy": "nearest_two_sentences",
+  "end_seconds": 1168.0330000000001,
+  "timing_note": "Conservative caption boundaries; not frame-exact. Context sufficiency is an estimate.",
+  "after_method": "sentences",
+  "before_method": "sentences",
+  "start_seconds": 1073.967
+ },
+ "schema_version": "2.1",
+ "job_id": "job_demo_3XPuGqqWLtk_5",
+ "outcome": "matched",
+ "submitted": {
+  "post": {
+   "post_id": "post_2a5f2f764c267776fd661b63",
+   "candidate_id": null,
+   "post_url": "https://www.youtube.com/shorts/3XPuGqqWLtk",
+   "platform": "youtube",
+   "title": "Barack Obama's speech to graduates",
+   "caption": "#shorts\n\nSubscribe and get a boost of motivation every day\nOn this channel you will see:\n-Best motivational speeches\n-Unique stories of successful people\n-Motivating quotes\n-Wise advice and stories\n-The wisdom of our ancestors\n-Video to support those who find themselves in difficult life situations\n-Stories that will leave you speechless\n#Motivation\n\n#Speech\n#shorts\nMusic: https://www.bensound.com\nFor any copyright concerns, please contact me zettogaf@gmail.com",
+   "author": {
+    "id": "UC77utDMe2X6dHqOBEwoUJlw",
+    "handle": null,
+    "display_name": "Take impulse",
+    "profile_url": "https://www.youtube.com/channel/UC77utDMe2X6dHqOBEwoUJlw",
+    "bio": null,
+    "verified": null,
+    "followers_count": null,
+    "following_count": null,
+    "posts_count": null
+   },
+   "engagement": {
+    "views_count": null,
+    "likes_count": null,
+    "comments_count": null,
+    "shares_count": null
+   },
+   "published_at": null,
+   "media": {
+    "media_id": "media_2a5f2f764c267776fd661b63",
+    "mime_type": "video/mp4",
+    "playback_url": "https://www.youtube.com/watch?v=3XPuGqqWLtk",
+    "duration_seconds": 24.0,
+    "width": 144,
+    "height": 256,
+    "fps": 30.0,
+    "has_audio": null
+   },
+   "retrieval": {
+    "retrieved_at": "2026-10-11T12:15:07.986188Z",
+    "provider": "yt-dlp+youtube_captions",
+    "metadata_source_urls": [
+     "https://www.youtube.com/shorts/3XPuGqqWLtk"
+    ],
+    "unavailable_fields": [
+     "published_at",
+     "author.verified",
+     "author.followers_count",
+     "author.following_count",
+     "author.posts_count",
+     "engagement.views_count",
+     "engagement.likes_count",
+     "engagement.comments_count",
+     "engagement.shares_count"
+    ],
+    "warnings": [
+     "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+     "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording."
+    ]
+   }
+  },
+  "transcript": {
+   "status": "complete",
+   "processed_ranges": [
+    {
+     "start_seconds": 0.16,
+     "end_seconds": 25.840000000000003
+    }
+   ],
+   "sentences": [
+    {
+     "sentence_id": "s1",
+     "start_seconds": 0.16,
+     "end_seconds": 3.8800000000000003,
+     "text": "nobody is going to give you anything",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s2",
+     "start_seconds": 2.48,
+     "end_seconds": 5.52,
+     "text": "that you have not earned",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s3",
+     "start_seconds": 5.52,
+     "end_seconds": 9.12,
+     "text": "nobody cares how tough your upbringing",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s4",
+     "start_seconds": 7.839,
+     "end_seconds": 10.639,
+     "text": "was",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s5",
+     "start_seconds": 9.12,
+     "end_seconds": 12.799,
+     "text": "nobody cares",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s6",
+     "start_seconds": 10.639,
+     "end_seconds": 14.399999999999999,
+     "text": "if you suffered some discrimination you",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s7",
+     "start_seconds": 12.799,
+     "end_seconds": 16.96,
+     "text": "have to remember that whatever you've",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s8",
+     "start_seconds": 14.4,
+     "end_seconds": 19.119,
+     "text": "gone through it pales in comparison to",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s9",
+     "start_seconds": 16.96,
+     "end_seconds": 21.52,
+     "text": "the hardships previous generations",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s10",
+     "start_seconds": 19.119,
+     "end_seconds": 23.6,
+     "text": "endured and they overcame them and if",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s11",
+     "start_seconds": 21.52,
+     "end_seconds": 25.84,
+     "text": "they overcame them you can overcome them",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s12",
+     "start_seconds": 23.6,
+     "end_seconds": 25.840000000000003,
+     "text": "too",
+     "speaker_id": null
+    }
+   ]
+  },
+  "frames": [],
+  "visual_text": []
+ },
+ "source": {
+  "post": {
+   "post_id": "post_e72908cf35603fc75e4ea353",
+   "candidate_id": "candidate_1",
+   "post_url": "https://www.youtube.com/watch?v=e50Tt9qJRQk",
+   "platform": "youtube",
+   "title": "President Obama Delivers Morehouse College Commencement Address",
+   "caption": null,
+   "author": {
+    "id": null,
+    "handle": null,
+    "display_name": null,
+    "profile_url": null,
+    "bio": null,
+    "verified": null,
+    "followers_count": null,
+    "following_count": null,
+    "posts_count": null
+   },
+   "engagement": {
+    "views_count": null,
+    "likes_count": null,
+    "comments_count": null,
+    "shares_count": null
+   },
+   "published_at": null,
+   "media": {
+    "media_id": "media_e72908cf35603fc75e4ea353",
+    "mime_type": "video/mp4",
+    "playback_url": "https://www.youtube.com/watch?v=e50Tt9qJRQk",
+    "duration_seconds": 1920.0,
+    "width": null,
+    "height": null,
+    "fps": null,
+    "has_audio": null
+   },
+   "retrieval": {
+    "retrieved_at": "2026-10-11T12:15:40.875301Z",
+    "provider": "yt-dlp+youtube_captions",
+    "metadata_source_urls": [
+     "https://www.youtube.com/watch?v=e50Tt9qJRQk"
+    ],
+    "unavailable_fields": [
+     "published_at",
+     "author.verified",
+     "author.followers_count",
+     "author.following_count",
+     "author.posts_count",
+     "engagement.views_count",
+     "engagement.likes_count",
+     "engagement.comments_count",
+     "engagement.shares_count",
+     "media.width",
+     "media.height",
+     "media.fps"
+    ],
+    "warnings": [
+     "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+     "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+     "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+     "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording."
+    ]
+   }
+  },
+  "transcript": {
+   "status": "partial",
+   "processed_ranges": [
+    {
+     "start_seconds": 1.9,
+     "end_seconds": 1908.9
+    }
+   ],
+   "sentences": [
+    {
+     "sentence_id": "s1",
+     "start_seconds": 1.9,
+     "end_seconds": 2.934,
+     "text": "The President: Hello, Morehouse!",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s2",
+     "start_seconds": 8.033,
+     "end_seconds": 9.266,
+     "text": "Thank you, everybody.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s3",
+     "start_seconds": 9.266,
+     "end_seconds": 10.4,
+     "text": "Please be seated.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s4",
+     "start_seconds": 10.4,
+     "end_seconds": 11.667,
+     "text": "Audience Member: I love you!",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s5",
+     "start_seconds": 11.667,
+     "end_seconds": 12.734,
+     "text": "The President: I love you back.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s6",
+     "start_seconds": 14.233,
+     "end_seconds": 18.266000000000002,
+     "text": "That is why I am here.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s7",
+     "start_seconds": 18.266,
+     "end_seconds": 28.599999999999998,
+     "text": "I have to say that it is one of the great honors of my life to",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s8",
+     "start_seconds": 28.6,
+     "end_seconds": 32.333,
+     "text": "be able to address this gathering here today.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s9",
+     "start_seconds": 32.333,
+     "end_seconds": 37.733999999999995,
+     "text": "I want to thank Dr. Wilson for his outstanding leadership,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s10",
+     "start_seconds": 37.734,
+     "end_seconds": 40.567,
+     "text": "and the Board of Trustees.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s11",
+     "start_seconds": 40.567,
+     "end_seconds": 44.633,
+     "text": "We have Congressman Cedric Richmond and Sanford Bishop --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s12",
+     "start_seconds": 44.633,
+     "end_seconds": 48.7,
+     "text": "both proud alumni of this school,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s13",
+     "start_seconds": 48.7,
+     "end_seconds": 50.7,
+     "text": "as well as Congressman Hank Johnson.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s14",
+     "start_seconds": 50.7,
+     "end_seconds": 55.2,
+     "text": "And one of my dear friends and a great inspiration to us all --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s15",
+     "start_seconds": 55.2,
+     "end_seconds": 57.133,
+     "text": "the great John Lewis is here.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s16",
+     "start_seconds": 63.834,
+     "end_seconds": 69.834,
+     "text": "We have your outstanding Mayor, Mr. Kasim Reed, in the house.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s17",
+     "start_seconds": 72.934,
+     "end_seconds": 77.967,
+     "text": "To all the members of the Morehouse family.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s18",
+     "start_seconds": 77.967,
+     "end_seconds": 80.767,
+     "text": "And most of all, congratulations to this distinguished group of",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s19",
+     "start_seconds": 80.767,
+     "end_seconds": 83.967,
+     "text": "Morehouse Men -- the Class of 2013.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s20",
+     "start_seconds": 90.7,
+     "end_seconds": 97.367,
+     "text": "I have to say that it's a little hard to follow -- not",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s21",
+     "start_seconds": 97.367,
+     "end_seconds": 102.066,
+     "text": "Dr. Wilson, but a skinny guy with a funny name.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s22",
+     "start_seconds": 105.1,
+     "end_seconds": 114.133,
+     "text": "Betsegaw Tadele -- he's going to be doing something.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s23",
+     "start_seconds": 114.133,
+     "end_seconds": 117.69999999999999,
+     "text": "I also have to say that you all are going to get wet.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s24",
+     "start_seconds": 120.767,
+     "end_seconds": 124.23299999999999,
+     "text": "And I'd be out there with you if I could.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s25",
+     "start_seconds": 125.9,
+     "end_seconds": 127.80000000000001,
+     "text": "But Secret Service gets nervous.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s26",
+     "start_seconds": 129.834,
+     "end_seconds": 131.8,
+     "text": "So I'm going to have to stay here, dry.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s27",
+     "start_seconds": 133.066,
+     "end_seconds": 134.8,
+     "text": "But know that I'm there with you in spirit.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s28",
+     "start_seconds": 138.1,
+     "end_seconds": 141.767,
+     "text": "Some of you are graduating summa cum laude.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s29",
+     "start_seconds": 144.233,
+     "end_seconds": 146.767,
+     "text": "Some of you are graduating magna cum laude.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s30",
+     "start_seconds": 148.6,
+     "end_seconds": 151.767,
+     "text": "I know some of you are just graduating, \"thank you, Lordy.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s31",
+     "start_seconds": 151.767,
+     "end_seconds": 161.333,
+     "text": "(laughter and applause)",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s32",
+     "start_seconds": 161.333,
+     "end_seconds": 163.266,
+     "text": "That's appropriate because it's a Sunday.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s33",
+     "start_seconds": 165.166,
+     "end_seconds": 170.333,
+     "text": "I see some moms and grandmas here, aunts,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s34",
+     "start_seconds": 170.333,
+     "end_seconds": 175.667,
+     "text": "in their Sunday best -- although they are upset about their hair",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s35",
+     "start_seconds": 175.667,
+     "end_seconds": 176.934,
+     "text": "getting messed up.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s36",
+     "start_seconds": 182.7,
+     "end_seconds": 185.533,
+     "text": "Michelle would not be sitting in the rain.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s37",
+     "start_seconds": 189.2,
+     "end_seconds": 190.767,
+     "text": "She has taught me about hair.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s38",
+     "start_seconds": 193.0,
+     "end_seconds": 195.467,
+     "text": "I want to congratulate all of you -- the parents,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s39",
+     "start_seconds": 195.467,
+     "end_seconds": 198.53300000000002,
+     "text": "the grandparents, the brothers and sisters,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s40",
+     "start_seconds": 198.533,
+     "end_seconds": 201.73399999999998,
+     "text": "the family and friends who supported these young men",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s41",
+     "start_seconds": 201.734,
+     "end_seconds": 203.36700000000002,
+     "text": "in so many ways.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s42",
+     "start_seconds": 203.367,
+     "end_seconds": 206.266,
+     "text": "This is your day, as well.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s43",
+     "start_seconds": 206.266,
+     "end_seconds": 209.39999999999998,
+     "text": "Just think about it -- your sons, your brothers,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s44",
+     "start_seconds": 209.4,
+     "end_seconds": 213.967,
+     "text": "your nephews -- they spent the last four years far from home",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s45",
+     "start_seconds": 213.967,
+     "end_seconds": 217.26600000000002,
+     "text": "and close to Spelman, and yet they are still here today.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s46",
+     "start_seconds": 223.567,
+     "end_seconds": 226.03300000000002,
+     "text": "So you've done something right.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s47",
+     "start_seconds": 226.033,
+     "end_seconds": 228.867,
+     "text": "Graduates, give a big round of applause to your family",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s48",
+     "start_seconds": 228.867,
+     "end_seconds": 230.46699999999998,
+     "text": "for everything that they've done for you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s49",
+     "start_seconds": 236.533,
+     "end_seconds": 238.83399999999997,
+     "text": "I know that some of you had to wait in long lines to get into",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s50",
+     "start_seconds": 238.834,
+     "end_seconds": 241.5,
+     "text": "today's ceremony.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s51",
+     "start_seconds": 241.5,
+     "end_seconds": 244.0,
+     "text": "And I would apologize, but it did not have anything to",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s52",
+     "start_seconds": 244.0,
+     "end_seconds": 245.0,
+     "text": "do with security.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s53",
+     "start_seconds": 245.0,
+     "end_seconds": 247.467,
+     "text": "Those graduates just wanted you to know what it's like to",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s54",
+     "start_seconds": 247.467,
+     "end_seconds": 248.93400000000003,
+     "text": "register for classes here.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s55",
+     "start_seconds": 248.934,
+     "end_seconds": 261.033,
+     "text": "(laughter and applause)",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s56",
+     "start_seconds": 261.033,
+     "end_seconds": 265.13300000000004,
+     "text": "And this time of year brings a different kind of stress --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s57",
+     "start_seconds": 265.133,
+     "end_seconds": 268.4,
+     "text": "every senior stopping by Gloster Hall over the past week making",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s58",
+     "start_seconds": 268.4,
+     "end_seconds": 271.09999999999997,
+     "text": "sure your name was actually on the list of students who",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s59",
+     "start_seconds": 271.1,
+     "end_seconds": 272.96700000000004,
+     "text": "met all the graduation requirements.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s60",
+     "start_seconds": 276.333,
+     "end_seconds": 280.40000000000003,
+     "text": "If it wasn't on the list, you had to figure out why.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s61",
+     "start_seconds": 280.4,
+     "end_seconds": 283.967,
+     "text": "Was it that library book you lent to that trifling roommate",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s62",
+     "start_seconds": 283.967,
+     "end_seconds": 285.066,
+     "text": "who didn't return it?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s63",
+     "start_seconds": 287.9,
+     "end_seconds": 290.133,
+     "text": "Was it Dr. Johnson's policy class?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s64",
+     "start_seconds": 294.467,
+     "end_seconds": 296.7,
+     "text": "Did you get enough Crown Forum credits?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s65",
+     "start_seconds": 301.0,
+     "end_seconds": 305.767,
+     "text": "On that last point, I'm going to exercise my power as President",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s66",
+     "start_seconds": 305.767,
+     "end_seconds": 309.633,
+     "text": "to declare this speech sufficient Crown Forum",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s67",
+     "start_seconds": 309.633,
+     "end_seconds": 314.26599999999996,
+     "text": "credits for any otherwise eligible student to graduate.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s68",
+     "start_seconds": 314.266,
+     "end_seconds": 316.20000000000005,
+     "text": "That is my graduation gift to you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s69",
+     "start_seconds": 327.367,
+     "end_seconds": 328.90000000000003,
+     "text": "You have a special dispensation.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s70",
+     "start_seconds": 330.967,
+     "end_seconds": 333.53299999999996,
+     "text": "Now, graduates, I am humbled to stand here with all of you as an",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s71",
+     "start_seconds": 333.533,
+     "end_seconds": 335.5,
+     "text": "honorary Morehouse Man.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s72",
+     "start_seconds": 340.433,
+     "end_seconds": 341.433,
+     "text": "I finally made it.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s73",
+     "start_seconds": 344.9,
+     "end_seconds": 349.2,
+     "text": "And as I do, I'm mindful of an old saying: \"You can always tell",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s74",
+     "start_seconds": 349.2,
+     "end_seconds": 353.09999999999997,
+     "text": "a Morehouse Man --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s75",
+     "start_seconds": 353.1,
+     "end_seconds": 354.533,
+     "text": "-- but you can't tell him much.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s76",
+     "start_seconds": 359.3,
+     "end_seconds": 362.834,
+     "text": "And that makes my task a little more difficult, I suppose.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s77",
+     "start_seconds": 362.834,
+     "end_seconds": 366.033,
+     "text": "But I think it also reflects the sense of pride that's",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s78",
+     "start_seconds": 366.033,
+     "end_seconds": 370.033,
+     "text": "always been part of this school's tradition.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s79",
+     "start_seconds": 370.033,
+     "end_seconds": 373.834,
+     "text": "Benjamin Mays, who served as the president of Morehouse for",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s80",
+     "start_seconds": 373.834,
+     "end_seconds": 379.5,
+     "text": "almost 30 years, understood that tradition better than anybody.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s81",
+     "start_seconds": 379.5,
+     "end_seconds": 383.5,
+     "text": "He said -- and I quote -- \"It will not be sufficient for",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s82",
+     "start_seconds": 383.5,
+     "end_seconds": 387.5,
+     "text": "Morehouse College, for any college, for that matter,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s83",
+     "start_seconds": 387.5,
+     "end_seconds": 391.133,
+     "text": "to produce clever graduates...",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s84",
+     "start_seconds": 391.133,
+     "end_seconds": 396.667,
+     "text": "but rather honest men, men who can be trusted in public and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s85",
+     "start_seconds": 396.667,
+     "end_seconds": 401.9,
+     "text": "private life -- men who are sensitive to the wrongs,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s86",
+     "start_seconds": 401.9,
+     "end_seconds": 405.5,
+     "text": "the sufferings, and the injustices of society",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s87",
+     "start_seconds": 405.5,
+     "end_seconds": 408.533,
+     "text": "and who are willing to accept responsibility for",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s88",
+     "start_seconds": 408.533,
+     "end_seconds": 409.834,
+     "text": "correcting (those) ills.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s89",
+     "start_seconds": 409.834,
+     "end_seconds": 416.266,
+     "text": "It was that mission -- not just to educate men,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s90",
+     "start_seconds": 416.266,
+     "end_seconds": 421.0,
+     "text": "but to cultivate good men, strong men,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s91",
+     "start_seconds": 421.0,
+     "end_seconds": 424.767,
+     "text": "upright men -- that brought community leaders together",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s92",
+     "start_seconds": 424.767,
+     "end_seconds": 428.467,
+     "text": "just two years after the end of the Civil War.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s93",
+     "start_seconds": 428.467,
+     "end_seconds": 433.633,
+     "text": "They assembled a list of 37 men, free blacks and freed slaves,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s94",
+     "start_seconds": 433.633,
+     "end_seconds": 436.667,
+     "text": "who would make up the first prospective class of what",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s95",
+     "start_seconds": 436.667,
+     "end_seconds": 438.633,
+     "text": "later became Morehouse College.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s96",
+     "start_seconds": 440.333,
+     "end_seconds": 443.3,
+     "text": "Most of those first students had a desire to become teachers and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s97",
+     "start_seconds": 443.3,
+     "end_seconds": 447.166,
+     "text": "preachers -- to better themselves so they could",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s98",
+     "start_seconds": 447.166,
+     "end_seconds": 448.233,
+     "text": "help others do the same.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s99",
+     "start_seconds": 448.233,
+     "end_seconds": 454.166,
+     "text": "A century and a half later, times have changed.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s100",
+     "start_seconds": 454.166,
+     "end_seconds": 459.166,
+     "text": "But the \"Morehouse Mystique\" still endures.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s101",
+     "start_seconds": 459.166,
+     "end_seconds": 462.867,
+     "text": "Some of you probably came here from communities where everybody",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s102",
+     "start_seconds": 462.867,
+     "end_seconds": 465.06600000000003,
+     "text": "looked like you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s103",
+     "start_seconds": 465.066,
+     "end_seconds": 467.7,
+     "text": "Others may have come here in search of a community.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s104",
+     "start_seconds": 467.7,
+     "end_seconds": 471.5,
+     "text": "And I suspect that some of you probably felt a little bit of",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s105",
+     "start_seconds": 471.5,
+     "end_seconds": 474.633,
+     "text": "culture shock the first time you came together as a class",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s106",
+     "start_seconds": 474.633,
+     "end_seconds": 475.767,
+     "text": "in King's Chapel.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s107",
+     "start_seconds": 475.767,
+     "end_seconds": 479.033,
+     "text": "All of a sudden, you weren't the only high school sports captain,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s108",
+     "start_seconds": 479.033,
+     "end_seconds": 482.867,
+     "text": "you weren't the only student council president.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s109",
+     "start_seconds": 482.867,
+     "end_seconds": 486.767,
+     "text": "You were suddenly in a group of high achievers,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s110",
+     "start_seconds": 486.767,
+     "end_seconds": 489.967,
+     "text": "and that meant you were expected to do something more.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s111",
+     "start_seconds": 492.233,
+     "end_seconds": 494.633,
+     "text": "That's the unique sense of purpose that this place has",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s112",
+     "start_seconds": 494.633,
+     "end_seconds": 499.7,
+     "text": "always infused -- the conviction that this is a training ground",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s113",
+     "start_seconds": 499.7,
+     "end_seconds": 503.734,
+     "text": "not only for individual success, but for leadership that can",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s114",
+     "start_seconds": 503.734,
+     "end_seconds": 505.734,
+     "text": "change the world.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s115",
+     "start_seconds": 507.266,
+     "end_seconds": 509.367,
+     "text": "Dr. King was just 15 years old when",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s116",
+     "start_seconds": 509.367,
+     "end_seconds": 512.4,
+     "text": "he enrolled here at Morehouse.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s117",
+     "start_seconds": 512.4,
+     "end_seconds": 515.5,
+     "text": "He was an unknown, undersized, unassuming young freshman who",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s118",
+     "start_seconds": 515.5,
+     "end_seconds": 517.133,
+     "text": "lived at home with his parents.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s119",
+     "start_seconds": 517.133,
+     "end_seconds": 522.633,
+     "text": "And I think it's fair to say he wasn't the coolest kid on campus",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s120",
+     "start_seconds": 522.633,
+     "end_seconds": 526.2660000000001,
+     "text": "-- for the suits he wore, his classmates called him \"Tweed.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s121",
+     "start_seconds": 528.8,
+     "end_seconds": 532.867,
+     "text": "But his education at Morehouse helped to forge the intellect,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s122",
+     "start_seconds": 532.867,
+     "end_seconds": 536.4,
+     "text": "the discipline, the compassion, the soul force that would",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s123",
+     "start_seconds": 536.4,
+     "end_seconds": 538.4,
+     "text": "transform America.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s124",
+     "start_seconds": 539.867,
+     "end_seconds": 542.5,
+     "text": "It was here that he was introduced to the writings",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s125",
+     "start_seconds": 542.5,
+     "end_seconds": 548.834,
+     "text": "of Gandhi and Thoreau, and the theory of civil disobedience.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s126",
+     "start_seconds": 548.834,
+     "end_seconds": 551.5,
+     "text": "It was here that professors encouraged him to look past",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s127",
+     "start_seconds": 551.5,
+     "end_seconds": 554.667,
+     "text": "the world as it was and fight for the world as it should be.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s128",
+     "start_seconds": 554.667,
+     "end_seconds": 559.433,
+     "text": "And it was here, at Morehouse, as Dr. King later wrote,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s129",
+     "start_seconds": 559.433,
+     "end_seconds": 564.567,
+     "text": "where \"I realized that nobody...was afraid.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s130",
+     "start_seconds": 564.567,
+     "end_seconds": 568.066,
+     "text": "Not even of some bad weather.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s131",
+     "start_seconds": 568.066,
+     "end_seconds": 569.3670000000001,
+     "text": "I added on that part.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s132",
+     "start_seconds": 571.233,
+     "end_seconds": 578.0999999999999,
+     "text": "I know it's wet out there.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s133",
+     "start_seconds": 578.1,
+     "end_seconds": 581.3000000000001,
+     "text": "But Dr. Wilson told me you all had a choice and decided to do",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s134",
+     "start_seconds": 581.3,
+     "end_seconds": 582.367,
+     "text": "it out here anyway.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s135",
+     "start_seconds": 585.2,
+     "end_seconds": 588.9340000000001,
+     "text": "That's a Morehouse Man talking.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s136",
+     "start_seconds": 588.934,
+     "end_seconds": 590.1999999999999,
+     "text": "Now, think about it.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s137",
+     "start_seconds": 590.2,
+     "end_seconds": 592.3330000000001,
+     "text": "For black men in the '40s and the '50s,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s138",
+     "start_seconds": 592.333,
+     "end_seconds": 597.967,
+     "text": "the threat of violence, the constant humiliations,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s139",
+     "start_seconds": 597.967,
+     "end_seconds": 601.8,
+     "text": "large and small, the uncertainty that you could support a family,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s140",
+     "start_seconds": 601.8,
+     "end_seconds": 606.0659999999999,
+     "text": "the gnawing doubts born of the Jim Crow culture that told you",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s141",
+     "start_seconds": 606.066,
+     "end_seconds": 609.3330000000001,
+     "text": "every day that somehow you were inferior,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s142",
+     "start_seconds": 609.333,
+     "end_seconds": 613.7339999999999,
+     "text": "the temptation to shrink from the world, to accept your place,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s143",
+     "start_seconds": 613.734,
+     "end_seconds": 620.8340000000001,
+     "text": "to avoid risks, to be afraid -- that temptation",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s144",
+     "start_seconds": 620.834,
+     "end_seconds": 622.834,
+     "text": "was necessarily strong.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s145",
+     "start_seconds": 624.333,
+     "end_seconds": 628.6329999999999,
+     "text": "And yet, here, under the tutelage of men like Dr. Mays,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s146",
+     "start_seconds": 628.633,
+     "end_seconds": 632.133,
+     "text": "young Martin learned to be unafraid.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s147",
+     "start_seconds": 632.133,
+     "end_seconds": 636.2330000000001,
+     "text": "And he, in turn, taught others to be unafraid.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s148",
+     "start_seconds": 636.233,
+     "end_seconds": 639.4,
+     "text": "And over time, he taught a nation to be unafraid.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s149",
+     "start_seconds": 641.6,
+     "end_seconds": 644.633,
+     "text": "And over the last 50 years, thanks to the moral force of",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s150",
+     "start_seconds": 644.633,
+     "end_seconds": 649.4000000000001,
+     "text": "Dr. King and a Moses generation that overcame their fear and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s151",
+     "start_seconds": 649.4,
+     "end_seconds": 653.066,
+     "text": "their cynicism and their despair,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s152",
+     "start_seconds": 653.066,
+     "end_seconds": 654.6,
+     "text": "barriers have come tumbling down,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s153",
+     "start_seconds": 654.6,
+     "end_seconds": 659.2330000000001,
+     "text": "and new doors of opportunity have swung open,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s154",
+     "start_seconds": 659.233,
+     "end_seconds": 664.1659999999999,
+     "text": "and laws and hearts and minds have been changed to the point",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s155",
+     "start_seconds": 664.166,
+     "end_seconds": 668.1,
+     "text": "where someone who looks just like you can somehow come to",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s156",
+     "start_seconds": 668.1,
+     "end_seconds": 671.667,
+     "text": "serve as President of these United States of America.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s157",
+     "start_seconds": 679.834,
+     "end_seconds": 683.433,
+     "text": "So the history we share should give you hope.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s158",
+     "start_seconds": 685.6,
+     "end_seconds": 689.8000000000001,
+     "text": "The future we share should give you hope.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s159",
+     "start_seconds": 689.8,
+     "end_seconds": 692.6999999999999,
+     "text": "You're graduating into an improving job market.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s160",
+     "start_seconds": 692.7,
+     "end_seconds": 696.3670000000001,
+     "text": "You're living in a time when advances in technology and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s161",
+     "start_seconds": 696.367,
+     "end_seconds": 699.6669999999999,
+     "text": "communication put the world at your fingertips.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s162",
+     "start_seconds": 699.667,
+     "end_seconds": 703.467,
+     "text": "Your generation is uniquely poised for success unlike",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s163",
+     "start_seconds": 703.467,
+     "end_seconds": 708.533,
+     "text": "any generation of African Americans that came before it.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s164",
+     "start_seconds": 708.533,
+     "end_seconds": 712.2,
+     "text": "But that doesn't mean we don't have work -- because if we're",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s165",
+     "start_seconds": 712.2,
+     "end_seconds": 717.433,
+     "text": "honest with ourselves, we know that too few of our brothers",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s166",
+     "start_seconds": 717.433,
+     "end_seconds": 719.734,
+     "text": "have the opportunities that you've had here at Morehouse.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s167",
+     "start_seconds": 722.166,
+     "end_seconds": 726.1,
+     "text": "In troubled neighborhoods all across this country -- many of",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s168",
+     "start_seconds": 726.1,
+     "end_seconds": 730.5,
+     "text": "them heavily African American -- too few of our citizens have",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s169",
+     "start_seconds": 730.5,
+     "end_seconds": 732.633,
+     "text": "role models to guide them.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s170",
+     "start_seconds": 732.633,
+     "end_seconds": 736.066,
+     "text": "Communities just a couple miles from my house in Chicago,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s171",
+     "start_seconds": 736.066,
+     "end_seconds": 740.1,
+     "text": "communities just a couple miles from here -- they're places",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s172",
+     "start_seconds": 740.1,
+     "end_seconds": 744.333,
+     "text": "where jobs are still too scarce and wages are still too low;",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s173",
+     "start_seconds": 744.333,
+     "end_seconds": 748.6669999999999,
+     "text": "where schools are underfunded and violence is pervasive;",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s174",
+     "start_seconds": 748.667,
+     "end_seconds": 752.033,
+     "text": "where too many of our men spend their youth not behind a desk in",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s175",
+     "start_seconds": 752.033,
+     "end_seconds": 756.734,
+     "text": "a classroom, but hanging out on the streets or brooding behind a",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s176",
+     "start_seconds": 756.734,
+     "end_seconds": 758.734,
+     "text": "jail cell.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s177",
+     "start_seconds": 760.5,
+     "end_seconds": 764.166,
+     "text": "My job, as President, is to advocate for policies that",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s178",
+     "start_seconds": 764.166,
+     "end_seconds": 767.3670000000001,
+     "text": "generate more opportunity for everybody -- policies that",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s179",
+     "start_seconds": 767.367,
+     "end_seconds": 770.4,
+     "text": "strengthen the middle class and give more people the chance to",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s180",
+     "start_seconds": 770.4,
+     "end_seconds": 773.533,
+     "text": "climb their way into the middle class.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s181",
+     "start_seconds": 773.533,
+     "end_seconds": 776.6,
+     "text": "Policies that create more good jobs and reduce poverty,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s182",
+     "start_seconds": 776.6,
+     "end_seconds": 779.6,
+     "text": "and educate more children, and give more families the security",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s183",
+     "start_seconds": 779.6,
+     "end_seconds": 782.967,
+     "text": "of health care, and protect more of our children from the horrors",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s184",
+     "start_seconds": 782.967,
+     "end_seconds": 784.1999999999999,
+     "text": "of gun violence.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s185",
+     "start_seconds": 784.2,
+     "end_seconds": 785.7,
+     "text": "That's my job.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s186",
+     "start_seconds": 785.7,
+     "end_seconds": 787.8670000000001,
+     "text": "Those are matters of public policy,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s187",
+     "start_seconds": 787.867,
+     "end_seconds": 790.367,
+     "text": "and it is important for all of us -- black,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s188",
+     "start_seconds": 790.367,
+     "end_seconds": 793.934,
+     "text": "white and brown -- to advocate for an America where everybody",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s189",
+     "start_seconds": 793.934,
+     "end_seconds": 795.3,
+     "text": "has got a fair shot in life.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s190",
+     "start_seconds": 795.3,
+     "end_seconds": 796.7669999999999,
+     "text": "Not just some.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s191",
+     "start_seconds": 796.767,
+     "end_seconds": 797.633,
+     "text": "Not just a few.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s192",
+     "start_seconds": 801.8,
+     "end_seconds": 803.6999999999999,
+     "text": "But along with collective responsibilities,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s193",
+     "start_seconds": 803.7,
+     "end_seconds": 805.734,
+     "text": "we have individual responsibilities.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s194",
+     "start_seconds": 807.8,
+     "end_seconds": 809.967,
+     "text": "There are some things, as black men,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s195",
+     "start_seconds": 809.967,
+     "end_seconds": 811.967,
+     "text": "we can only do for ourselves.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s196",
+     "start_seconds": 814.033,
+     "end_seconds": 816.4,
+     "text": "There are some things, as Morehouse Men,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s197",
+     "start_seconds": 816.4,
+     "end_seconds": 819.567,
+     "text": "that you are obliged to do for those still left behind.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s198",
+     "start_seconds": 821.967,
+     "end_seconds": 825.4,
+     "text": "As Morehouse Men, you now wield something even more powerful",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s199",
+     "start_seconds": 825.4,
+     "end_seconds": 828.467,
+     "text": "than the diploma you're about to collect -- and that's the power",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s200",
+     "start_seconds": 828.467,
+     "end_seconds": 831.4,
+     "text": "of your example.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s201",
+     "start_seconds": 831.4,
+     "end_seconds": 834.367,
+     "text": "So what I ask of you today is the same thing I ask of every",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s202",
+     "start_seconds": 834.367,
+     "end_seconds": 839.0,
+     "text": "graduating class I address: Use that power for something",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s203",
+     "start_seconds": 839.0,
+     "end_seconds": 841.767,
+     "text": "larger than yourself.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s204",
+     "start_seconds": 841.767,
+     "end_seconds": 844.533,
+     "text": "Live up to President Mays's challenge.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s205",
+     "start_seconds": 844.533,
+     "end_seconds": 847.133,
+     "text": "Be \"sensitive to the wrongs, the sufferings,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s206",
+     "start_seconds": 847.133,
+     "end_seconds": 848.667,
+     "text": "and the injustices of society.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s207",
+     "start_seconds": 848.667,
+     "end_seconds": 851.567,
+     "text": "And be \"willing to accept responsibility",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s208",
+     "start_seconds": 851.567,
+     "end_seconds": 852.567,
+     "text": "for correcting (those) ills.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s209",
+     "start_seconds": 852.567,
+     "end_seconds": 857.633,
+     "text": "I know that some of you came to Morehouse from communities",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s210",
+     "start_seconds": 857.633,
+     "end_seconds": 860.533,
+     "text": "where life was about keeping your head down and looking out",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s211",
+     "start_seconds": 860.533,
+     "end_seconds": 863.066,
+     "text": "for yourself.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s212",
+     "start_seconds": 863.066,
+     "end_seconds": 866.3000000000001,
+     "text": "Maybe you feel like you escaped, and now you can take your degree",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s213",
+     "start_seconds": 866.3,
+     "end_seconds": 869.266,
+     "text": "and get that fancy job and the nice house and the nice car --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s214",
+     "start_seconds": 869.266,
+     "end_seconds": 871.567,
+     "text": "and never look back.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s215",
+     "start_seconds": 871.567,
+     "end_seconds": 874.667,
+     "text": "And don't get me wrong -- with all those student loans you've",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s216",
+     "start_seconds": 874.667,
+     "end_seconds": 876.667,
+     "text": "had to take out, I know you've got to earn some money.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s217",
+     "start_seconds": 878.633,
+     "end_seconds": 881.8000000000001,
+     "text": "With doors open to you that your parents and grandparents could",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s218",
+     "start_seconds": 881.8,
+     "end_seconds": 886.0659999999999,
+     "text": "not even imagine, no one expects you to take a vow of poverty.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s219",
+     "start_seconds": 886.066,
+     "end_seconds": 892.033,
+     "text": "But I will say it betrays a poverty of ambition if all you",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s220",
+     "start_seconds": 894.2,
+     "end_seconds": 896.734,
+     "text": "think about is what goods you can buy instead of what good",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s221",
+     "start_seconds": 896.734,
+     "end_seconds": 897.5,
+     "text": "you can do.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s222",
+     "start_seconds": 902.6,
+     "end_seconds": 904.533,
+     "text": "So, yes, go get that law degree.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s223",
+     "start_seconds": 904.533,
+     "end_seconds": 908.266,
+     "text": "But if you do, ask yourself if the only option is to defend the",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s224",
+     "start_seconds": 908.266,
+     "end_seconds": 911.033,
+     "text": "rich and the powerful, or if you can also find some",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s225",
+     "start_seconds": 911.033,
+     "end_seconds": 913.0,
+     "text": "time to defend the powerless.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s226",
+     "start_seconds": 915.533,
+     "end_seconds": 919.133,
+     "text": "Sure, go get your MBA, or start that business.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s227",
+     "start_seconds": 919.133,
+     "end_seconds": 920.767,
+     "text": "We need black businesses out there.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s228",
+     "start_seconds": 920.767,
+     "end_seconds": 924.0,
+     "text": "But ask yourselves what broader purpose your business might",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s229",
+     "start_seconds": 924.0,
+     "end_seconds": 926.567,
+     "text": "serve, in putting people back to work,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s230",
+     "start_seconds": 926.567,
+     "end_seconds": 928.467,
+     "text": "or transforming a neighborhood.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s231",
+     "start_seconds": 928.467,
+     "end_seconds": 932.066,
+     "text": "The most successful CEOs I know didn't start out intent just on",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s232",
+     "start_seconds": 932.066,
+     "end_seconds": 935.1,
+     "text": "making money -- rather, they had a vision of how their product or",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s233",
+     "start_seconds": 935.1,
+     "end_seconds": 938.633,
+     "text": "service would change things, and the money followed.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s234",
+     "start_seconds": 942.166,
+     "end_seconds": 943.8000000000001,
+     "text": "Some of you may be headed to medical school",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s235",
+     "start_seconds": 943.8,
+     "end_seconds": 945.967,
+     "text": "to become doctors.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s236",
+     "start_seconds": 945.967,
+     "end_seconds": 949.1999999999999,
+     "text": "But make sure you heal folks in underserved communities who",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s237",
+     "start_seconds": 949.2,
+     "end_seconds": 951.533,
+     "text": "really need it, too.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s238",
+     "start_seconds": 951.533,
+     "end_seconds": 954.734,
+     "text": "For generations, certain groups in this country -- especially",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s239",
+     "start_seconds": 954.734,
+     "end_seconds": 958.633,
+     "text": "African Americans -- have been desperate in need of access to",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s240",
+     "start_seconds": 958.633,
+     "end_seconds": 959.967,
+     "text": "quality, affordable health care.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s241",
+     "start_seconds": 959.967,
+     "end_seconds": 964.7669999999999,
+     "text": "And as a society, we're finally beginning to change that.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s242",
+     "start_seconds": 964.767,
+     "end_seconds": 966.8340000000001,
+     "text": "Those of you who are under the age of 26 already have",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s243",
+     "start_seconds": 966.834,
+     "end_seconds": 969.266,
+     "text": "the option to stay on your parent's health care plan.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s244",
+     "start_seconds": 969.266,
+     "end_seconds": 971.8,
+     "text": "But all of you are heading into an economy where many young",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s245",
+     "start_seconds": 971.8,
+     "end_seconds": 974.266,
+     "text": "people expect not only to have multiple jobs,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s246",
+     "start_seconds": 974.266,
+     "end_seconds": 976.333,
+     "text": "but multiple careers.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s247",
+     "start_seconds": 976.333,
+     "end_seconds": 981.433,
+     "text": "So starting October 1st, because of the Affordable Care Act --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s248",
+     "start_seconds": 981.433,
+     "end_seconds": 983.567,
+     "text": "otherwise known as Obamacare --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s249",
+     "start_seconds": 983.967,
+     "end_seconds": 985.633,
+     "text": "-- you'll be able to shop for a quality,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s250",
+     "start_seconds": 985.633,
+     "end_seconds": 989.3670000000001,
+     "text": "affordable plan that's yours and travels with you -- a plan that",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s251",
+     "start_seconds": 989.367,
+     "end_seconds": 991.1329999999999,
+     "text": "will insure not only your health,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s252",
+     "start_seconds": 991.133,
+     "end_seconds": 994.5,
+     "text": "but your dreams if you are sick or get in an accident.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s253",
+     "start_seconds": 994.5,
+     "end_seconds": 996.967,
+     "text": "But we're going to need some doctors to make sure",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s254",
+     "start_seconds": 996.967,
+     "end_seconds": 998.967,
+     "text": "it works, too.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s255",
+     "start_seconds": 1000.3,
+     "end_seconds": 1002.8,
+     "text": "We've got to make sure everybody has good health in this country.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s256",
+     "start_seconds": 1002.8,
+     "end_seconds": 1004.834,
+     "text": "It's not just good for you, it's good for this country.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s257",
+     "start_seconds": 1004.834,
+     "end_seconds": 1007.266,
+     "text": "So you're going to have to spread the word to your fellow",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s258",
+     "start_seconds": 1007.266,
+     "end_seconds": 1009.9,
+     "text": "young people.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s259",
+     "start_seconds": 1009.9,
+     "end_seconds": 1012.934,
+     "text": "Which brings me to a second point: Just as Morehouse has",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s260",
+     "start_seconds": 1012.934,
+     "end_seconds": 1014.6669999999999,
+     "text": "taught you to expect more of yourselves,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s261",
+     "start_seconds": 1014.667,
+     "end_seconds": 1018.467,
+     "text": "inspire those who look up to you to expect more of themselves.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s262",
+     "start_seconds": 1020.6,
+     "end_seconds": 1023.1,
+     "text": "We know that too many young men in our community continue",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s263",
+     "start_seconds": 1023.1,
+     "end_seconds": 1025.2,
+     "text": "to make bad choices.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s264",
+     "start_seconds": 1025.2,
+     "end_seconds": 1028.4,
+     "text": "And I have to say, growing up, I made quite a few myself.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s265",
+     "start_seconds": 1030.667,
+     "end_seconds": 1034.6999999999998,
+     "text": "Sometimes I wrote off my own failings as just another example",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s266",
+     "start_seconds": 1034.7,
+     "end_seconds": 1037.967,
+     "text": "of the world trying to keep a black man down.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s267",
+     "start_seconds": 1037.967,
+     "end_seconds": 1043.2,
+     "text": "I had a tendency sometimes to make excuses for me not doing",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s268",
+     "start_seconds": 1043.2,
+     "end_seconds": 1044.2,
+     "text": "the right thing.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s269",
+     "start_seconds": 1044.2,
+     "end_seconds": 1048.066,
+     "text": "But one of the things that all of you have learned over the",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s270",
+     "start_seconds": 1048.066,
+     "end_seconds": 1052.133,
+     "text": "last four years is there's no longer any room for excuses.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s271",
+     "start_seconds": 1057.633,
+     "end_seconds": 1060.333,
+     "text": "I understand there's a common fraternity creed here at",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s272",
+     "start_seconds": 1060.333,
+     "end_seconds": 1065.633,
+     "text": "Morehouse: \"Excuses are tools of the incompetent used to build",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s273",
+     "start_seconds": 1065.633,
+     "end_seconds": 1070.7340000000002,
+     "text": "bridges to nowhere and monuments of nothingness.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s274",
+     "start_seconds": 1070.734,
+     "end_seconds": 1073.9669999999999,
+     "text": "Well, we've got no time for excuses.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s275",
+     "start_seconds": 1073.967,
+     "end_seconds": 1077.333,
+     "text": "Not because the bitter legacy of slavery and segregation have",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s276",
+     "start_seconds": 1077.333,
+     "end_seconds": 1081.066,
+     "text": "vanished entirely; they have not.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s277",
+     "start_seconds": 1081.066,
+     "end_seconds": 1084.934,
+     "text": "Not because racism and discrimination no longer exist;",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s278",
+     "start_seconds": 1084.934,
+     "end_seconds": 1086.8999999999999,
+     "text": "we know those are still out there.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s279",
+     "start_seconds": 1088.5,
+     "end_seconds": 1091.166,
+     "text": "It's just that in today's hyperconnected,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s280",
+     "start_seconds": 1091.166,
+     "end_seconds": 1094.3,
+     "text": "hypercompetitive world, with millions of young people from",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s281",
+     "start_seconds": 1094.3,
+     "end_seconds": 1098.2659999999998,
+     "text": "China and India and Brazil -- many of whom started with a",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s282",
+     "start_seconds": 1098.266,
+     "end_seconds": 1102.633,
+     "text": "whole lot less than all of you did -- all of them entering the",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s283",
+     "start_seconds": 1102.633,
+     "end_seconds": 1106.934,
+     "text": "global workforce alongside you, nobody is going to give you",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s284",
+     "start_seconds": 1106.934,
+     "end_seconds": 1108.8,
+     "text": "anything that you have not earned.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s285",
+     "start_seconds": 1110.767,
+     "end_seconds": 1114.367,
+     "text": "Nobody cares how tough your upbringing was.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s286",
+     "start_seconds": 1114.367,
+     "end_seconds": 1117.533,
+     "text": "Nobody cares if you suffered some discrimination.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s287",
+     "start_seconds": 1120.934,
+     "end_seconds": 1124.133,
+     "text": "And moreover, you have to remember that whatever you've",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s288",
+     "start_seconds": 1124.133,
+     "end_seconds": 1127.7340000000002,
+     "text": "gone through, it pales in comparison to the hardships",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s289",
+     "start_seconds": 1127.734,
+     "end_seconds": 1131.033,
+     "text": "previous generations endured -- and they overcame them.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s290",
+     "start_seconds": 1131.033,
+     "end_seconds": 1133.7669999999998,
+     "text": "And if they overcame them, you can overcome them, too.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s291",
+     "start_seconds": 1138.834,
+     "end_seconds": 1143.934,
+     "text": "You now hail from a lineage and legacy of immeasurably strong",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s292",
+     "start_seconds": 1143.934,
+     "end_seconds": 1147.734,
+     "text": "men -- men who bore tremendous burdens and still laid the",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s293",
+     "start_seconds": 1147.734,
+     "end_seconds": 1152.6999999999998,
+     "text": "stones for the path on which we now walk.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s294",
+     "start_seconds": 1152.7,
+     "end_seconds": 1154.3,
+     "text": "You wear the mantle of Frederick Douglass and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s295",
+     "start_seconds": 1154.3,
+     "end_seconds": 1157.633,
+     "text": "Booker T. Washington, and Ralph Bunche and Langston Hughes,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s296",
+     "start_seconds": 1157.633,
+     "end_seconds": 1161.3,
+     "text": "and George Washington Carver and Ralph Abernathy and Thurgood",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s297",
+     "start_seconds": 1161.3,
+     "end_seconds": 1163.3999999999999,
+     "text": "Marshall, and, yes, Dr. Martin Luther King,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s298",
+     "start_seconds": 1163.4,
+     "end_seconds": 1168.0330000000001,
+     "text": "Jr. These men were many things to many people.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s299",
+     "start_seconds": 1168.033,
+     "end_seconds": 1170.3,
+     "text": "And they knew full well the role that racism played",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s300",
+     "start_seconds": 1170.3,
+     "end_seconds": 1171.3,
+     "text": "in their lives.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s301",
+     "start_seconds": 1171.3,
+     "end_seconds": 1174.7,
+     "text": "But when it came to their own accomplishments and sense of",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s302",
+     "start_seconds": 1174.7,
+     "end_seconds": 1178.367,
+     "text": "purpose, they had no time for excuses.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s303",
+     "start_seconds": 1178.367,
+     "end_seconds": 1182.233,
+     "text": "Every one of you have a grandma or an uncle or a parent who's",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s304",
+     "start_seconds": 1182.233,
+     "end_seconds": 1185.367,
+     "text": "told you that at some point in life, as an African American,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s305",
+     "start_seconds": 1185.367,
+     "end_seconds": 1187.867,
+     "text": "you have to work twice as hard as anyone else if you",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s306",
+     "start_seconds": 1187.867,
+     "end_seconds": 1188.867,
+     "text": "want to get by.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s307",
+     "start_seconds": 1188.867,
+     "end_seconds": 1193.2659999999998,
+     "text": "I think President Mays put it even better: He said,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s308",
+     "start_seconds": 1193.266,
+     "end_seconds": 1198.1000000000001,
+     "text": "\"Whatever you do, strive to do it so well that no man living",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s309",
+     "start_seconds": 1198.1,
+     "end_seconds": 1201.233,
+     "text": "and no man dead, and no man yet to be born can",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s310",
+     "start_seconds": 1201.233,
+     "end_seconds": 1202.6,
+     "text": "do it any better.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s311",
+     "start_seconds": 1208.433,
+     "end_seconds": 1211.7,
+     "text": "And I promise you, what was needed in Dr. Mays's time,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s312",
+     "start_seconds": 1211.7,
+     "end_seconds": 1215.433,
+     "text": "that spirit of excellence, and hard work, and dedication,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s313",
+     "start_seconds": 1215.433,
+     "end_seconds": 1218.0,
+     "text": "and no excuses is needed now more than ever.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s314",
+     "start_seconds": 1218.0,
+     "end_seconds": 1221.8,
+     "text": "If you think you can just get over in this economy",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s315",
+     "start_seconds": 1221.8,
+     "end_seconds": 1223.567,
+     "text": "just because you have a Morehouse degree,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s316",
+     "start_seconds": 1223.567,
+     "end_seconds": 1226.7,
+     "text": "you're in for a rude awakening.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s317",
+     "start_seconds": 1226.7,
+     "end_seconds": 1230.333,
+     "text": "But if you stay hungry, if you keep hustling,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s318",
+     "start_seconds": 1230.333,
+     "end_seconds": 1234.133,
+     "text": "if you keep on your grind and get other folks to do the same",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s319",
+     "start_seconds": 1234.133,
+     "end_seconds": 1235.5330000000001,
+     "text": "-- nobody can stop you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s320",
+     "start_seconds": 1240.4,
+     "end_seconds": 1242.9340000000002,
+     "text": "And when I talk about pursuing excellence and setting an",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s321",
+     "start_seconds": 1242.934,
+     "end_seconds": 1246.567,
+     "text": "example, I'm not just talking about in your professional life.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s322",
+     "start_seconds": 1248.7,
+     "end_seconds": 1251.567,
+     "text": "One of today's graduates, Frederick Anderson --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s323",
+     "start_seconds": 1251.567,
+     "end_seconds": 1253.934,
+     "text": "where's Frederick?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s324",
+     "start_seconds": 1253.934,
+     "end_seconds": 1254.934,
+     "text": "Frederick, right here.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s325",
+     "start_seconds": 1257.0,
+     "end_seconds": 1261.567,
+     "text": "I know it's raining, but I'm going to tell about Frederick.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s326",
+     "start_seconds": 1261.567,
+     "end_seconds": 1263.834,
+     "text": "Frederick started his college career in Ohio,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s327",
+     "start_seconds": 1263.834,
+     "end_seconds": 1267.2,
+     "text": "only to find out that his high school sweetheart back",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s328",
+     "start_seconds": 1267.2,
+     "end_seconds": 1270.0330000000001,
+     "text": "in Georgia was pregnant.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s329",
+     "start_seconds": 1270.033,
+     "end_seconds": 1274.2659999999998,
+     "text": "So he came back and enrolled in Morehouse to be closer to her.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s330",
+     "start_seconds": 1274.266,
+     "end_seconds": 1277.467,
+     "text": "Pretty soon, helping raise a newborn and working night shifts",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s331",
+     "start_seconds": 1277.467,
+     "end_seconds": 1280.6670000000001,
+     "text": "became too much, so he started taking business classes at a",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s332",
+     "start_seconds": 1280.667,
+     "end_seconds": 1284.867,
+     "text": "technical college instead -- doing everything from delivering",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s333",
+     "start_seconds": 1284.867,
+     "end_seconds": 1290.5,
+     "text": "newspapers to buffing hospital floors to support his family.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s334",
+     "start_seconds": 1290.5,
+     "end_seconds": 1294.9,
+     "text": "And then he enrolled at Morehouse a second time.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s335",
+     "start_seconds": 1294.9,
+     "end_seconds": 1297.2,
+     "text": "But even with a job, he couldn't keep up with the",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s336",
+     "start_seconds": 1297.2,
+     "end_seconds": 1299.6670000000001,
+     "text": "cost of tuition.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s337",
+     "start_seconds": 1299.667,
+     "end_seconds": 1302.6999999999998,
+     "text": "So after getting his degree from that technical school,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s338",
+     "start_seconds": 1302.7,
+     "end_seconds": 1305.6670000000001,
+     "text": "this father of three decided to come back to Morehouse",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s339",
+     "start_seconds": 1305.667,
+     "end_seconds": 1306.8,
+     "text": "for a third time.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s340",
+     "start_seconds": 1310.033,
+     "end_seconds": 1312.934,
+     "text": "As Frederick says, \"God has a plan for my life,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s341",
+     "start_seconds": 1312.934,
+     "end_seconds": 1315.3329999999999,
+     "text": "and He's not done with me yet.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s342",
+     "start_seconds": 1315.333,
+     "end_seconds": 1318.9,
+     "text": "And today, Frederick is a family man, and a working man,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s343",
+     "start_seconds": 1318.9,
+     "end_seconds": 1320.2,
+     "text": "and a Morehouse Man.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s344",
+     "start_seconds": 1320.633,
+     "end_seconds": 1323.7,
+     "text": "And that's what I'm asking all of you to do: Keep setting an",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s345",
+     "start_seconds": 1323.7,
+     "end_seconds": 1325.7340000000002,
+     "text": "example for what it means to be a man.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s346",
+     "start_seconds": 1337.667,
+     "end_seconds": 1343.4669999999999,
+     "text": "Be the best husband to your wife, or you're your boyfriend,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s347",
+     "start_seconds": 1343.467,
+     "end_seconds": 1351.767,
+     "text": "or your partner.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s348",
+     "start_seconds": 1351.767,
+     "end_seconds": 1356.0,
+     "text": "Be the best father you can be to your children.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s349",
+     "start_seconds": 1356.0,
+     "end_seconds": 1357.5,
+     "text": "Because nothing is more important.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s350",
+     "start_seconds": 1359.467,
+     "end_seconds": 1361.633,
+     "text": "I was raised by a heroic single mom,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s351",
+     "start_seconds": 1361.633,
+     "end_seconds": 1364.7340000000002,
+     "text": "wonderful grandparents -- made incredible sacrifices for me.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s352",
+     "start_seconds": 1364.734,
+     "end_seconds": 1367.667,
+     "text": "And I know there are moms and grandparents here today who did",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s353",
+     "start_seconds": 1367.667,
+     "end_seconds": 1370.5,
+     "text": "the same thing for all of you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s354",
+     "start_seconds": 1370.5,
+     "end_seconds": 1373.8,
+     "text": "But I sure wish I had had a father who was not only present,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s355",
+     "start_seconds": 1373.8,
+     "end_seconds": 1375.6,
+     "text": "but involved.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s356",
+     "start_seconds": 1375.6,
+     "end_seconds": 1376.6,
+     "text": "Didn't know my dad.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s357",
+     "start_seconds": 1376.6,
+     "end_seconds": 1382.3329999999999,
+     "text": "And so my whole life, I've tried to be for Michelle and my girls",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s358",
+     "start_seconds": 1382.333,
+     "end_seconds": 1385.5330000000001,
+     "text": "what my father was not for my mother and me.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s359",
+     "start_seconds": 1385.533,
+     "end_seconds": 1389.867,
+     "text": "I want to break that cycle where a father is not at home --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s360",
+     "start_seconds": 1391.033,
+     "end_seconds": 1396.667,
+     "text": "-- where a father is not helping to raise that son or daughter.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s361",
+     "start_seconds": 1396.667,
+     "end_seconds": 1402.667,
+     "text": "I want to be a better father, a better husband, a better man.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s362",
+     "start_seconds": 1402.667,
+     "end_seconds": 1405.8999999999999,
+     "text": "It's hard work that demands your constant attention and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s363",
+     "start_seconds": 1405.9,
+     "end_seconds": 1408.5,
+     "text": "frequent sacrifice.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s364",
+     "start_seconds": 1408.5,
+     "end_seconds": 1411.9,
+     "text": "And I promise you, Michelle will tell you I'm not perfect.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s365",
+     "start_seconds": 1411.9,
+     "end_seconds": 1414.433,
+     "text": "She's got a long list of my imperfections.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s366",
+     "start_seconds": 1416.033,
+     "end_seconds": 1418.7669999999998,
+     "text": "Even now, I'm still practicing, I'm still learning,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s367",
+     "start_seconds": 1418.767,
+     "end_seconds": 1422.2,
+     "text": "still getting corrected in terms of how to be a fine husband and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s368",
+     "start_seconds": 1422.2,
+     "end_seconds": 1423.166,
+     "text": "a good father.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s369",
+     "start_seconds": 1425.7,
+     "end_seconds": 1429.767,
+     "text": "But I will tell you this: Everything else is unfulfilled",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s370",
+     "start_seconds": 1429.767,
+     "end_seconds": 1434.767,
+     "text": "if we fail at family, if we fail at that responsibility.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s371",
+     "start_seconds": 1436.967,
+     "end_seconds": 1441.066,
+     "text": "I know that when I am on my deathbed someday,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s372",
+     "start_seconds": 1441.066,
+     "end_seconds": 1445.367,
+     "text": "I will not be thinking about any particular legislation I passed;",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s373",
+     "start_seconds": 1445.367,
+     "end_seconds": 1448.2,
+     "text": "I will not be thinking about a policy I promoted;",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s374",
+     "start_seconds": 1448.2,
+     "end_seconds": 1450.8,
+     "text": "I will not be thinking about the speech I gave,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s375",
+     "start_seconds": 1450.8,
+     "end_seconds": 1453.533,
+     "text": "I will not be thinking the Nobel Prize I received.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s376",
+     "start_seconds": 1453.533,
+     "end_seconds": 1457.3329999999999,
+     "text": "I will be thinking about that walk I took with my daughters.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s377",
+     "start_seconds": 1457.333,
+     "end_seconds": 1460.567,
+     "text": "I'll be thinking about a lazy afternoon with my wife.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s378",
+     "start_seconds": 1460.567,
+     "end_seconds": 1463.467,
+     "text": "I'll be thinking about sitting around the dinner table and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s379",
+     "start_seconds": 1463.467,
+     "end_seconds": 1466.5,
+     "text": "seeing them happy and healthy and knowing that",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s380",
+     "start_seconds": 1466.5,
+     "end_seconds": 1467.5,
+     "text": "they were loved.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s381",
+     "start_seconds": 1467.5,
+     "end_seconds": 1469.4,
+     "text": "And I'll be thinking about whether I did right by",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s382",
+     "start_seconds": 1469.4,
+     "end_seconds": 1471.6000000000001,
+     "text": "all of them.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s383",
+     "start_seconds": 1471.6,
+     "end_seconds": 1475.6,
+     "text": "So be a good role model, set a good example for that young",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s384",
+     "start_seconds": 1475.6,
+     "end_seconds": 1477.533,
+     "text": "brother coming up.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s385",
+     "start_seconds": 1477.533,
+     "end_seconds": 1479.0659999999998,
+     "text": "If you know somebody who's not on point,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s386",
+     "start_seconds": 1479.066,
+     "end_seconds": 1483.066,
+     "text": "go back and bring that brother along -- those who've been left",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s387",
+     "start_seconds": 1483.066,
+     "end_seconds": 1485.767,
+     "text": "behind, who haven't had the same opportunities we have --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s388",
+     "start_seconds": 1485.767,
+     "end_seconds": 1488.367,
+     "text": "they need to hear from you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s389",
+     "start_seconds": 1488.367,
+     "end_seconds": 1492.667,
+     "text": "You've got to be engaged on the barbershops,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s390",
+     "start_seconds": 1492.667,
+     "end_seconds": 1496.433,
+     "text": "on the basketball court, at church,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s391",
+     "start_seconds": 1496.433,
+     "end_seconds": 1500.433,
+     "text": "spend time and energy and presence to give people",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s392",
+     "start_seconds": 1500.433,
+     "end_seconds": 1501.767,
+     "text": "opportunities and a chance.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s393",
+     "start_seconds": 1501.767,
+     "end_seconds": 1505.133,
+     "text": "Pull them up, expose them, support their dreams.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s394",
+     "start_seconds": 1505.133,
+     "end_seconds": 1507.9,
+     "text": "Don't put them down.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s395",
+     "start_seconds": 1507.9,
+     "end_seconds": 1511.767,
+     "text": "We've got to teach them just like what we have to learn,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s396",
+     "start_seconds": 1511.767,
+     "end_seconds": 1514.9,
+     "text": "what it means to be a man -- to serve your city like",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s397",
+     "start_seconds": 1514.9,
+     "end_seconds": 1519.3670000000002,
+     "text": "Maynard Jackson; to shape the culture like Spike Lee;",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s398",
+     "start_seconds": 1519.367,
+     "end_seconds": 1522.633,
+     "text": "to be like Chester Davenport, one of the first people to",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s399",
+     "start_seconds": 1522.633,
+     "end_seconds": 1525.133,
+     "text": "integrate the University of Georgia Law School.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s400",
+     "start_seconds": 1525.133,
+     "end_seconds": 1528.4,
+     "text": "When he got there, nobody would sit next to him in class.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s401",
+     "start_seconds": 1528.4,
+     "end_seconds": 1530.633,
+     "text": "But Chester didn't mind.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s402",
+     "start_seconds": 1530.633,
+     "end_seconds": 1533.1000000000001,
+     "text": "Later on, he said, \"It was the thing for me to do.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s403",
+     "start_seconds": 1533.1,
+     "end_seconds": 1535.667,
+     "text": "Someone needed to be the first.\"",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s404",
+     "start_seconds": 1535.667,
+     "end_seconds": 1539.6999999999998,
+     "text": "And today, Chester is here celebrating his 50th reunion.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s405",
+     "start_seconds": 1539.7,
+     "end_seconds": 1544.5,
+     "text": "Where is Chester Davenport?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s406",
+     "start_seconds": 1544.5,
+     "end_seconds": 1545.467,
+     "text": "He's here.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s407",
+     "start_seconds": 1550.266,
+     "end_seconds": 1552.7340000000002,
+     "text": "So if you've had role models, fathers,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s408",
+     "start_seconds": 1552.734,
+     "end_seconds": 1555.233,
+     "text": "brothers like that -- thank them today.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s409",
+     "start_seconds": 1555.233,
+     "end_seconds": 1557.734,
+     "text": "And if you haven't, commit yourself to being that man",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s410",
+     "start_seconds": 1557.734,
+     "end_seconds": 1560.166,
+     "text": "to somebody else.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s411",
+     "start_seconds": 1560.166,
+     "end_seconds": 1562.667,
+     "text": "And finally, as you do these things,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s412",
+     "start_seconds": 1562.667,
+     "end_seconds": 1566.033,
+     "text": "do them not just for yourself, but don't even do them just for",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s413",
+     "start_seconds": 1566.033,
+     "end_seconds": 1568.433,
+     "text": "the African American community.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s414",
+     "start_seconds": 1568.433,
+     "end_seconds": 1570.2,
+     "text": "I want you to set your sights higher.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s415",
+     "start_seconds": 1570.2,
+     "end_seconds": 1573.333,
+     "text": "At the turn of the last century, W.E.B.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s416",
+     "start_seconds": 1573.333,
+     "end_seconds": 1579.433,
+     "text": "DuBois spoke about the \"talented tenth\" -- a class of highly",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s417",
+     "start_seconds": 1579.433,
+     "end_seconds": 1584.133,
+     "text": "educated, socially conscious leaders in the black community.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s418",
+     "start_seconds": 1584.133,
+     "end_seconds": 1586.066,
+     "text": "But it's not just the African American community",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s419",
+     "start_seconds": 1586.066,
+     "end_seconds": 1587.567,
+     "text": "that needs you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s420",
+     "start_seconds": 1587.567,
+     "end_seconds": 1589.834,
+     "text": "The country needs you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s421",
+     "start_seconds": 1589.834,
+     "end_seconds": 1591.834,
+     "text": "The world needs you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s422",
+     "start_seconds": 1593.2,
+     "end_seconds": 1595.967,
+     "text": "As Morehouse Men, many of you know what it's like to be an",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s423",
+     "start_seconds": 1595.967,
+     "end_seconds": 1598.8670000000002,
+     "text": "outsider; know what it's like to be marginalized;",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s424",
+     "start_seconds": 1598.867,
+     "end_seconds": 1603.8,
+     "text": "know what it's like to feel the sting of discrimination.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s425",
+     "start_seconds": 1603.8,
+     "end_seconds": 1608.867,
+     "text": "And that's an experience that a lot of Americans share.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s426",
+     "start_seconds": 1608.867,
+     "end_seconds": 1611.734,
+     "text": "Hispanic Americans know that feeling when somebody asks",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s427",
+     "start_seconds": 1611.734,
+     "end_seconds": 1615.7669999999998,
+     "text": "them where they come from or tell them to go back.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s428",
+     "start_seconds": 1615.767,
+     "end_seconds": 1617.633,
+     "text": "Gay and lesbian Americans feel it when a stranger",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s429",
+     "start_seconds": 1617.633,
+     "end_seconds": 1620.3,
+     "text": "passes judgment on their parenting skills or the",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s430",
+     "start_seconds": 1620.3,
+     "end_seconds": 1622.433,
+     "text": "love that they share.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s431",
+     "start_seconds": 1622.433,
+     "end_seconds": 1625.266,
+     "text": "Muslim Americans feel it when they're stared at with suspicion",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s432",
+     "start_seconds": 1625.266,
+     "end_seconds": 1628.133,
+     "text": "because of their faith.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s433",
+     "start_seconds": 1628.133,
+     "end_seconds": 1630.567,
+     "text": "Any woman who knows the injustice of earning less pay",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s434",
+     "start_seconds": 1630.567,
+     "end_seconds": 1633.667,
+     "text": "for doing the same work -- she knows what it's like to be on",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s435",
+     "start_seconds": 1633.667,
+     "end_seconds": 1634.7669999999998,
+     "text": "the outside looking in.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s436",
+     "start_seconds": 1634.767,
+     "end_seconds": 1641.934,
+     "text": "So your experiences give you special insight that",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s437",
+     "start_seconds": 1641.934,
+     "end_seconds": 1644.367,
+     "text": "today's leaders need.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s438",
+     "start_seconds": 1644.367,
+     "end_seconds": 1650.767,
+     "text": "If you tap into that experience, it should endow you with empathy",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s439",
+     "start_seconds": 1650.767,
+     "end_seconds": 1652.7,
+     "text": "-- the understanding of what it's like to walk in somebody",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s440",
+     "start_seconds": 1652.7,
+     "end_seconds": 1657.3,
+     "text": "else's shoes, to see through their eyes,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s441",
+     "start_seconds": 1657.3,
+     "end_seconds": 1660.834,
+     "text": "to know what it's like when you're not born on 3rd base,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s442",
+     "start_seconds": 1660.834,
+     "end_seconds": 1663.6670000000001,
+     "text": "thinking you hit a triple.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s443",
+     "start_seconds": 1663.667,
+     "end_seconds": 1667.033,
+     "text": "It should give you the ability to connect.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s444",
+     "start_seconds": 1667.033,
+     "end_seconds": 1669.5,
+     "text": "It should give you a sense of compassion and what it",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s445",
+     "start_seconds": 1669.5,
+     "end_seconds": 1670.7,
+     "text": "means to overcome barriers.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s446",
+     "start_seconds": 1670.7,
+     "end_seconds": 1674.567,
+     "text": "And I will tell you, Class of 2013,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s447",
+     "start_seconds": 1674.567,
+     "end_seconds": 1676.667,
+     "text": "whatever success I have achieved,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s448",
+     "start_seconds": 1676.667,
+     "end_seconds": 1679.867,
+     "text": "whatever positions of leadership I have held have depended less",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s449",
+     "start_seconds": 1679.867,
+     "end_seconds": 1684.3,
+     "text": "on Ivy League degrees or SAT scores or GPAs,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s450",
+     "start_seconds": 1684.3,
+     "end_seconds": 1687.8999999999999,
+     "text": "and have instead been due to that sense of connection and",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s451",
+     "start_seconds": 1687.9,
+     "end_seconds": 1690.9340000000002,
+     "text": "empathy -- the special obligation I felt,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s452",
+     "start_seconds": 1690.934,
+     "end_seconds": 1694.8999999999999,
+     "text": "as a black man like you, to help those who need it most,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s453",
+     "start_seconds": 1694.9,
+     "end_seconds": 1697.3670000000002,
+     "text": "people who didn't have the opportunities that I had --",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s454",
+     "start_seconds": 1697.367,
+     "end_seconds": 1700.0,
+     "text": "because there but for the grace of God,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s455",
+     "start_seconds": 1700.0,
+     "end_seconds": 1702.166,
+     "text": "go I -- I might have been in their shoes.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s456",
+     "start_seconds": 1702.166,
+     "end_seconds": 1703.934,
+     "text": "I might have been in prison.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s457",
+     "start_seconds": 1703.934,
+     "end_seconds": 1705.7,
+     "text": "I might have been unemployed.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s458",
+     "start_seconds": 1705.7,
+     "end_seconds": 1708.0330000000001,
+     "text": "I might not have been able to support a family.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s459",
+     "start_seconds": 1708.033,
+     "end_seconds": 1711.1,
+     "text": "And that motivates me.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s460",
+     "start_seconds": 1712.867,
+     "end_seconds": 1717.533,
+     "text": "So it's up to you to widen your circle of concern -- to care",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s461",
+     "start_seconds": 1717.533,
+     "end_seconds": 1723.6329999999998,
+     "text": "about justice for everybody, white, black and brown.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s462",
+     "start_seconds": 1723.633,
+     "end_seconds": 1724.2,
+     "text": "Everybody.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s463",
+     "start_seconds": 1724.2,
+     "end_seconds": 1726.467,
+     "text": "Not just in your own community, but also across this country",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s464",
+     "start_seconds": 1726.467,
+     "end_seconds": 1728.3670000000002,
+     "text": "and around the world.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s465",
+     "start_seconds": 1728.367,
+     "end_seconds": 1730.166,
+     "text": "To make sure everyone has a voice,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s466",
+     "start_seconds": 1730.166,
+     "end_seconds": 1733.7,
+     "text": "and everybody gets a seat at the table; that everybody,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s467",
+     "start_seconds": 1733.7,
+     "end_seconds": 1736.834,
+     "text": "no matter what you look like or where you come from,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s468",
+     "start_seconds": 1736.834,
+     "end_seconds": 1740.467,
+     "text": "what your last name is -- it doesn't matter,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s469",
+     "start_seconds": 1740.467,
+     "end_seconds": 1743.2,
+     "text": "everybody gets a chance to walk through those doors of",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s470",
+     "start_seconds": 1743.2,
+     "end_seconds": 1748.367,
+     "text": "opportunity if they are willing to work hard enough.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s471",
+     "start_seconds": 1748.367,
+     "end_seconds": 1751.3,
+     "text": "When Leland Shelton was four years old -- where's Leland?",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s472",
+     "start_seconds": 1753.734,
+     "end_seconds": 1756.033,
+     "text": "Stand up, Leland.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s473",
+     "start_seconds": 1756.033,
+     "end_seconds": 1757.533,
+     "text": "When Leland Shelton was four years old,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s474",
+     "start_seconds": 1757.533,
+     "end_seconds": 1761.6329999999998,
+     "text": "social services took him away from his mama,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s475",
+     "start_seconds": 1761.633,
+     "end_seconds": 1763.367,
+     "text": "put him in the care of his grandparents.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s476",
+     "start_seconds": 1765.433,
+     "end_seconds": 1769.533,
+     "text": "By age 14, he was in the foster care system.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s477",
+     "start_seconds": 1769.533,
+     "end_seconds": 1774.0659999999998,
+     "text": "Three years after that, Leland enrolled in Morehouse.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s478",
+     "start_seconds": 1774.066,
+     "end_seconds": 1777.8,
+     "text": "And today he is graduating Phi Beta Kappa on his way",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s479",
+     "start_seconds": 1777.8,
+     "end_seconds": 1779.667,
+     "text": "to Harvard Law School.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s480",
+     "start_seconds": 1788.567,
+     "end_seconds": 1790.133,
+     "text": "But he's not stopping there.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s481",
+     "start_seconds": 1790.133,
+     "end_seconds": 1794.0,
+     "text": "As a member of the National Foster Care Youth and Alumni",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s482",
+     "start_seconds": 1794.0,
+     "end_seconds": 1798.1,
+     "text": "Policy Council, he plans to use his law degree to make sure kids",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s483",
+     "start_seconds": 1798.1,
+     "end_seconds": 1800.8,
+     "text": "like him don't fall through the cracks.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s484",
+     "start_seconds": 1800.8,
+     "end_seconds": 1803.2659999999998,
+     "text": "And it won't matter whether they're black kids or brown",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s485",
+     "start_seconds": 1803.266,
+     "end_seconds": 1807.3670000000002,
+     "text": "kids or white kids or Native American kids,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s486",
+     "start_seconds": 1807.367,
+     "end_seconds": 1809.6,
+     "text": "because he'll understand what they're going through.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s487",
+     "start_seconds": 1809.6,
+     "end_seconds": 1812.734,
+     "text": "And he'll be fighting for them.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s488",
+     "start_seconds": 1812.734,
+     "end_seconds": 1815.7669999999998,
+     "text": "He'll be in their corner.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s489",
+     "start_seconds": 1815.767,
+     "end_seconds": 1817.5,
+     "text": "That's leadership.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s490",
+     "start_seconds": 1817.5,
+     "end_seconds": 1819.133,
+     "text": "That's a Morehouse Man right there.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s491",
+     "start_seconds": 1820.4,
+     "end_seconds": 1822.3000000000002,
+     "text": "That's what we've come to expect from you,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s492",
+     "start_seconds": 1822.3,
+     "end_seconds": 1825.3999999999999,
+     "text": "Morehouse -- a legacy of leaders -- not just in",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s493",
+     "start_seconds": 1825.4,
+     "end_seconds": 1830.066,
+     "text": "our black community, but for the entire American community.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s494",
+     "start_seconds": 1830.066,
+     "end_seconds": 1831.9,
+     "text": "To recognize the burdens you carry with you,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s495",
+     "start_seconds": 1831.9,
+     "end_seconds": 1836.567,
+     "text": "but to resist the temptation to use them as excuses.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s496",
+     "start_seconds": 1836.567,
+     "end_seconds": 1839.6,
+     "text": "To transform the way we think about manhood,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s497",
+     "start_seconds": 1839.6,
+     "end_seconds": 1843.9669999999999,
+     "text": "and set higher standards for ourselves and for others.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s498",
+     "start_seconds": 1843.967,
+     "end_seconds": 1846.7,
+     "text": "To be successful, but also to understand that each of us has",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s499",
+     "start_seconds": 1846.7,
+     "end_seconds": 1849.066,
+     "text": "responsibilities not just to ourselves,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s500",
+     "start_seconds": 1849.066,
+     "end_seconds": 1851.2,
+     "text": "but to one another and to future generations.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s501",
+     "start_seconds": 1854.066,
+     "end_seconds": 1856.066,
+     "text": "Men who refuse to be afraid.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s502",
+     "start_seconds": 1857.934,
+     "end_seconds": 1860.667,
+     "text": "Men who refuse to be afraid.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s503",
+     "start_seconds": 1862.667,
+     "end_seconds": 1867.6999999999998,
+     "text": "Members of the Class of 2013, you are heirs to a great legacy.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s504",
+     "start_seconds": 1867.7,
+     "end_seconds": 1871.1000000000001,
+     "text": "You have within you that same courage and that same strength,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s505",
+     "start_seconds": 1871.1,
+     "end_seconds": 1874.7669999999998,
+     "text": "the same resolve as the men who came before you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s506",
+     "start_seconds": 1874.767,
+     "end_seconds": 1878.133,
+     "text": "That's what being a Morehouse Man is all about.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s507",
+     "start_seconds": 1878.133,
+     "end_seconds": 1882.367,
+     "text": "That's what being an American is all about.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s508",
+     "start_seconds": 1882.367,
+     "end_seconds": 1886.0,
+     "text": "Success may not come quickly or easily.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s509",
+     "start_seconds": 1886.0,
+     "end_seconds": 1888.467,
+     "text": "But if you strive to do what's right,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s510",
+     "start_seconds": 1888.467,
+     "end_seconds": 1889.9340000000002,
+     "text": "if you work harder and dream bigger,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s511",
+     "start_seconds": 1889.934,
+     "end_seconds": 1893.367,
+     "text": "if you set an example in your own lives and do your part to",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s512",
+     "start_seconds": 1893.367,
+     "end_seconds": 1896.133,
+     "text": "help meet the challenges of our time, then I'm confident that,",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s513",
+     "start_seconds": 1896.133,
+     "end_seconds": 1899.3,
+     "text": "together, we will continue the never-ending task of",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s514",
+     "start_seconds": 1899.3,
+     "end_seconds": 1901.367,
+     "text": "perfecting our union.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s515",
+     "start_seconds": 1901.367,
+     "end_seconds": 1903.633,
+     "text": "Congratulations, Class of 2013.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s516",
+     "start_seconds": 1903.633,
+     "end_seconds": 1905.3,
+     "text": "God bless you.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s517",
+     "start_seconds": 1905.3,
+     "end_seconds": 1907.066,
+     "text": "God bless Morehouse.",
+     "speaker_id": null
+    },
+    {
+     "sentence_id": "s518",
+     "start_seconds": 1907.066,
+     "end_seconds": 1908.9,
+     "text": "And God bless the United States of America.",
+     "speaker_id": null
+    }
+   ]
+  },
+  "frames": [],
+  "visual_text": []
+ },
+ "alignment": {
+  "status": "verified",
+  "clip_media_id": "media_2a5f2f764c267776fd661b63",
+  "source_media_id": "media_e72908cf35603fc75e4ea353",
+  "matches": [
+   {
+    "match_id": "match_001",
+    "clip_start_seconds": 0.16,
+    "clip_end_seconds": 25.840000000000003,
+    "source_start_seconds": 1102.633,
+    "source_end_seconds": 1133.7669999999998,
+    "evidence": [
+     {
+      "method": "transcript_partial_ratio",
+      "clip_refs": [
+       "s1",
+       "s2",
+       "s3",
+       "s4",
+       "s5",
+       "s6",
+       "s7",
+       "s8",
+       "s9",
+       "s10",
+       "s11",
+       "s12"
+      ],
+      "source_refs": [
+       "s283",
+       "s284",
+       "s285",
+       "s286",
+       "s287",
+       "s288",
+       "s289",
+       "s290"
+      ],
+      "description": "A distinctive fuzzy transcript passage was localized to supplied provider timestamps; time bounds were not interpolated from text."
+     }
+    ]
+   }
+  ],
+  "match_quality": {
+   "confidence": {
+    "level": "high",
+    "method": "transcript_partial_ratio_v1",
+    "basis": [
+     "Distinctive transcript similarity scored 96.3/100 using a lexical matching heuristic."
+    ],
+    "limitations": [
+     "The transcript similarity score is a heuristic, not a calibrated accuracy or authenticity probability.",
+     "Audio, visual and deepfake verification were not performed.",
+     "Time bounds use provider word timestamps when available, otherwise enclosing caption or ASR segments; segment boundaries may include surrounding speech.",
+     "The earliest original upload was not established.",
+     "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+     "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+     "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+     "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+     "Transcript coverage is partial; unprocessed content was not compared.",
+     "Only one transcript passage was localized; edit and deletion counts were not assessed."
+    ]
+   },
+   "matched_clip_seconds": 25.680000000000003,
+   "clip_coverage_ratio": 0.9938080495356038,
+   "metrics": [
+    {
+     "name": "transcript_partial_ratio",
+     "unit": "score_0_100",
+     "value": 96.2962962962963
+    }
+   ],
+   "methods_used": [
+    "transcript_partial_ratio"
+   ]
+  },
+  "edit_analysis": {
+   "status": "not_assessed",
+   "scope": "single_passage",
+   "minimum_gap_seconds": 1.0,
+   "source_gaps": [],
+   "unmatched_clip_ranges": [],
+   "counts": {
+    "matched_passages": 1,
+    "source_gaps": null,
+    "unmatched_clip_segments": null,
+    "confirmed_added_segments": null,
+    "confirmed_deleted_segments": null
+   }
+  },
+  "limitations": [
+   "The transcript similarity score is a heuristic, not a calibrated accuracy or authenticity probability.",
+   "Audio, visual and deepfake verification were not performed.",
+   "Time bounds use provider word timestamps when available, otherwise enclosing caption or ASR segments; segment boundaries may include surrounding speech.",
+   "The earliest original upload was not established.",
+   "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+   "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+   "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+   "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+   "Transcript coverage is partial; unprocessed content was not compared.",
+   "Only one transcript passage was localized; edit and deletion counts were not assessed."
+  ]
+ },
+ "context": {
+  "source_media_id": "media_e72908cf35603fc75e4ea353",
+  "windows": [
+   {
+    "context_id": "context_001",
+    "match_ids": [
+     "match_001"
+    ],
+    "requested_start_seconds": 1073.967,
+    "requested_end_seconds": 1168.0330000000001,
+    "coverage": "complete",
+    "sentences": [
+     {
+      "sentence_id": "s275",
+      "start_seconds": 1073.967,
+      "end_seconds": 1077.333,
+      "text": "Not because the bitter legacy of slavery and segregation have",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s276",
+      "start_seconds": 1077.333,
+      "end_seconds": 1081.066,
+      "text": "vanished entirely; they have not.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s277",
+      "start_seconds": 1081.066,
+      "end_seconds": 1084.934,
+      "text": "Not because racism and discrimination no longer exist;",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s278",
+      "start_seconds": 1084.934,
+      "end_seconds": 1086.8999999999999,
+      "text": "we know those are still out there.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s279",
+      "start_seconds": 1088.5,
+      "end_seconds": 1091.166,
+      "text": "It's just that in today's hyperconnected,",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s280",
+      "start_seconds": 1091.166,
+      "end_seconds": 1094.3,
+      "text": "hypercompetitive world, with millions of young people from",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s281",
+      "start_seconds": 1094.3,
+      "end_seconds": 1098.2659999999998,
+      "text": "China and India and Brazil -- many of whom started with a",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s282",
+      "start_seconds": 1098.266,
+      "end_seconds": 1102.633,
+      "text": "whole lot less than all of you did -- all of them entering the",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s283",
+      "start_seconds": 1102.633,
+      "end_seconds": 1106.934,
+      "text": "global workforce alongside you, nobody is going to give you",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s284",
+      "start_seconds": 1106.934,
+      "end_seconds": 1108.8,
+      "text": "anything that you have not earned.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s285",
+      "start_seconds": 1110.767,
+      "end_seconds": 1114.367,
+      "text": "Nobody cares how tough your upbringing was.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s286",
+      "start_seconds": 1114.367,
+      "end_seconds": 1117.533,
+      "text": "Nobody cares if you suffered some discrimination.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s287",
+      "start_seconds": 1120.934,
+      "end_seconds": 1124.133,
+      "text": "And moreover, you have to remember that whatever you've",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s288",
+      "start_seconds": 1124.133,
+      "end_seconds": 1127.7340000000002,
+      "text": "gone through, it pales in comparison to the hardships",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s289",
+      "start_seconds": 1127.734,
+      "end_seconds": 1131.033,
+      "text": "previous generations endured -- and they overcame them.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s290",
+      "start_seconds": 1131.033,
+      "end_seconds": 1133.7669999999998,
+      "text": "And if they overcame them, you can overcome them, too.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s291",
+      "start_seconds": 1138.834,
+      "end_seconds": 1143.934,
+      "text": "You now hail from a lineage and legacy of immeasurably strong",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s292",
+      "start_seconds": 1143.934,
+      "end_seconds": 1147.734,
+      "text": "men -- men who bore tremendous burdens and still laid the",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s293",
+      "start_seconds": 1147.734,
+      "end_seconds": 1152.6999999999998,
+      "text": "stones for the path on which we now walk.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s294",
+      "start_seconds": 1152.7,
+      "end_seconds": 1154.3,
+      "text": "You wear the mantle of Frederick Douglass and",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s295",
+      "start_seconds": 1154.3,
+      "end_seconds": 1157.633,
+      "text": "Booker T. Washington, and Ralph Bunche and Langston Hughes,",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s296",
+      "start_seconds": 1157.633,
+      "end_seconds": 1161.3,
+      "text": "and George Washington Carver and Ralph Abernathy and Thurgood",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s297",
+      "start_seconds": 1161.3,
+      "end_seconds": 1163.3999999999999,
+      "text": "Marshall, and, yes, Dr. Martin Luther King,",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s298",
+      "start_seconds": 1163.4,
+      "end_seconds": 1168.0330000000001,
+      "text": "Jr. These men were many things to many people.",
+      "speaker_id": null
+     },
+     {
+      "sentence_id": "s299",
+      "start_seconds": 1168.033,
+      "end_seconds": 1170.3,
+      "text": "And they knew full well the role that racism played",
+      "speaker_id": null
+     }
+    ]
+   }
+  ],
+  "limitations": [
+   "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+   "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+   "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+   "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+   "Conservative caption boundaries; not frame-exact. Context sufficiency is an estimate."
+  ]
+ },
+ "comparison": {
+  "context_assessment": "no_material_difference_found",
+  "caption_assessment": "not_provided",
+  "assessment_confidence": {
+   "level": "moderate",
+   "method": "groq_transcript_context",
+   "basis": [
+    "The clip is a verbatim excerpt from the source speech, maintaining the original sequence and meaning."
+   ],
+   "limitations": []
+  },
+  "summary": "Takeaways: The speaker argues that graduates must earn their success because the modern global economy does not grant exceptions for personal hardships or past discrimination. \n\nWhat this means: The surrounding context clarifies that while the speaker acknowledges racism and the legacy of slavery still exist, he emphasizes that international competition makes these factors irrelevant to employers. He encourages the audience to draw strength from historical figures who overcame much greater obstacles to succeed.\n\nReliability: A source passage was located using timed transcripts. Factual claims and recording authenticity were not checked.",
+  "findings": [
+   {
+    "finding_id": "finding_1",
+    "type": "context",
+    "explanation": "The speaker frames the need for hard work within the context of a hypercompetitive global workforce.",
+    "evidence": [
+     {
+      "media_id": "media_e72908cf35603fc75e4ea353",
+      "sentence_ids": [
+       "s283"
+      ],
+      "start_seconds": 1102.633,
+      "end_seconds": 1106.934,
+      "quote": "global workforce alongside you, nobody is going to give you"
+     }
+    ]
+   },
+   {
+    "finding_id": "finding_2",
+    "type": "context",
+    "explanation": "The speaker explicitly acknowledges that discrimination still exists before telling the audience that 'nobody cares' about it in a professional context.",
+    "evidence": [
+     {
+      "media_id": "media_e72908cf35603fc75e4ea353",
+      "sentence_ids": [
+       "s277"
+      ],
+      "start_seconds": 1081.066,
+      "end_seconds": 1084.934,
+      "quote": "Not because racism and discrimination no longer exist;"
+     }
+    ]
+   }
+  ],
+  "limitations": [
+   "Transcript comparison does not establish factual truth, speaker identity or recording authenticity."
+  ]
+ },
+ "summary": "Takeaways: The speaker argues that graduates must earn their success because the modern global economy does not grant exceptions for personal hardships or past discrimination. \n\nWhat this means: The surrounding context clarifies that while the speaker acknowledges racism and the legacy of slavery still exist, he emphasizes that international competition makes these factors irrelevant to employers. He encourages the audience to draw strength from historical figures who overcame much greater obstacles to succeed.\n\nReliability: A source passage was located using timed transcripts. Factual claims and recording authenticity were not checked.",
+ "limitations": [
+  "The transcript similarity score is a heuristic, not a calibrated accuracy or authenticity probability.",
+  "Audio, visual and deepfake verification were not performed.",
+  "Time bounds use provider word timestamps when available, otherwise enclosing caption or ASR segments; segment boundaries may include surrounding speech.",
+  "The earliest original upload was not established.",
+  "Frame extraction and visual forensics were not run; the assessment is based on transcript evidence.",
+  "Transcript timestamps come from the caption or speech provider and were not independently verified against the recording.",
+  "Source playback uses YouTube; its video file was not downloaded. Analysis uses the supplied transcript; usable timestamps are checked separately.",
+  "The provider supplied a timed transcript, but complete recording coverage could not be independently confirmed.",
+  "Transcript coverage is partial; unprocessed content was not compared.",
+  "Only one transcript passage was localized; edit and deletion counts were not assessed.",
+  "Transcript comparison does not establish factual truth, speaker identity or recording authenticity.",
+  "Conservative caption boundaries; not frame-exact. Context sufficiency is an estimate.",
+  "Unverified source candidate: https://www.youtube.com/watch?v=3qELiw_1Ddg",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=3qELiw_1Ddg\", \"title\": \"What Trauma Taught Me About Resilience | Charles Hunt | TEDxCharlotte\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}",
+  "Unverified source candidate: https://www.youtube.com/watch?v=_K4MctEmkmI",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=_K4MctEmkmI\", \"title\": \"President Obama Delivers the Commencement Address at Howard University\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}",
+  "Unverified source candidate: https://www.youtube.com/watch?v=Qbel5MhtDq4",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=Qbel5MhtDq4\", \"title\": \"Barack Obama graduation speech: Arizona State University (ASU)\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}",
+  "Unverified source candidate: https://www.youtube.com/watch?v=UGA6O68QCqg",
+  "Unverified source candidate details: {\"url\": \"https://www.youtube.com/watch?v=UGA6O68QCqg\", \"title\": \"Obama Exhorts Good Deeds by Morehouse Graduates\", \"reason\": \"A discovery lead; the longer recording has not passed transcript alignment.\"}"
+ ]
+}
