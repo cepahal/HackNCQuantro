@@ -9,6 +9,7 @@ import { BridgeError, createSummarySender } from "./summary.ts";
 import { assertBackendReady, BACKEND_NOT_READY_MESSAGE, createAnalysisDispatcher } from "./analysis.ts";
 import { createPublicReportPreparer } from "./public-reports.ts";
 import { createEnrollmentHandler } from "./enroll.ts";
+import { createDemoResponder } from "./demo.ts";
 
 async function main(): Promise<void> {
   const config = readConfig(process.env, process.argv.slice(2));
@@ -76,7 +77,9 @@ async function main(): Promise<void> {
       console.error("The private Photon bridge stopped accepting requests.");
       stop();
     });
-    if (cloudApp) {
+    const demo = config.demoReplies ? createDemoResponder() : undefined;
+    if (demo) console.log("Photon demo replies are enabled; inbound messages receive the hardcoded demo report.");
+    if (cloudApp && !demo) {
       // Recovery never delays inbound acknowledgments. Existing markers are GET-only.
       void analysis.recover({
         inboxDirectory: directory,
@@ -92,6 +95,10 @@ async function main(): Promise<void> {
     console.log(`Quantro Photon (${config.cloud ? "iMessage" : "terminal"}) ready at http://127.0.0.1:${config.port}.`);
     for await (const [space, message] of app.messages) {
       if (message.direction !== "inbound") continue;
+      if (demo) {
+        void demo(space, message).catch(() => console.error("A demo reply could not be sent. Private details were omitted."));
+        continue;
+      }
       try {
         await receive(space, message);
         if (await hasConversation(directory, space.id)) {

@@ -149,6 +149,16 @@ Failures are never automatically retried.
 Official enrollment contract:
 [Create user](https://photon.codes/docs/api-reference/users/create-user).
 
+### Hackathon demo replies (default on)
+
+Until `PHOTON_DEMO_REPLIES=false` is set, every inbound message (except reactions and
+typing) gets three hardcoded texts from `src/demo.ts`: the URL acknowledgement, the
+demo source context, then `Full report:` with the static demo report link on
+`quantro-ten.vercel.app`. A message containing `qzYTN4lfEn4`, `tSj9gkgCM8Q` or
+`3XPuGqqWLtk` gets that video's demo; anything else gets the Joe Biden demo. Intake,
+analysis and saved-request recovery are skipped, so no failure text can reach the
+user. QR enrollment and the welcome message are unchanged.
+
 ## Incoming submission boundary
 
 The receiver uses actual SDK `Message`/`Content` types. It ignores outbound messages,
