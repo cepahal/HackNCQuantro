@@ -14,7 +14,7 @@ import { errorDisplay, type ErrorDisplay } from "../lib/display";
 import { compact, date, percent, time, unique } from "../lib/format";
 import { summaryText } from "../lib/report-summary";
 import { sourceLeads } from "../lib/source-leads";
-import { diagnosticOutput, type ReportDiagnostics } from "../lib/report-diagnostics";
+import { analysisName, diagnosticFilename, diagnosticOutput, type ReportDiagnostics } from "../lib/report-diagnostics";
 import styles from "./ReportPage.module.css";
 
 export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:string|null}){
@@ -44,7 +44,7 @@ export default function ReportPage({jobId,reportId}:{jobId:string|null;reportId:
  return <><Navbar/><div className={styles.page}><main className={styles.main}>
   <header className={styles.header}>
    <Link className={styles.back} href="/">← New analysis</Link>
-   <div className={styles.heading}><div><p className={styles.eyebrow}>Zoomout / Diagnostics</p><h1>Analysis output</h1></div>
+   <div className={styles.heading}><div><p className={styles.eyebrow}>Zoomout / Diagnostics</p><h1>{analysisName(report)}</h1></div>
     <div className={styles.actions}><button className={styles.copyButton} onClick={copyLink}>{copyStatus.startsWith("Link copied")?"Copied":copyStatus.startsWith("Couldn’t")?"Copy failed":"Copy link"}<span aria-hidden="true">↗</span></button><span role="status" className="sr-only">{copyStatus}</span></div>
    </div>
   </header>
@@ -184,7 +184,7 @@ export function DiagnosticPanel({ report=null, display=null, initialDiagnostics,
  const download=()=>{
   const link=document.createElement("a");
   const url=URL.createObjectURL(new Blob([output],{type:"text/plain;charset=utf-8"}));
-  link.href=url;link.download=`${jobId}-diagnostics.txt`;link.click();
+  link.href=url;link.download=diagnosticFilename(report);link.click();
   window.setTimeout(()=>URL.revokeObjectURL(url),0);
   setActionStatus("Output downloaded.");
  };
