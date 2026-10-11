@@ -11,6 +11,7 @@ are skipped and disclosed. Messaging happens strictly after the report is saved,
 and a messaging failure becomes a delivery warning rather than undoing the save.
 """
 
+import json
 import logging
 import os
 import re
@@ -357,15 +358,46 @@ def _discover_sources(queries: _SearchQueries, store: TigerStore, excluded: set[
     return eligible[:limit]
 
 
-def _remote_context_query(queries: list[str], title: str | None) -> str | None:
-    """Keep a spoken quote exact while spending one lexical request on fuller context."""
+def _remote_metadata_clue(title: str | None, caption: str | None) -> str:
+    """Bound unverified entity/event/activity hints without inferring new facts."""
+    # Preserve scene/event clues at the end of long titles rather than using
+    # only the first six words. Metadata remains an unverified locator.
+    title_parts = [_title_clue(title)]
+    if title and len(title.split()) > 8:
+        title_parts.append(_title_clue(' '.join(title.split()[-4:])))
+    title_words = list(dict.fromkeys(word for part in title_parts if part for word in part.split()))[:14]
+    caption_clue = _title_clue(caption)
+    caption_words = [word for word in (caption_clue or '').split()
+                     if word.casefold() not in {item.casefold() for item in title_words}][:4]
+    return ' '.join([*title_words, *caption_words])[:240]
+
+
+def _remote_context_quote(queries: list[str], title: str | None, caption: str | None) -> str | None:
+    """Rank unchanged speech by bounded numeric and metadata-overlap clues."""
     if not queries:
         return None
-    # Longer distinctive speech is a stronger locator than a short viral payoff.
-    # Ranking does not rewrite words or infer the identity in unverified metadata.
-    quote = max(queries, key=lambda text: (len(set(re.findall(r"\w+", text.casefold()))), len(text)))
-    base = _with_clue(_title_clue(title), quote) or quote
-    intent = ' ("full remarks" OR "full interview" OR "full speech" OR "full context")'
+    metadata_words = set(re.findall(r'\w+', _remote_metadata_clue(title, caption).casefold()))
+
+    def priority(text: str) -> tuple[int, int, int]:
+        words = set(re.findall(r'\w+', text.casefold()))
+        clue_score = 3 * len(words & metadata_words) + 4 * sum(any(c.isdigit() for c in word) for word in words)
+        return clue_score, len(words), len(text)
+
+    return max(queries, key=priority)
+
+
+def _remote_context_query(queries: list[str], title: str | None, caption: str | None = None) -> str | None:
+    """Keep a spoken quote exact while spending one lexical request on fuller context."""
+    quote = _remote_context_quote(queries, title, caption)
+    if quote is None:
+        return None
+    metadata = _remote_metadata_clue(title, caption)
+    base = _with_clue(metadata, quote) or quote
+    scene = ' '.join((title or '', caption or '', quote)).casefold()
+    everyday_scene = bool(re.search(r'\b(?:orders?|ordering|restaurant|milkshakes?|burgers?|chick|mcdonalds?|visits?|visiting|food)\b', scene))
+    intent = (' ("full video" OR "full visit" OR "extended" OR "original footage" OR "full context")'
+              if everyday_scene else
+              ' ("full remarks" OR "full interview" OR "full speech" OR "full video" OR "full context")')
     site = ' site:youtube.com/watch'
     if len(base + intent + site) <= 512:
         return base + intent + site
@@ -389,7 +421,7 @@ def _remote_context_priority(candidate: dict[str, Any]) -> tuple[int, float]:
         duration = float(units[1]) * (3_600 if unit.startswith(('hour', 'hr')) else 60 if unit.startswith('min') else 1)
     if duration is not None and not 0 < duration <= 86_400:
         duration = None
-    fuller = bool(re.search(r'\b(?:full|complete|entire|unedited|unabridged)\s+(?:speech|remarks|address|interview|press conference|recording|debate|event|video|context)\b', metadata))
+    fuller = bool(re.search(r'\b(?:full|complete|entire|unedited|unabridged|extended)\s+(?:speech|remarks|address|interview|press conference|recording|debate|event|video|visit|footage|context)\b|\boriginal\s+footage\b', metadata))
     short = bool(re.search(r'\b(?:shorts?|clips?|highlights?|excerpt|compilation|meme|remix)\b', metadata))
     short = short or '/shorts/' in str(candidate.get('url', '')).casefold()
     priority = 0 if fuller or duration is not None and duration > 90 else 2 if short or duration is not None and duration <= 60 else 1
@@ -409,24 +441,41 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
     warnings.extend(queries.warnings)
     # Search the actual speech. The public query builder also appends unverified
     # titles/captions, so its last query is not necessarily a spoken payoff.
-    clues = list(dict.fromkeys(phrase for sentence in report.submitted.transcript.sentences[:500]
-                               for part in re.split(r"[.!?]+", sentence.text)
-                               if (phrase := _phrase(part, minimum=4))))
+    parts = [part for sentence in report.submitted.transcript.sentences[:500]
+             for part in re.split(r"[.!?]+", sentence.text)]
+    clues = list(dict.fromkeys(phrase for part in parts if (phrase := _phrase(part, minimum=4))))
+    # Short observed numeric phrases can locate an event better than a long
+    # generic greeting. Keep their actual words; never generate a substitute.
+    numeric_clues = list(dict.fromkeys(phrase for part in parts
+                         if assess_candidates and re.search(r'\d', part)
+                         and (phrase := _phrase(part, minimum=2))))
+    distinctive = _remote_context_quote([*clues, *numeric_clues], post.title, post.caption) if assess_candidates else None
     if len(clues) > 1:
         # A short clip's distinctive payoff can follow a generic opening.
         # Cover its end, beginning and middle instead of dropping the last quote.
         clues = list(dict.fromkeys(clues[index] for index in (len(clues) - 1, 0, len(clues) // 2)))[:REMOTE_SEARCH_QUERY_LIMIT]
+    if distinctive and distinctive not in clues:
+        clues = [*clues[:REMOTE_SEARCH_QUERY_LIMIT - 1], distinctive]
     queries = queries.model_copy(update={"queries": clues})
     candidates: list[dict[str, Any]] = []
     if queries.queries:
         _heartbeat(store, report.job_id)
-        candidates = _discover_sources(queries, store, _post_identities(post), warnings,
+        primary_queries = queries
+        if assess_candidates:
+            spoken_quote = _remote_context_quote(queries.queries, post.title, post.caption)
+            locator = _with_clue(_remote_metadata_clue(post.title, post.caption), spoken_quote)
+            if locator and locator != spoken_quote:
+                # Keep the first speech-only query and replace the last slot;
+                # one existing primary request now also carries event clues.
+                located = [*queries.queries[:-1], locator] if len(queries.queries) > 1 else [*queries.queries, locator]
+                primary_queries = queries.model_copy(update={'queries': list(dict.fromkeys(located))[:REMOTE_SEARCH_QUERY_LIMIT]})
+        candidates = _discover_sources(primary_queries, store, _post_identities(post), warnings,
                                       SEARCH_LIMIT if assess_candidates else 3)
         fallback_provider = os.getenv('SEARCH_FALLBACK_PROVIDER', '').strip().lower()
         if fallback_provider in {'serpapi', 'brave', 'google_cse'}:
             # A lexical engine complements Exa's semantic web index. This uses
             # an explicitly configured existing credential, never an inferred key.
-            exact_query = (_remote_context_query(queries.queries, post.title) if assess_candidates
+            exact_query = (_remote_context_query(queries.queries, post.title, post.caption) if assess_candidates
                            else _with_clue(_title_clue(post.title), queries.queries[0]))
             if exact_query:
                 settings = dict(os.environ)
@@ -474,7 +523,11 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
         # metadata nor declared duration can satisfy the independent speech gate.
         if eligible:
             warnings.append('Source candidates were prioritized using unverified fuller-recording metadata; titles and duration hints do not establish additional context or originality.')
-        eligible = eligible[:3]
+        if post.title or post.caption:
+            warnings.append('The submitted title and caption are unverified search clues, not established speaker identity, events or facts.')
+        # Display more weaker leads without increasing the independent native
+        # assessment budget (at most two recordings in assess_remote_sources).
+        eligible = eligible[:SEARCH_LIMIT]
     urls = [candidate['url'] for candidate in eligible]
     result = report.model_copy(deep=True)
     result.limitations = [item for item in result.limitations if item != NO_DISCOVERY_LIMITATION]
@@ -489,6 +542,19 @@ def _discover_remote_sources(report: ReportV2, store: TigerStore, *, assess_cand
         warnings.append("Source discovery used partial, provider-estimated text; candidate links are leads, not verified originals.")
     warnings.append("Candidate recording downloads, alignment and source-context assessment were not performed in this fallback.")
     warnings.extend(f"Unverified source candidate: {url}" for url in urls)
+    for candidate in eligible:
+        try:
+            safe_url = canonical_youtube_url(candidate['url'])
+        except QuantroError:
+            continue
+        title = candidate.get('title')
+        title = ' '.join(title[:1_000].split())[:240] or None if isinstance(title, str) else None
+        if title and any(marker in title for marker in ('/tmp/', 'file://')):
+            title = None
+        warnings.append('Unverified source candidate details: ' + json.dumps({
+            'url': safe_url, 'title': title,
+            'reason': 'Discovery metadata may relate to this clip; speech and broader context are not verified.',
+        }, ensure_ascii=False))
     result.limitations.extend(item for item in warnings if item not in result.limitations)
     result.submitted.post.retrieval.warnings.extend(
         item for item in warnings if item not in result.submitted.post.retrieval.warnings

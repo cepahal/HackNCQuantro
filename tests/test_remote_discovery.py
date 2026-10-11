@@ -1,6 +1,7 @@
 """Remote speech can discover possible sources without fabricating verification."""
 
 import copy
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -133,7 +134,7 @@ def test_discovery_filters_aliases_self_and_unsafe_urls_before_candidate_count(r
 
     result = analysis._discover_remote_sources(report, object())
 
-    candidate_notes = [item for item in result.limitations if SOURCE in item or OTHER_SOURCE in item]
+    candidate_notes = [item for item in result.limitations if item.startswith('Unverified source candidate: ')]
     assert len(candidate_notes) == 2
     assert sum(SOURCE in item for item in candidate_notes) == 1
     assert sum(OTHER_SOURCE in item for item in candidate_notes) == 1
@@ -230,4 +231,47 @@ def test_real_query_builder_preserves_conditional_and_negated_words(report, monk
     assert any("If the figures were accurate" in query for query in seen)
     assert any("not cancel" in query for query in seen)
     assert result.submitted.transcript.sentences[0].text == original
+    assert_unverified(result)
+
+
+def test_source_lead_details_are_safe_bounded_and_do_not_fabricate_verification(report, monkeypatch):
+    report.submitted.post.title = 'A visit to a restaurant'
+    monkeypatch.setattr(analysis, 'build_search_queries', lambda *args: {'queries': [], 'warnings': []})
+    rows = [dict(candidate(SOURCE), title='  President stops by restaurant\nFull visit  '),
+            dict(candidate('https://youtu.be/TCm9788Tb5g', 2), title='Duplicate'),
+            dict(candidate('http://127.0.0.1/private', 3), title='Unsafe'),
+            dict(candidate('https://www.youtube.com/watch?v=aqz-KE-bpKQ', 4), title='X' * 500),
+            dict(candidate('https://www.youtube.com/watch?v=YE7VzlLtp-4', 5), title=None),
+            dict(candidate('https://www.youtube.com/watch?v=FX6GQSyxA-8', 6), title='Weaker discovery lead'),
+            dict(candidate('https://www.youtube.com/watch?v=abcdefghijk', 7), title='Another uncertain lead'),
+            dict(candidate('https://www.youtube.com/watch?v=lmnopqrstuv', 8), title='Outside lead budget')]
+    monkeypatch.setattr(analysis, '_discover_sources', lambda *args, **kwargs: rows)
+    monkeypatch.setattr(analysis, 'assess_remote_sources', lambda result, *args: result)
+
+    result = analysis._discover_remote_sources(report, object(), assess_candidates=True)
+
+    details = [json.loads(item.removeprefix('Unverified source candidate details: '))
+               for item in result.limitations if item.startswith('Unverified source candidate details: ')]
+    assert len(details) == analysis.SEARCH_LIMIT == 5
+    assert details[0] == {
+        'url': SOURCE, 'title': 'President stops by restaurant Full visit',
+        'reason': 'Discovery metadata may relate to this clip; speech and broader context are not verified.',
+    }
+    assert all(set(detail) == {'url', 'title', 'reason'} for detail in details)
+    assert max(len(detail['title'] or '') for detail in details) == 240
+    assert len({detail['url'] for detail in details}) == 5
+    assert '127.0.0.1' not in result.model_dump_json()
+    assert 'Outside lead budget' not in result.model_dump_json()
+    assert_unverified(result)
+
+
+@pytest.mark.parametrize('title', ['/tmp/private.mp4', 'file://private', ['not', 'a', 'title'], '', None])
+def test_bad_candidate_title_cannot_poison_an_otherwise_safe_lead(report, monkeypatch, title):
+    monkeypatch.setattr(analysis, 'build_search_queries', lambda *args: {'queries': [], 'warnings': []})
+    monkeypatch.setattr(analysis, '_discover_sources', lambda *args, **kwargs: [dict(candidate(SOURCE), title=title)])
+    result = analysis._discover_remote_sources(report, object())
+    details = next(json.loads(item.removeprefix('Unverified source candidate details: '))
+                   for item in result.limitations if item.startswith('Unverified source candidate details: '))
+    assert details['url'] == SOURCE
+    assert details['title'] is None
     assert_unverified(result)

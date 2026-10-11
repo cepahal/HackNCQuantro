@@ -1,5 +1,5 @@
 import type { ReportV2 } from "../lib/api-types";
-import { buildReportSummary, summaryQuoteLabel, summaryText } from "../lib/report-summary";
+import { buildReportSummary, summaryQuoteLabel, summaryTakeaways, summaryText } from "../lib/report-summary";
 import styles from "./ReportSummary.module.css";
 
 export default function ReportSummary({ report }: { report: ReportV2 }) {
@@ -18,18 +18,18 @@ export default function ReportSummary({ report }: { report: ReportV2 }) {
     <div className={styles.sections}>
       <section className={styles.section} aria-label="Takeaways">
         <h2>Takeaways</h2>
-        {summary.evidenceStatus.slice(0, 2).map(item => <p key={item.label}>{summaryText(item.text)}</p>)}
+        {summaryTakeaways(reading).map((paragraph, index) => <p key={index}>{summaryText(paragraph)}</p>)}
+        {reading?.deferredReading && <details className={styles.details}>
+            <summary>Full model reading</summary>
+            {reading.paragraphs.map((paragraph, index) => <p key={index}>{summaryText(paragraph)}</p>)}
+        </details>}
+        {reading?.note && <p className={styles.note}>Assumption: {summaryText(reading.note)}</p>}
       </section>
       <section className={styles.section} aria-label="What this means">
         <h2>What this means</h2>
-        {reading?.deferredReading ? <>
-          <p>The model&apos;s interpretation is tentative. Its full reading is available below.</p>
-          <details className={styles.details}>
-            <summary>Full model reading</summary>
-            {reading.paragraphs.map((paragraph, index) => <p key={index}>{summaryText(paragraph)}</p>)}
-          </details>
-        </> : reading?.paragraphs.map((paragraph, index) => <p key={index}>{summaryText(paragraph)}</p>)}
-        {reading?.note && <p className={styles.note}>Assumption: {summaryText(reading.note)}</p>}
+        {summary.metadataClues.map(item => <p key={item.label}>{item.label}: {summaryText(item.text)}</p>)}
+        {summary.metadataClues.length > 0 && <p className={styles.note}>The title and caption are claims supplied with the post. They do not verify who appears or speaks in the clip.</p>}
+        {summary.metadataClues.length === 0 && !caption && <p>No title or caption was supplied to explain how the post frames this clip.</p>}
         {caption?.paragraphs.map((paragraph, index) => <p key={`caption-${index}`}>{summaryText(paragraph)}</p>)}
         {references && <details className={styles.details}>
           <summary>Model speculation (unverified)</summary>
@@ -42,7 +42,7 @@ export default function ReportSummary({ report }: { report: ReportV2 }) {
       </section>
       <section className={styles.section} aria-label="Reliability">
         <h2>Reliability</h2>
-        <p>{summaryText(summary.evidenceStatus[2].text)}</p>
+        {summary.evidenceStatus.map(item => <p key={item.label}>{summaryText(item.text)}</p>)}
         {limits?.paragraphs.map((paragraph, index) => <p key={index}>{summaryText(paragraph)}</p>)}
         {limits?.note && <p className={styles.note}>{summaryText(limits.note)}</p>}
         {finding && <details className={styles.details}>

@@ -430,3 +430,26 @@ Verified locally: 375 backend regression tests and 73 frontend tests passed.
 Frontend TypeScript and scoped ESLint passed. Hosted rollout is a separate step;
 these results do not establish population accuracy or recovery of an original
 full-length recording.
+
+## 2026-10-10 clip interpretation and source suggestions
+
+Removed the forced political-speech assumption. The existing cheap interpretation
+call now reads bounded title/caption/uploader clues alongside actual speech, with
+explicit attribution and no verified identity or deception claims. No-match
+reports still explain what the clip says or does. Frontend Takeaways show that
+reading; source status belongs in Reliability.
+
+Search retains exact words, uses metadata to locate the event, and preserves
+short numeric phrases. The report displays up to five safe YouTube discovery
+leads, including weaker ones, separately from verified source context. Discovery
+metadata cannot satisfy the speech/context verification gate. The two-recording
+native assessment budget and public report schema are unchanged.
+
+Local verification: 446 backend tests, 81 frontend tests, ESLint, TypeScript and
+production build passed. The hosted optional SerpAPI key was replaced privately
+with the already-authorized working credential; no secret enters this commit.
+Remaining: remote analysis inspects only the first 60 seconds of each candidate,
+source discovery is incomplete, external platform access can fail, and text
+matching does not verify authenticity or factual truth. No model was trained or
+population accuracy measured by this change. Hosted smoke results follow after
+manual deployment.

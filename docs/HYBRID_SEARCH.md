@@ -110,13 +110,14 @@ The current fallback extends the earlier transcript-only baseline:
    Interpretation failure preserves the observed speech match.
 6. When enabled, make at most one additional standalone submitted-transcript
    interpretation call before saving, including on no-match results. Its summary
-   explicitly says **"Assuming this is political speech"**. The assumption and
-   suggested references are not established facts. The bounded reading uses
+   describes the actual clip without assuming political speech. Bounded title,
+   caption and uploader clues are attributed metadata, not verified identities
+   or events. Suggested references are not established facts. The reading uses
    validated local sentence references and short exact quotes, never internal IDs.
    Provider or validation failure retains the prior report and adds a limitation.
 7. Save the sanitized report through the existing idempotent Tiger boundary.
    Completed-job retries reuse the stored summary and do not repeat the optional
-   standalone call. No public schema or frontend change is needed.
+   standalone call. The public schema stays unchanged.
 
 Configuration uses existing credentials; no additional API or dependency is
 required. For the already available SerpAPI lexical provider, set
@@ -200,3 +201,29 @@ Verified locally: 375 backend regression tests and 73 frontend tests passed.
 Frontend TypeScript and scoped ESLint passed. Hosted rollout is a separate step;
 these results do not establish population accuracy or recovery of an original
 full-length recording.
+
+## 2026-10-10 content-first interpretation and multiple source leads
+
+The submitted interpretation now combines actual speech with bounded title,
+caption, platform and uploader metadata in the existing one-call budget. It
+explains the action or claim in plain language without assuming every clip is a
+political speech. Metadata identities and settings must be attributed. A failed
+source match does not suppress the submitted-clip interpretation.
+
+Discovery keeps the first actual-speech query, uses a bounded joint metadata and
+speech locator in the primary query budget, and preserves short numeric clues.
+The optional lexical query distinguishes full visits/footage from speeches.
+Up to five safe, deduplicated YouTube leads are exposed with titles, links and
+optional previews, including weaker candidates. They remain explicitly
+unverified and separate from the verified source. Actual candidate assessment
+remains capped at two recordings; no numeric match probability is invented.
+
+Reports place the concrete reading in Takeaways, attributed post clues in What
+this means, source/context status in Reliability, and exact cited words in
+Evidence. Older saved summaries remain historical. Reanalyze with a new job to
+produce the updated interpretation.
+
+Verified locally: 446 backend regression tests, 81 frontend tests, full frontend
+ESLint, TypeScript and the production build passed. Universal original recovery,
+Instagram/TikTok access, later source windows, physical edits and factual or
+intent judgments remain unverified. Hosted rollout is a separate verification.

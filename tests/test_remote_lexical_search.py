@@ -337,7 +337,7 @@ def test_active_assessment_uses_one_fuller_context_query_preserving_spoken_words
     monkeypatch.setenv('SEARCH_FALLBACK_PROVIDER', 'serpapi')
     monkeypatch.setenv('SEARCH_FALLBACK_API_KEY', 'test-key')
     report.submitted.post.title = 'Bush Texas Education Address'
-    report.submitted.post.caption = 'An unsupported identity and a guaranteed cancellation.'
+    report.submitted.post.caption = 'Texas school funding discussion.'
     report.submitted.transcript.sentences.append(report.submitted.transcript.sentences[0].model_copy(update={
         'sentence_id': 'payoff', 'start_seconds': 6.0, 'end_seconds': 8.0,
         'text': 'Now watch this drive.',
@@ -351,13 +351,13 @@ def test_active_assessment_uses_one_fuller_context_query_preserving_spoken_words
     search_mocks[0].assert_called_once()
     search_mocks[1].assert_called_once()
     query = search_mocks[1].call_args.args[0]
-    assert query == ['Bush Texas Education Address ' + QUOTE
-                     + ' ("full remarks" OR "full interview" OR "full speech" OR "full context") site:youtube.com/watch']
-    assert 'guaranteed' not in query[0]
+    assert query == ['Bush Texas Education Address school funding discussion ' + QUOTE
+                     + ' ("full remarks" OR "full interview" OR "full speech" OR "full video" OR "full context") site:youtube.com/watch']
+    assert any('unverified search clues' in item for item in result.limitations)
     assert len(query) == 1 and len(query[0]) <= 512
     assert report.model_dump(mode='json') == before
     assessor.assert_called_once()
-    assert len(assessor.call_args.args[1]) <= 3
+    assert len(assessor.call_args.args[1]) <= analysis.SEARCH_LIMIT
     _assert_unverified(result)
 
 
@@ -395,6 +395,9 @@ def test_broader_recording_ranks_ahead_of_short_lexical_reposts_before_cutoff(re
 
 @pytest.mark.parametrize(('metadata', 'expected'), [
     ({'title': 'Full interview'}, 0),
+    ({'title': 'Extended restaurant visit'}, 1),
+    ({'title': 'Full visit'}, 0),
+    ({'title': 'Original footage'}, 0),
     ({'snippet': 'Duration: 1:02:03'}, 0),
     ({'snippet': 'Length: 2 minutes'}, 0),
     ({'snippet': 'Duration: 23 seconds'}, 2),
@@ -405,3 +408,59 @@ def test_broader_recording_ranks_ahead_of_short_lexical_reposts_before_cutoff(re
 ])
 def test_ranking_uses_only_explicit_bounded_unverified_metadata(metadata, expected):
     assert analysis._remote_context_priority(metadata)[0] == expected
+
+
+def test_food_order_query_keeps_tail_scene_clues_and_caption_as_unverified_locators(report, search_mocks, monkeypatch):
+    monkeypatch.setenv('SEARCH_FALLBACK_PROVIDER', 'serpapi')
+    monkeypatch.setenv('SEARCH_FALLBACK_API_KEY', 'test-key')
+    report.submitted.post.title = 'President Donald Trump stops to talk with supporters during a campaign visit at Chick-fil-A Atlanta'
+    report.submitted.post.caption = 'Vine City restaurant visit April 2024'
+    report.submitted.transcript.sentences[0].text = 'We are going to order thirty milkshakes for everyone here.'
+    monkeypatch.setattr(analysis, 'assess_remote_sources', lambda result, *args: result)
+    before = report.model_dump(mode='json')
+
+    result = analysis._discover_remote_sources(report, object(), assess_candidates=True)
+
+    search_mocks[0].assert_called_once()
+    search_mocks[1].assert_called_once()
+    query = search_mocks[1].call_args.args[0][0]
+    assert '"We are going to order thirty milkshakes for everyone here"' in query
+    assert 'Chick' in query and 'Atlanta' in query
+    assert 'Vine' in query and 'City' in query
+    assert '"full video"' in query and '"full visit"' in query and '"original footage"' in query
+    assert '"full speech"' not in query and '"full remarks"' not in query
+    assert len(query) <= 512
+    assert report.model_dump(mode='json') == before
+    assert any('unverified search clues' in item for item in result.limitations)
+    _assert_unverified(result)
+
+
+def test_short_numeric_utterance_and_joint_primary_locator_survive_lexical_failure(report, search_mocks, monkeypatch):
+    monkeypatch.setenv('SEARCH_FALLBACK_PROVIDER', 'serpapi')
+    monkeypatch.setenv('SEARCH_FALLBACK_API_KEY', 'test-key')
+    report.submitted.post.title = 'Donald Trump visits Chick-fil-A in Atlanta'
+    report.submitted.post.caption = 'Vine City restaurant visit'
+    report.submitted.transcript.sentences[0].text = "I'm going to take care of the customers."
+    report.submitted.transcript.sentences.append(report.submitted.transcript.sentences[0].model_copy(update={
+        'sentence_id': 'numeric_order', 'start_seconds': 6.0, 'end_seconds': 7.0, 'text': '30 milkshakes.',
+    }))
+    report.submitted.transcript.processed_ranges[0].end_seconds = 7.0
+    search_mocks[1].side_effect = QuantroError(ErrorCode.SEARCH_FAILED, Stage.SEARCH_CANDIDATES, retryable=True)
+    monkeypatch.setattr(analysis, 'assess_remote_sources', lambda result, *args: result)
+    before = report.model_dump(mode='json')
+
+    result = analysis._discover_remote_sources(report, object(), assess_candidates=True)
+
+    primary_queries = search_mocks[0].call_args.args[0].queries
+    assert primary_queries[0] == '"I\'m going to take care of the customers"'
+    assert len(primary_queries) <= analysis.REMOTE_SEARCH_QUERY_LIMIT
+    assert '"30 milkshakes"' in primary_queries[-1]
+    assert 'Trump' in primary_queries[-1] and 'Chick' in primary_queries[-1]
+    assert 'Vine' in primary_queries[-1] and 'City' in primary_queries[-1]
+    assert ' OR ' not in primary_queries[-1]
+    assert '"30 milkshakes"' in search_mocks[1].call_args.args[0][0]
+    search_mocks[0].assert_called_once()
+    search_mocks[1].assert_called_once()
+    assert _links(result) == [PRIMARY]
+    assert report.model_dump(mode='json') == before
+    _assert_unverified(result)

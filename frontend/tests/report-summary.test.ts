@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReportV2 } from "../lib/api-types.ts";
 import { reportSummary } from "../lib/display.ts";
-import { buildReportSummary, summaryText, summaryQuoteLabel } from "../lib/report-summary.ts";
+import { buildReportSummary, summaryText, summaryQuoteLabel, summaryTakeaways } from "../lib/report-summary.ts";
 import { reportFixture } from "./fixtures/report_v2.ts";
 
 const prefix = "Assuming this is political speech, a tentative reading of the submitted transcript is: ";
@@ -29,7 +29,7 @@ test("known backend format separates all six meanings without implementation pre
   assert.equal(view.politicalAssumption, true);
   assert.equal(view.partialTranscript, true);
   assert.deepEqual(view.sections[0].paragraphs, ["The excerpt discusses a tax policy and a condition."]);
-  assert.equal(view.sections[0].note, "We are treating this as political speech; that has not been verified.");
+  assert.equal(view.sections[0].note, "This saved interpretation assumed political speech; that assumption has not been verified.");
   const finding = view.sections.find(s => s.id === "finding")!;
   assert.deepEqual(finding.paragraphs, [
     "A distinctive speech passage matches a candidate recording.",
@@ -198,4 +198,51 @@ test("clip timing is explicitly estimated only for partial submitted transcripts
   const quote = { sentence_id: "s", text: "Observed words.", start_seconds: 0, end_seconds: 2 };
   assert.equal(summaryQuoteLabel(quote, true), "Clip 0:00–0:02 · timing estimated");
   assert.equal(summaryQuoteLabel(quote, false), "Transcript 0:00–0:02");
+});
+
+test("neutral no-match milkshake analysis remains content-first without a political assumption", () => {
+  const report = structuredClone(reportFixture) as ReportV2;
+  report.outcome = "no_verified_match";
+  report.source = report.alignment = report.context = report.comparison = null;
+  report.submitted.post.title = "Trump orders 30 milkshakes at Atlanta Chick-fil-A";
+  report.submitted.post.caption = null;
+  report.submitted.transcript.status = "partial";
+  report.submitted.transcript.sentences = [{ sentence_id: "order", text: "Thirty milkshakes.", start_seconds: 1, end_seconds: 3, speaker_id: null }];
+  const overview = "The clip centers on a large food order. The title identifies Trump at an Atlanta Chick-fil-A, while the supplied transcript includes an order for thirty milkshakes.";
+  report.summary = "A tentative reading of the submitted clip is: " + overview
+    + " Transcript evidence: “Thirty milkshakes.” No submitted caption was provided for interpretation. "
+    + limit + " Existing pipeline result: No distinctive unique speech match was verified.";
+  const view = buildReportSummary(report);
+  const reading = view.sections.find(section => section.id === "meaning")!;
+  assert.deepEqual(summaryTakeaways(reading), [overview]);
+  assert.equal(view.politicalAssumption, false);
+  assert.equal(reading.note, undefined);
+  assert.doesNotMatch(summaryTakeaways(reading).join(" "), /No verified speech match|political speech/);
+  assert.deepEqual(view.metadataClues, [{ label: "Post title", text: report.submitted.post.title }]);
+  assert.match(view.evidenceStatus[0].text, /No verified speech match/);
+  assert.deepEqual(view.sections.find(section => section.id === "evidence")!.quotes, report.submitted.transcript.sentences);
+});
+
+test("metadata clues remain explicitly attributed and do not become verified speaker facts", () => {
+  const report = structuredClone(reportFixture) as ReportV2;
+  report.submitted.post.title = "   ";
+  report.submitted.post.caption = "Uploader claims this is a speech by a president.";
+  const before = JSON.stringify(report);
+  const view = buildReportSummary(report);
+  assert.deepEqual(view.metadataClues, [{ label: "Post caption", text: report.submitted.post.caption }]);
+  assert.equal(JSON.stringify(report), before);
+  report.submitted.post.title = report.submitted.post.caption = null;
+  assert.deepEqual(buildReportSummary(report).metadataClues, []);
+});
+
+test("long saved readings expose an exact content sentence before the full reading", () => {
+  const report = interpreted();
+  const first = "The speaker orders milkshakes for a group.";
+  const rest = Array.from({ length: 80 }, (_, index) => `word${index}`).join(" ");
+  report.summary = prefix + first + " " + rest + " " + limit;
+  const reading = buildReportSummary(report).sections.find(section => section.id === "meaning")!;
+  assert.equal(reading.deferredReading, true);
+  assert.deepEqual(summaryTakeaways(reading), [first]);
+  assert.deepEqual(reading.paragraphs, [first + " " + rest]);
+  assert.deepEqual(summaryTakeaways(undefined), []);
 });

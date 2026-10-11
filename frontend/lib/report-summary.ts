@@ -2,7 +2,8 @@ import type { ReportV2, TranscriptSentence } from "./api-types.ts";
 import { reportSummary } from "./display.ts";
 import { time } from "./format.ts";
 
-const MEANING_PREFIX = "Assuming this is political speech, a tentative reading of the submitted transcript is: ";
+const MEANING_PREFIX = "A tentative reading of the submitted clip is: ";
+const LEGACY_MEANING_PREFIX = "Assuming this is political speech, a tentative reading of the submitted transcript is: ";
 const EVIDENCE_PREFIX = "Transcript evidence: ";
 const REFERENCES_PREFIX = "Possible references (unverified hypotheses only): ";
 const PIPELINE_PREFIX = "Existing pipeline result: ";
@@ -27,6 +28,7 @@ export type ReadableSummary = {
   politicalAssumption: boolean;
   partialTranscript: boolean;
   evidenceStatus: Array<{ label: string; text: string }>;
+  metadataClues: Array<{ label: string; text: string }>;
   sections: SummarySection[];
 };
 
@@ -38,6 +40,15 @@ export function summaryText(text: string): string {
 export function summaryQuoteLabel(quote: SummaryQuote, partial: boolean): string {
   const range = `${time(quote.start_seconds)}–${time(quote.end_seconds)}`;
   return partial ? `Clip ${range} · timing estimated` : `Transcript ${range}`;
+}
+
+/** Extract an existing first sentence for long saved reports without inventing a reading. */
+export function summaryTakeaways(reading: SummarySection | undefined): string[] {
+  if (!reading) return [];
+  if (!reading.deferredReading) return reading.paragraphs;
+  const first = reading.paragraphs[0] ?? "";
+  const sentence = first.match(/^[\s\S]*?[.!?](?=\s|$)/)?.[0];
+  return [sentence ?? first].filter(Boolean);
 }
 
 function evidenceStatus(report: ReportV2): ReadableSummary["evidenceStatus"] {
@@ -78,14 +89,19 @@ export function buildReportSummary(report: ReportV2): ReadableSummary {
   const text = reportSummary(report);
   const partialTranscript = report.submitted.transcript.status === "partial"
     || Boolean(report.source?.transcript.status === "partial");
+  const metadataClues = [
+    { label: "Post title", text: report.submitted.post.title },
+    { label: "Post caption", text: report.submitted.post.caption },
+  ].filter((item): item is { label: string; text: string } => Boolean(item.text?.trim()));
   const fallback: ReadableSummary = {
-    politicalAssumption: false, partialTranscript, evidenceStatus: evidenceStatus(report),
+    politicalAssumption: false, partialTranscript, evidenceStatus: evidenceStatus(report), metadataClues,
     sections: [section("summary", "Summary", text)],
   };
+  const meaningPrefix = [MEANING_PREFIX, LEGACY_MEANING_PREFIX].find(prefix => text.startsWith(prefix));
   const limitAt = text.lastIndexOf(` ${LIMIT}`);
-  if (!text.startsWith(MEANING_PREFIX) || limitAt < MEANING_PREFIX.length) return fallback;
+  if (!meaningPrefix || limitAt < meaningPrefix.length) return fallback;
 
-  let body = text.slice(MEANING_PREFIX.length, limitAt).trim();
+  let body = text.slice(meaningPrefix.length, limitAt).trim();
   const tail = text.slice(limitAt + LIMIT.length + 1).trim();
   const pipeline = tail.startsWith(PIPELINE_PREFIX) ? tail.slice(PIPELINE_PREFIX.length) : "";
   const extraLimit = tail && !pipeline ? tail : "";
@@ -112,7 +128,8 @@ export function buildReportSummary(report: ReportV2): ReadableSummary {
   if (!body) return fallback;
 
   const meaning = section("meaning", "Meaning", body);
-  meaning.note = "We are treating this as political speech; that has not been verified.";
+  const politicalAssumption = meaningPrefix === LEGACY_MEANING_PREFIX;
+  if (politicalAssumption) meaning.note = "This saved interpretation assumed political speech; that assumption has not been verified.";
   const sections = [meaning];
   if (evidence) {
     const observed = section("evidence", "Transcript evidence", "");
@@ -151,5 +168,5 @@ export function buildReportSummary(report: ReportV2): ReadableSummary {
   const limits = section("limits", "Limits", [LIMIT, extraLimit].filter(Boolean).join("\n\n"));
   if (partialTranscript) limits.note = "Only partial transcript evidence was available; unobserved speech and full context remain unknown.";
   sections.push(limits);
-  return { politicalAssumption: true, partialTranscript, evidenceStatus: evidenceStatus(report), sections };
+  return { politicalAssumption, partialTranscript, evidenceStatus: evidenceStatus(report), metadataClues, sections };
 }
