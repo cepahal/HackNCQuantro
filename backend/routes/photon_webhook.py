@@ -15,12 +15,12 @@ from backend.services.messaging.inbound import (
     canned_reply,
     extract_url,
     is_outbound_echo,
-    parse_inbound,
     message_timestamp,
+    parse_inbound,
 )
 from backend.services.messaging.photon import PhotonProvider
-from backend.services.resolution.run import run_analysis
 from backend.services.reporting.send_summary import DeliveryTracker
+from backend.services.resolution.run import run_analysis
 from backend.services.shared.errors import QuantroError, Stage
 from backend.services.storage.tiger import TigerStore
 
@@ -61,6 +61,36 @@ def job_id_for(conversation_id: str, url: str) -> str:
     )
 
 
+def retry_job_id(
+    base_job_id: str,
+    conversation_id: str,
+    store: TigerStore | None,
+    summary_tracker: DeliveryTracker,
+) -> str | None:
+    """Choose a fresh attempt only after persisted, confirmed early failures.
+
+    Caller holds the stable conversation/URL reservation across all attempts.
+    Completed, running and uncertain attempts never advance to a new job ID.
+    """
+    if store is None:
+        return base_job_id
+    for attempt in range(33):
+        job_id = base_job_id if attempt == 0 else f"{base_job_id}_retry_{attempt}"
+        job = store.get_job(job_id)
+        if job is None:
+            return job_id
+        if (
+            job["status"] != "failed"
+            or job.get("error_retryable") is not True
+            or job.get("error_stage") not in {stage.value for stage in _PRE_DELIVERY_STAGES}
+            or summary_tracker.has_record(conversation_id, job_id)
+            or store.get_report(f"report_{job_id}") is not None
+        ):
+            return None
+    # Bound storage work and fail closed; exhausted attempts need operator review.
+    return None
+
+
 def _reply(provider: PhotonProvider, conversation_id: str, body: str) -> None:
     try:
         provider.send_message(conversation_id, body)
@@ -76,6 +106,7 @@ def analyze_and_reply(
     provider: PhotonProvider,
     tracker: DeliveryTracker,
     inbound_tracker: DeliveryTracker | None = None,
+    reservation_job_id: str | None = None,
 ) -> None:
     try:
         run_analysis(
@@ -95,7 +126,7 @@ def analyze_and_reply(
             and not tracker.has_record(conversation_id, job_id)
         ):
             # Retry only a confirmed early failure with no summary attempt, including no pending reservation.
-            inbound_tracker.release(conversation_id, job_id)
+            inbound_tracker.release(conversation_id, reservation_job_id or job_id)
         logger.warning(
             "Photon analysis %s failed at %s: %s",
             job_id,
@@ -156,7 +187,9 @@ async def photon_webhook(
     if not await run_in_threadpool(tracker.check_and_record, conversation_id, event_id):
         duplicate = {"status": "duplicate"}
         if url is not None:
-            duplicate["job_id"] = job_id_for(conversation_id, url)
+            duplicate["job_id"] = await run_in_threadpool(
+                tracker.get_message_id, conversation_id, event_id
+            ) or job_id_for(conversation_id, url)
         return JSONResponse(content=duplicate)
     if url is None:
         reply = canned_reply(message)
@@ -164,9 +197,16 @@ async def photon_webhook(
             await run_in_threadpool(_reply, provider, conversation_id, reply)
         return JSONResponse(content={"status": "needs_url"})
 
-    job_id = job_id_for(conversation_id, url)
-    if not await run_in_threadpool(tracker.check_and_record, conversation_id, job_id):
-        return JSONResponse(content={"status": "duplicate", "job_id": job_id})
+    reservation_job_id = job_id_for(conversation_id, url)
+    if not await run_in_threadpool(tracker.check_and_record, conversation_id, reservation_job_id):
+        return JSONResponse(content={"status": "duplicate", "job_id": reservation_job_id})
+    job_id = await run_in_threadpool(
+        retry_job_id, reservation_job_id, conversation_id, store, summary_tracker
+    )
+    if job_id is None:
+        return JSONResponse(content={"status": "duplicate", "job_id": reservation_job_id})
+    # Event replay reports its actual attempt; this metadata is not a send receipt.
+    await run_in_threadpool(tracker.record_message_id, conversation_id, event_id, job_id)
     background_tasks.add_task(
         analyze_and_reply,
         job_id,
@@ -176,6 +216,7 @@ async def photon_webhook(
         provider,
         summary_tracker,
         tracker,
+        reservation_job_id,
     )
     await run_in_threadpool(_reply, provider, conversation_id, ACK_REPLY)
     return JSONResponse(content={"status": "accepted", "job_id": job_id})
