@@ -43,7 +43,7 @@ def draft(evidence):
 
 @pytest.fixture
 def generated(monkeypatch):
-    generate = Mock(side_effect=lambda evidence: (draft(evidence), "gemini-test"))
+    generate = Mock(side_effect=lambda evidence, *_: (draft(evidence), "gemini-test"))
     monkeypatch.setattr(insights, "_generate", generate)
     return generate
 
@@ -111,7 +111,7 @@ def test_payload_is_bounded_and_stale_source_context_is_excluded(saved):
     assert {item["media_id"] for item in insights._evidence(report)["sentences"]} == {report.submitted.post.media.media_id}
 
 
-@pytest.mark.parametrize("change", ["fabricated_ref", "missing_source_ref", "too_verbose", "unsafe", "leak"])
+@pytest.mark.parametrize("change", ["fabricated_ref", "missing_source_ref", "too_verbose", "unsafe", "leak", "metadata", "uploader"])
 def test_gemini_response_rejects_fabricated_evidence_or_unsafe_prose(saved, monkeypatch, change):
     _, report = saved
     evidence = insights._evidence(report)
@@ -124,6 +124,10 @@ def test_gemini_response_rejects_fabricated_evidence_or_unsafe_prose(saved, monk
         response["summary"] = "word " * 31
     elif change == "unsafe":
         response["summary"] = "<script>text</script>"
+    elif change == "metadata":
+        response["context_gap"] = "According to the title provided by the channel, the speaker gives a keynote address."
+    elif change == "uploader":
+        response["summary"] = "Graduation Desk shares the commencement remarks."
     else:
         response["summary"] = "api_key=private"
     client = Mock()
@@ -131,7 +135,7 @@ def test_gemini_response_rejects_fabricated_evidence_or_unsafe_prose(saved, monk
     request = Mock(return_value=response)
     monkeypatch.setattr(insights, "generate_json", request)
     with pytest.raises(ValueError):
-        insights._generate(evidence)
+        insights._generate(evidence, ("Graduation Desk",))
     assert request.call_args.kwargs["max_attempts"] == 1
     client.close.assert_called_once()
 
@@ -286,7 +290,7 @@ def test_source_review_uses_only_sentences_in_supplied_context(saved):
     source_rows = [row for row in evidence["sentences"] if row["media_id"] == evidence["source_media_id"]]
     assert source_rows
     assert all((row["sentence_id"], row["text"], row["start_seconds"], row["end_seconds"]) in recorded for row in source_rows)
-    assert evidence["title"] == (report.submitted.post.title or "")[:300]
+    assert "title" not in evidence and "caption" not in evidence
 
 
 @pytest.mark.parametrize("change", ["unavailable", "stale_text", "outside_window"])
@@ -347,3 +351,10 @@ def test_green_review_uses_backend_owned_transcript_scope(saved, monkeypatch):
     assert generated.source_review.fact_check == "No obvious factual issue was identified in the reviewed excerpt. External facts and recording authenticity were not independently verified."
     assert generated.source_review.semantic == response["source_review"]["semantic"]
     assert generated.source_review.references
+
+
+def test_metadata_guard_allows_names_and_words_that_were_actually_spoken():
+    spoken = "we will build the channel together, said barack obama"
+    assert not insights._mentions_metadata("Barack Obama says they will build the channel.", spoken, ("Barack Obama",))
+    assert insights._mentions_metadata("CNN shows the speaker discussing hope.", spoken, ("CNN",))
+    assert insights._mentions_metadata("The video title frames this as a keynote.", spoken, ())
