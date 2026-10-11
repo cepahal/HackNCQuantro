@@ -18,14 +18,14 @@ export default function ReportAnalytics({ data, interpretation, interpretationSt
   const { metrics, wafer } = data;
   const contextText = interpretation?.status === "ready" ? interpretation.context_gap : data.contextText;
   const layers = [
-    { title: "Source-match confidence", value: wafer.confidence, note: "Strength of the recorded speech match, not a truth score." },
-    { title: "Word overlap", value: wafer.wordMatches ? `${wafer.wordMatches.matched}/${wafer.wordMatches.total} words` : "Unavailable",
+    { available: true, title: "Source-match confidence", value: wafer.confidence, note: "Strength of the recorded speech match, not a truth score." },
+    { available: wafer.wordMatches !== null, title: "Word overlap", value: wafer.wordMatches ? `${wafer.wordMatches.matched}/${wafer.wordMatches.total} words` : "Unavailable",
       note: "Exact token overlap in aligned transcript passages. Word order is not assessed." },
-    { title: "Splice assessment", value: wafer.sourceGaps === null ? "Not assessed" : `${wafer.sourceGaps} source ${wafer.sourceGaps === 1 ? "gap" : "gaps"}`,
+    { available: wafer.sourceGaps !== null, title: "Splice assessment", value: wafer.sourceGaps === null ? "Not assessed" : `${wafer.sourceGaps} source ${wafer.sourceGaps === 1 ? "gap" : "gaps"}`,
       note: "Source gaps can suggest cuts. They do not confirm a splice or manipulation." },
-    { title: "Detection limitations", value: wafer.limitations.length ? `${wafer.limitations.length} recorded` : "None recorded",
+    { available: wafer.limitations.length > 0, title: "Detection limitations", value: wafer.limitations.length ? `${wafer.limitations.length} recorded` : "None recorded",
       note: wafer.limitations.length ? wafer.limitations[0] : "No recorded limitations does not establish accuracy or authenticity." },
-  ];
+  ].filter(layer => layer.available);
   return <section className={styles.analytics} aria-label="Source analysis">
     <div className="max-w-3xl"><p className={styles.eyebrow}>The context</p>
       <p className={styles.context}>{contextText}</p>
@@ -35,14 +35,14 @@ export default function ReportAnalytics({ data, interpretation, interpretationSt
       {contextText && contextText.length > 260 && <details className={styles.fullReading}><summary>Read the full context analysis</summary><p>{contextText}</p></details>}
     </div>
     <dl className={`${styles.metrics} grid grid-cols-1 gap-6 sm:grid-cols-3`}>
-      <div><dt>Generation time</dt><dd>{metrics.generationSeconds === null ? "Unavailable" : `${metrics.generationSeconds.toFixed(1)}s`}</dd><p>Recorded pipeline time</p></div>
+      {metrics.generationSeconds !== null && <div><dt>Generation time</dt><dd>{metrics.generationSeconds.toFixed(1)}s</dd><p>Recorded pipeline time</p></div>}
       <div><dt>General summary</dt><dd className={styles.summary}>{interpretation?.status === "ready" ? interpretation.summary : metrics.summary}</dd></div>
-      <div><dt>Source context window</dt><dd className={styles.window}>{metrics.contextWindows.length
-        ? metrics.contextWindows.map((window, index) => <span key={index}>{time(window.start, true)} to {time(window.end, true)}</span>) : "Unavailable"}</dd><p>Requested transcript ranges, not guaranteed complete coverage</p></div>
+      {metrics.contextWindows.length > 0 && <div><dt>Source context window</dt><dd className={styles.window}>{metrics.contextWindows.length
+        ? metrics.contextWindows.map((window, index) => <span key={index}>{time(window.start, true)} to {time(window.end, true)}</span>) : "Unavailable"}</dd><p>Requested transcript ranges, not guaranteed complete coverage</p></div>}
     </dl>
-    <div className={styles.wafer} aria-label="Four layers of recorded evidence">
+    <div className={styles.wafer} aria-label="Recorded evidence">
       <div className={styles.stack} aria-hidden="true">
-        {[0, 1, 2, 3].map(index => <motion.div key={index} className={styles.disc}
+        {layers.map((layer, index) => <motion.div key={layer.title} className={styles.disc}
           style={{ top: `${index * 53}px`, zIndex: 4 - index }}
           animate={reducedMotion ? { y: 0 } : { y: [0, -4, 0] }}
           transition={{ duration: 5, repeat: Infinity, delay: index * .22, ease: "easeInOut" }}>
@@ -78,7 +78,7 @@ export function SourceOptions({ options, isVideoDetected, pendingUrl, error, onS
       {Array.from({ length: 4 }, (_, index) => {
         const option = options[index];
         return <button key={option?.url ?? index} type="button" className={styles.option}
-          disabled={!option || pendingUrl !== null} onClick={() => option && onSelect(option)}
+          hidden={!option} disabled={!option || pendingUrl !== null} onClick={() => option && onSelect(option)}
           aria-label={option ? `Recheck ${option.title}` : `Source option ${index + 1} unavailable`}>
           <span className={styles.optionIndex}>0{index + 1}</span><span>
             <span className={styles.optionTitle}>{option?.title ?? "No additional candidate recorded"}</span>

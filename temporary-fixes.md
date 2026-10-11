@@ -549,3 +549,11 @@ confidence, and three evidence-cited observations were produced. The deployed
 Vercel page visibly renders both recordings, both transcripts, matching times,
 context and findings. This proves recovery for this example, not universal
 accuracy, earliest-upload identity, media authenticity or full-video coverage.
+
+### 2026-10-11 splice export repair
+
+The classified YouTube automation-block fallback is restored after captions and native audio retrieval fail. It reuses the bounded Gemini reader, retains partial/estimated evidence labels, and continues the normal source resolver. A live retry of R0ukW4AzcSs returned HTTP 200, matched, and a retrievable report. This does not provide video bytes or independently verified timing.
+
+FFmpeg exports now accept valid container duration when stream duration is absent or N/A, and reject empty alignments before encoding. Safe diagnostics distinguish source-download, encoding, storage and timeout failures without exposing provider stderr or filesystem paths. Unavailable splice output, unrecorded generation time, unassessed splice metrics and empty candidate cards are hidden in the main results view; underlying diagnostics remain available.
+
+Verification: 52 focused backend tests passed, including real FFmpeg codec, label, synchronization and cleanup checks. Frontend presentation tests and TypeScript passed. A platform-blocked source still needs a downloadable permitted recording to produce a context MP4; transcript recovery alone cannot meet that dependency. The existing whole-recording download budget remains 100 MB.

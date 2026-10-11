@@ -95,3 +95,19 @@ def test_separate_matches_leave_source_gap_labeled_as_context(source, tmp_path):
             colors.append(image.convert('RGB').getpixel((23, 35)))
     assert colors[0][1] > colors[0][2] and colors[2][1] > colors[2][2]
     assert colors[1][2] > colors[1][1]
+
+
+@pytest.mark.parametrize("value", [None, "N/A", "nan", "inf", "0", "-1"])
+def test_duration_uses_container_when_stream_duration_is_unusable(value):
+    assert cv._duration({"duration": value}, {"format": {"duration": "8.0"}}) == 8.0
+
+
+def test_duration_rejects_missing_or_nonfinite_metadata():
+    with pytest.raises(ValueError, match="duration is unavailable"):
+        cv._duration({"duration": "N/A"}, {"format": {"duration": "nan"}})
+
+
+def test_empty_alignment_is_rejected_before_ffmpeg_encoding(source, tmp_path):
+    with pytest.raises(ValueError, match="No aligned passages"):
+        cv.encode(source, tmp_path / "empty.mp4", {"start_seconds": 0., "end_seconds": 7.}, N(matches=[]))
+    assert not (tmp_path / "empty.mp4").exists()

@@ -444,3 +444,23 @@ def test_low_confidence_never_exports_context_video(store, wired, monkeypatch):
     assert report['outcome'] == 'no_verified_match'
     assert report['context_video'] is None
     exporter.assert_not_awaited()
+
+
+@pytest.mark.parametrize("failure,reason", [
+    (run.StorageError("private storage details"), "context_storage_unavailable"),
+    (run.MediaDownloadError("auth_required", "private download details", CLIP), "context_source_media_unavailable"),
+    (QuantroError(ErrorCode.MEDIA_UNAVAILABLE, Stage.RETRIEVE_CANDIDATE_MEDIA), "context_source_media_unavailable"),
+    (TimeoutError("private timeout details"), "context_export_timeout"),
+    (run.subprocess.CalledProcessError(1, ["ffmpeg", "/tmp/private.mp4"], stderr="private secret"), "context_encoding_failed"),
+])
+def test_context_export_records_safe_failure_boundary(store, wired, monkeypatch, failure, reason):
+    monkeypatch.setenv("CONTEXT_VIDEO_ENABLED", "true")
+    monkeypatch.setattr(run.context_video.sentence_context, "model_counts", lambda *args: None)
+    monkeypatch.setattr(run.context_video, "export", AsyncMock(side_effect=failure))
+    result = run.run_analysis("job_export_diagnostic", CLIP, store=store)
+    events = store.get_diagnostics("job_export_diagnostic")
+    event = next(item for item in events if item["stage"] == "context_video")
+    assert event["data"]["reason"] == reason
+    assert event["data"]["exception_type"] != "Exception"
+    assert "private" not in json.dumps(event)
+    assert store.get_report(result.report_id)["outcome"] == "matched"

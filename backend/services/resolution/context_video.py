@@ -45,13 +45,27 @@ def _probe(path):
     return json.loads(_run(['ffprobe','-v','error','-show_streams','-show_format','-of','json',str(path)]).stdout)
 
 
+def _duration(stream, info):
+    """Some valid containers expose duration only at the format level."""
+    for value in (stream.get('duration'), info.get('format', {}).get('duration')):
+        try:
+            duration = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(duration) and duration > 0:
+            return duration
+    raise ValueError('Media duration is unavailable')
+
+
 def encode(source_path, output, selection, alignment):
     """One encode, continuous source audio/video, with timed labels burned in."""
     info = _probe(source_path)
     video = next((s for s in info['streams'] if s['codec_type']=='video'),None)
     if not video:
         raise ValueError('Source has no video stream')
-    duration = float(video.get('duration') or info['format']['duration'])
+    duration = _duration(video, info)
+    if not alignment.matches:
+        raise ValueError('No aligned passages are available for export')
     start, end = selection['start_seconds'], min(selection['end_seconds'],duration)
     first = min(m.source_start_seconds for m in alignment.matches)
     last = max(m.source_end_seconds for m in alignment.matches)
@@ -97,8 +111,8 @@ def encode(source_path, output, selection, alignment):
     streams = result['streams']
     v = next(s for s in streams if s['codec_type']=='video')
     a = next(s for s in streams if s['codec_type']=='audio')
-    actual = float(v['duration'])
-    if v['codec_name']!='h264' or a['codec_name']!='aac' or abs(actual-(end-start))>.1 or abs(actual-float(a['duration']))>.1:
+    actual = _duration(v, result)
+    if v['codec_name']!='h264' or a['codec_name']!='aac' or abs(actual-(end-start))>.1 or abs(actual-_duration(a, result))>.1:
         raise ValueError('Export failed stream verification')
     return actual
 

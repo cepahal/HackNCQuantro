@@ -5,12 +5,13 @@ import json
 import logging
 import os
 import re
+import subprocess
 import time
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlsplit
 
 from ..external_apis.retrieve_post import _validate_url
-from ..external_apis.tigerdata_storage import TigerDataPostStore
+from ..external_apis.tigerdata_storage import StorageError, TigerDataPostStore
 from ..reporting.build_report import build_report
 from ..reporting.save_report import (
     _report_url,
@@ -34,6 +35,7 @@ from .alignment import build_alignment, build_context
 from .analysis import compare_clip, interpret_clip
 from .candidates import CandidateSearchError, check_source_video, find_source_video
 from .diagnostics import DiagnosticCapture, media_snapshot, record
+from .download import MediaDownloadError
 from .media import resolve_media
 
 logger = logging.getLogger(__name__)
@@ -302,9 +304,29 @@ async def _build(job_id: str, url: str, store: TigerStore, *, source_url: str | 
                     store.touch_job(job_id)
                     context_asset = await context_video.export(chosen[0],chosen[2],context_selection)
                     record('context_video', 'completed', context_asset.model_dump(mode='json'))
-                except Exception:  # noqa: BLE001 - Export failure retains the source recording and saved analysis.
+                except Exception as exc:  # noqa: BLE001 - Export failure retains the source recording and saved analysis.
                     warnings.append('The labeled context video could not be exported or stored; the original source remains available.')
-                    record('context_video', 'unavailable', {'reason': 'Export or storage unavailable; original source retained.'})
+                    # Classify the failing boundary without publishing stderr, paths or credentials.
+                    reason = 'context_export_unavailable'
+                    details = {'reason': reason, 'exception_type': 'Exception'}
+                    if isinstance(exc, MediaDownloadError):
+                        reason = 'context_source_media_unavailable'
+                        details.update(exception_type='MediaDownloadError', stage=Stage.RETRIEVE_CANDIDATE_MEDIA.value,
+                                       code=exc.code if exc.code in {'auth_required', 'unavailable', 'format_unavailable', 'download_failed', 'file_too_large'} else 'download_failed')
+                    elif isinstance(exc, StorageError):
+                        reason = 'context_storage_unavailable'
+                        details.update(exception_type='StorageError', code=ErrorCode.STORAGE_FAILED.value)
+                    elif isinstance(exc, QuantroError):
+                        reason = 'context_source_media_unavailable'
+                        details.update(exception_type='QuantroError', code=exc.code.value, stage=exc.stage.value, retryable=exc.retryable)
+                    elif isinstance(exc, (subprocess.TimeoutExpired, TimeoutError)):
+                        reason = 'context_export_timeout'
+                        details.update(exception_type='TimeoutError', retryable=True)
+                    elif isinstance(exc, subprocess.CalledProcessError):
+                        reason = 'context_encoding_failed'
+                        details.update(exception_type='CalledProcessError')
+                    details['reason'] = reason
+                    record('context_video', 'unavailable', details)
         stage = Stage.COMPARE_CONTEXT_AND_CAPTION
         started = time.monotonic()
         comparison = compare_clip(post, features, chosen[3]) if chosen else None

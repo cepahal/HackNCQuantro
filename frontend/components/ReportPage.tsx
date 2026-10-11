@@ -126,7 +126,7 @@ export function ReportContent({ report, display, diagnostics, onRecheckCompleted
     : primaryLead || candidateMedia ? "This is the strongest available search lead. Its speech and surrounding context have not been verified against the excerpt."
       : "No source found does not establish whether the excerpt is accurate or unedited."}</p>
   </section>
-  <section className={styles.primarySource} aria-label="Spliced context video">
+  <section hidden={!verifiedSource || !report.context_video} className={styles.primarySource} aria-label="Spliced context video">
    <div className={styles.primaryHead}><h2>Clip in context</h2></div>
    {verifiedSource && report.context_video
     ? <div className={styles.primaryVideo}><ReportPlayer key={report.context_video.media_id}

@@ -286,3 +286,16 @@ test("the analytics view has four evidence layers and keeps source gaps separate
   assert.match(html, /do not confirm a splice/);
   assert.doesNotMatch(html, /0 splices detected|95% accurate/);
 });
+
+test("missing generated context stays hidden while submitted and matched recordings remain available", () => {
+  const value = report();
+  value.context_video = null;
+  value.alignment!.edit_analysis.status = "not_assessed";
+  const html = renderToStaticMarkup(createElement(ReportContent, {report:value,display:display(value)}));
+  const primary = html.slice(0, html.indexOf('aria-label="Analysis diagnostic output"'));
+  assert.match(primary, /<section hidden=""[^>]*aria-label="Spliced context video"/);
+  assert.match(primary, /aria-label="Submitted excerpt"/);
+  assert.match(primary, /aria-label="Matched source recording"/);
+  assert.equal((primary.match(/<video/g) ?? []).length, 2);
+  assert.doesNotMatch(primary, /Splice assessment|Generation time/);
+});
